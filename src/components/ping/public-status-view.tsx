@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Activity, CalendarClock, RefreshCw } from "lucide-react";
+import { Activity, AlertTriangle, CalendarClock, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { api, ApiError, formatMs, formatUptime, timeAgo } from "@/lib/ping-client";
-import type { DailyBucket, PublicStatusMonitor, PublicStatusResponse } from "@/lib/ping-types";
+import { api, ApiError, formatDateTime, formatDuration, formatMs, formatUptime, timeAgo } from "@/lib/ping-client";
+import type { DailyBucket, PublicIncident, PublicStatusMonitor, PublicStatusResponse } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
 import { StatusDot } from "./status-dot";
@@ -134,6 +134,11 @@ export function PublicStatusView({ token }: { token: string }) {
             >
               <StatusDot status={banner.dot} pulse={banner.dot === "up" || banner.dot === "down"} />
               <div className="min-w-0">
+                {data.title && (
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    {data.title}
+                  </p>
+                )}
                 <h1 className="text-lg font-semibold leading-snug">{banner.headline}</h1>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {summary && summary.total > 0 ? (
@@ -166,6 +171,17 @@ export function PublicStatusView({ token }: { token: string }) {
                   <MonitorRow key={m.id} monitor={m} now={now} />
                 ))}
               </div>
+            )}
+
+            {/* incidents (derived from real checks only) */}
+            {data.incidents.length > 0 ? (
+              <IncidentList incidents={data.incidents} now={now} />
+            ) : (
+              data.monitors.length > 0 && (
+                <div className="rounded-xl border bg-card/60 px-4 py-3 text-xs text-muted-foreground">
+                  No incidents recorded in the last 30 days.
+                </div>
+              )
             )}
 
             <p className="pt-1 text-center text-[11px] leading-relaxed text-muted-foreground">
@@ -289,6 +305,55 @@ function MonitorRow({ monitor, now }: { monitor: PublicStatusMonitor; now: numbe
         )}
       </div>
     </article>
+  );
+}
+
+/** 30 calendar-day strip ending today. Grey = no recorded checks that day. */
+function IncidentList({ incidents, now }: { incidents: PublicIncident[]; now: number }) {
+  return (
+    <section className="ping-fade-up rounded-xl border bg-card p-4">
+      <h2 className="flex items-center gap-2 text-sm font-semibold">
+        <AlertTriangle className="size-4 text-down/90" aria-hidden="true" />
+        Incidents <span className="font-normal text-muted-foreground">· last 30 days</span>
+      </h2>
+      <ul className="mt-3 divide-y divide-border">
+        {incidents.map((inc, i) => {
+          const started = new Date(inc.startedAt);
+          const ended = inc.endedAt ? new Date(inc.endedAt) : null;
+          const durationMs = (ended ? ended.getTime() : now) - started.getTime();
+          return (
+            <li key={`${inc.monitorId}-${inc.startedAt}-${i}`} className="py-2.5 first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span className="text-sm font-medium text-foreground">{inc.monitorName}</span>
+                {ended ? (
+                  <span className="text-xs text-muted-foreground">resolved</span>
+                ) : (
+                  <span className="rounded-full border border-down/40 bg-down/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-down">
+                    ongoing
+                  </span>
+                )}
+                <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+                  {formatDuration(Math.round(durationMs / 1000))}
+                </span>
+              </div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                <span>started {formatDateTime(inc.startedAt)}</span>
+                <span>
+                  {inc.downChecks} failed check{inc.downChecks === 1 ? "" : "s"}
+                </span>
+                {inc.lastStatusCode != null && (
+                  <span className="tabular-nums">HTTP {inc.lastStatusCode}</span>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-2.5 text-[10px] leading-relaxed text-muted-foreground/80">
+        Incidents are stitched from recorded checks — consecutive failed checks count as one
+        incident. Gaps with no recorded data never count as downtime.
+      </p>
+    </section>
   );
 }
 

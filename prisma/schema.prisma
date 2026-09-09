@@ -80,11 +80,29 @@ model Session {
   createdAt DateTime @default(now())
 }
 
+// A webhook endpoint notified when a monitor goes down or recovers.
+// Each event is one fire-and-forget POST (10s timeout, no retries) —
+// lastDelivery* fields record the honest outcome of the latest attempt.
+model WebhookChannel {
+  id             String    @id @default(cuid())
+  name           String
+  url            String
+  notifyDown     Boolean   @default(true)
+  notifyUp       Boolean   @default(true)
+  enabled        Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  deliveries     Int       @default(0)
+  lastDeliveryAt DateTime?
+  lastOk         Boolean?
+  lastError      String?
+}
+
 // Singleton row holding app settings (id = "main")
 model Settings {
   id           String   @id @default("main")
   passwordHash String
   passwordSalt String
   statusToken  String? // public status-page token; null = page disabled
+  statusTitle  String? // optional custom title shown on the public status page
   updatedAt    DateTime @updatedAt
 }

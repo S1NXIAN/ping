@@ -408,7 +408,7 @@ export function DashboardView({
             <Button
               size="sm"
               onClick={() => setAddOpen(true)}
-              className="hidden bg-white font-semibold text-black hover:bg-zinc-200 sm:inline-flex"
+              className="hidden bg-white font-semibold text-black shadow-sm transition-transform hover:bg-zinc-200 active:scale-[0.98] sm:inline-flex"
             >
               <Plus className="size-4" /> New monitor
             </Button>
@@ -423,10 +423,10 @@ export function DashboardView({
           <button
             onClick={() => setActiveFolder("all")}
             className={cn(
-              "flex items-center gap-2 rounded-md px-2.5 py-2 text-sm transition-colors",
+              "flex items-center gap-2 rounded-md border-l-2 px-2.5 py-2 text-sm transition-colors",
               activeFolder === "all"
-                ? "bg-secondary font-medium text-foreground"
-                : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
+                ? "border-primary bg-secondary font-medium text-foreground"
+                : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
             )}
           >
             <LayoutGrid className="size-4" aria-hidden="true" />
@@ -444,10 +444,10 @@ export function DashboardView({
                 <button
                   onClick={() => setActiveFolder(f.id)}
                   className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm transition-colors",
+                    "flex w-full items-center gap-2 rounded-md border-l-2 px-2.5 py-2 text-sm transition-colors",
                     active
-                      ? "bg-secondary font-medium text-foreground"
-                      : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
+                      ? "border-primary bg-secondary font-medium text-foreground"
+                      : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
                   )}
                 >
                   <Folder className={cn("size-4", s?.down ? "text-down" : "text-muted-foreground")} aria-hidden="true" />
@@ -573,7 +573,7 @@ export function DashboardView({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search…"
                 title="Search by name, URL, folder, or account"
-                className="pl-9"
+                className="border-border/70 pl-9 focus-visible:border-primary/40 focus-visible:ring-primary/20"
                 aria-label="Search monitors"
               />
               {query && (
@@ -734,7 +734,7 @@ export function DashboardView({
       {/* footer */}
       <footer className="sticky bottom-0 z-30 mt-auto border-t bg-background/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[11px] text-muted-foreground">
-          <span className="font-medium text-foreground/70">PING</span>
+          <span className="font-medium tracking-wide text-foreground/80">PING</span>
           <span>honest uptime for Render Free</span>
           <span className="ml-auto flex items-center gap-3">
             <span>not affiliated with render.com</span>

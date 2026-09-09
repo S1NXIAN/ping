@@ -124,6 +124,17 @@ export interface PublicStatusMonitor {
   daily: DailyBucket[]; // days with recorded checks only
 }
 
+/** A down period on the public status page, derived from recorded checks. */
+export interface PublicIncident {
+  monitorId: string;
+  monitorName: string;
+  startedAt: string;
+  /** Null while the incident is still ongoing. */
+  endedAt: string | null;
+  downChecks: number;
+  lastStatusCode: number | null;
+}
+
 export interface PublicStatusResponse {
   monitors: PublicStatusMonitor[];
   summary: {
@@ -134,6 +145,10 @@ export interface PublicStatusResponse {
     pending: number;
     lastCheckAt: string | null;
   };
+  /** Custom title set by the admin, null when unset. */
+  title: string | null;
+  /** Down periods in the last 30 days, newest first (derived from real checks). */
+  incidents: PublicIncident[];
   serverTime: string;
 }
 
@@ -141,6 +156,23 @@ export interface PublicStatusResponse {
 export interface StatusPageInfoResponse {
   enabled: boolean;
   token: string | null;
+  /** Custom title shown on the public status page (null = default). */
+  title: string | null;
+}
+
+/** A webhook endpoint notified when a monitor goes down or recovers. */
+export interface WebhookChannelDTO {
+  id: string;
+  name: string;
+  url: string;
+  notifyDown: boolean;
+  notifyUp: boolean;
+  enabled: boolean;
+  createdAt: string;
+  deliveries: number;
+  lastDeliveryAt: string | null;
+  lastOk: boolean | null;
+  lastError: string | null;
 }
 
 export interface RenderStatusResponse {

@@ -2,6 +2,7 @@
 // Nothing here simulates or estimates anything.
 import type { Monitor } from "@prisma/client";
 import { db } from "./db";
+import { fireWebhooks, isTransition } from "./webhooks";
 
 export const CHECK_TIMEOUT_MS = 15_000;
 export const MAX_CONCURRENCY = 5;
@@ -47,6 +48,7 @@ function describeError(e: unknown): string {
 
 /** Runs one real HTTP check and persists the result. */
 export async function runCheck(monitor: Monitor) {
+  const previousStatus = monitor.lastStatus; // captured BEFORE the check runs
   const started = performance.now();
   let status: "up" | "down" = "down";
   let statusCode: number | null = null;
@@ -101,6 +103,17 @@ export async function runCheck(monitor: Monitor) {
       lastError: error ? error.slice(0, 200) : null,
     },
   });
+  // Notify webhook channels on up↔down transitions (fire-and-forget, never throws).
+  const event = isTransition(previousStatus, status);
+  if (event) {
+    void fireWebhooks(event, monitor, {
+      status,
+      statusCode,
+      responseMs,
+      error: error ? error.slice(0, 200) : null,
+      checkedAt: check.checkedAt.toISOString(),
+    });
+  }
   return check;
 }
 

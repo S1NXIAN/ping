@@ -36,6 +36,7 @@ import {
 } from "@/lib/ping-client";
 import type { AdminInfoResponse, ImportResult, StatusPageInfoResponse } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
+import { NotificationsSection } from "./notifications-section";
 import { RenderStatusCard } from "./render-status-card";
 
 const GH_ACTIONS_YAML = `name: PING keep-alive
@@ -119,6 +120,8 @@ export function AdminView({
   // --- public status page ---
   const [statusPage, setStatusPage] = useState<StatusPageInfoResponse | null>(null);
   const [spBusy, setSpBusy] = useState<string | null>(null);
+  const [titleDraft, setTitleDraft] = useState("");
+  const [titleDirty, setTitleDirty] = useState(false);
 
   const statusUrl =
     statusPage?.enabled && statusPage.token
@@ -153,25 +156,30 @@ export function AdminView({
 
   const loadStatusPage = useCallback(async () => {
     try {
-      setStatusPage(await api<StatusPageInfoResponse>("/api/admin/status-page"));
+      const r = await api<StatusPageInfoResponse>("/api/admin/status-page");
+      setStatusPage(r);
+      if (!titleDirty) setTitleDraft(r.title ?? "");
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.message.startsWith("Admin locked")) onExpired();
         else if (err.message === "Unauthorized") onAuthLost();
       }
     }
-  }, [onExpired, onAuthLost]);
+  }, [onExpired, onAuthLost, titleDirty]);
 
   useEffect(() => {
     loadStatusPage();
   }, [loadStatusPage]);
 
-  async function statusPageAction(action: "enable" | "disable" | "regenerate") {
+  async function statusPageAction(
+    action: "enable" | "disable" | "regenerate" | "title",
+    title?: string,
+  ) {
     setSpBusy(action);
     try {
       const r = await api<StatusPageInfoResponse>("/api/admin/status-page", {
         method: "POST",
-        body: JSON.stringify({ action }),
+        body: JSON.stringify(action === "title" ? { action, title: title ?? null } : { action }),
       });
       setStatusPage(r);
       toast({
@@ -180,7 +188,11 @@ export function AdminView({
             ? "Status page disabled — the public link now returns “not found”"
             : action === "regenerate"
               ? "New link generated — old links no longer work"
-              : "Status page enabled",
+              : action === "title"
+                ? title
+                  ? "Custom title saved"
+                  : "Custom title cleared"
+                : "Status page enabled",
       });
     } catch (err) {
       toast({
@@ -389,6 +401,9 @@ export function AdminView({
             </form>
           </Section>
 
+          {/* Notifications */}
+          <NotificationsSection onExpired={onExpired} onAuthLost={onAuthLost} />
+
           {/* Keep awake */}
           <Section
             icon={HeartPulse}
@@ -569,6 +584,45 @@ export function AdminView({
                 </Button>
               </>
             )}
+
+            {/* custom title (works whether the page is on or off) */}
+            <div className="space-y-1.5 border-t pt-3.5">
+              <Label htmlFor="sp-title" className="text-xs">
+                Custom page title <span className="text-muted-foreground/70">(optional)</span>
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="sp-title"
+                  value={titleDraft}
+                  maxLength={60}
+                  placeholder="e.g. Acme Corp — service status"
+                  onChange={(e) => {
+                    setTitleDraft(e.target.value);
+                    setTitleDirty(true);
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 shrink-0"
+                  disabled={spBusy != null}
+                  onClick={() => {
+                    setTitleDirty(false);
+                    void statusPageAction("title", titleDraft.trim() || null);
+                  }}
+                >
+                  {spBusy === "title" ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    "Save"
+                  )}
+                </Button>
+              </div>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Shown as a small label above the banner on the public page. Clear the field and save
+                to remove it.
+              </p>
+            </div>
           </Section>
 
           {/* Render Free facts */}

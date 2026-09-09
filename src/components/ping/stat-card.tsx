@@ -27,7 +27,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "rounded-lg border bg-card px-3.5 py-3 transition-colors hover:border-border/70",
+        "rounded-lg border bg-card px-3.5 py-3 transition-colors hover:border-primary/25 hover:bg-card/60",
         className,
       )}
     >
