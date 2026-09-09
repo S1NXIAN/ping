@@ -9,6 +9,7 @@ import { LoginView } from "./login-view";
 import { DashboardView } from "./dashboard-view";
 import { AdminView } from "./admin-view";
 import { UnlockDialog } from "./unlock-dialog";
+import { PublicStatusView } from "./public-status-view";
 
 type Phase = "booting" | "login" | "app";
 
@@ -23,10 +24,21 @@ export function PingApp() {
   const [unlockExpiresAt, setUnlockExpiresAt] = useState<string | null>(null);
   const [unlockPromptOpen, setUnlockPromptOpen] = useState(false);
 
+  // Public status page: `/?status=<token>` renders a read-only view with
+  // no session logic at all. Detected in an effect (not a lazy initializer)
+  // so SSR and the first client render agree — no hydration mismatch.
+  const [publicToken, setPublicToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("status");
+    if (t) setPublicToken(t);
+  }, []);
+
   const adminUnlocked =
     !!unlockExpiresAt && new Date(unlockExpiresAt).getTime() > Date.now();
 
   useEffect(() => {
+    if (publicToken) return; // public mode skips session boot entirely
     let cancelled = false;
     (async () => {
       try {
@@ -46,7 +58,7 @@ export function PingApp() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [publicToken]);
 
   // Auto-lock: when the 15-minute unlock expires, drop it. If the user is
   // sitting in Settings, bounce them back to the dashboard and say why.
@@ -105,6 +117,10 @@ export function PingApp() {
     setUnlockExpiresAt(null);
     setView("dashboard");
     setPhase("login");
+  }
+
+  if (publicToken) {
+    return <PublicStatusView token={publicToken} />;
   }
 
   if (phase === "booting") {

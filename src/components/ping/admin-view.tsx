@@ -4,14 +4,19 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Clock,
+  Copy,
   Database,
   Download,
+  Eye,
   FileUp,
+  Globe,
   HeartPulse,
   KeyRound,
+  Link2,
   Loader2,
   LockKeyhole,
   LockOpen,
+  RefreshCw,
   Server,
   ShieldCheck,
 } from "lucide-react";
@@ -29,7 +34,7 @@ import {
   formatMs,
   timeAgo,
 } from "@/lib/ping-client";
-import type { AdminInfoResponse, ImportResult } from "@/lib/ping-types";
+import type { AdminInfoResponse, ImportResult, StatusPageInfoResponse } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { RenderStatusCard } from "./render-status-card";
 
@@ -111,6 +116,15 @@ export function AdminView({
   // --- keep-awake URL (computed client-side to match this deployment) ---
   const [tickUrl, setTickUrl] = useState("");
 
+  // --- public status page ---
+  const [statusPage, setStatusPage] = useState<StatusPageInfoResponse | null>(null);
+  const [spBusy, setSpBusy] = useState<string | null>(null);
+
+  const statusUrl =
+    statusPage?.enabled && statusPage.token
+      ? `${typeof window !== "undefined" ? window.location.origin : ""}/?status=${statusPage.token}`
+      : "";
+
   // --- import ---
   const [importing, setImporting] = useState(false);
   const [fileInput, setFileInput] = useState<HTMLInputElement | null>(null);
@@ -136,6 +150,47 @@ export function AdminView({
   useEffect(() => {
     if (unlockExpiresAt && unlockMsLeft <= 0) onExpired();
   }, [unlockExpiresAt, unlockMsLeft, onExpired]);
+
+  const loadStatusPage = useCallback(async () => {
+    try {
+      setStatusPage(await api<StatusPageInfoResponse>("/api/admin/status-page"));
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.message.startsWith("Admin locked")) onExpired();
+        else if (err.message === "Unauthorized") onAuthLost();
+      }
+    }
+  }, [onExpired, onAuthLost]);
+
+  useEffect(() => {
+    loadStatusPage();
+  }, [loadStatusPage]);
+
+  async function statusPageAction(action: "enable" | "disable" | "regenerate") {
+    setSpBusy(action);
+    try {
+      const r = await api<StatusPageInfoResponse>("/api/admin/status-page", {
+        method: "POST",
+        body: JSON.stringify({ action }),
+      });
+      setStatusPage(r);
+      toast({
+        description:
+          action === "disable"
+            ? "Status page disabled — the public link now returns “not found”"
+            : action === "regenerate"
+              ? "New link generated — old links no longer work"
+              : "Status page enabled",
+      });
+    } catch (err) {
+      toast({
+        description: err instanceof Error ? err.message : "Action failed",
+        variant: "destructive",
+      });
+    } finally {
+      setSpBusy(null);
+    }
+  }
 
   const loadInfo = useCallback(async () => {
     try {
@@ -406,6 +461,114 @@ export function AdminView({
               </ul>
               {freeHours}
             </div>
+          </Section>
+
+          {/* Public status page */}
+          <Section
+            icon={Globe}
+            title="Public status page"
+            description="Share a read-only link that shows monitor names, live statuses, and 30-day uptime — no login required. URLs, accounts, and folders are never exposed; monitors can be excluded individually from their ⋮ menu."
+          >
+            {statusPage == null ? (
+              <div className="h-16 animate-pulse rounded-lg border bg-muted/30" />
+            ) : statusPage.enabled ? (
+              <>
+                <div className="flex items-center gap-2 rounded-lg border border-up/25 bg-up/10 px-3 py-2.5 text-sm text-up">
+                  <span className="relative flex size-2.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-up opacity-60" />
+                    <span className="relative inline-flex size-2.5 rounded-full bg-up" />
+                  </span>
+                  Status page is live
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="ml-auto h-8 bg-card"
+                    onClick={() => statusUrl && window.open(statusUrl, "_blank", "noopener")}
+                    aria-label="Open the public status page in a new tab"
+                  >
+                    <Eye className="size-3.5" /> Preview
+                  </Button>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Public link (share this)
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <code className="min-w-0 flex-1 truncate rounded-md border bg-muted/40 px-2.5 py-2 text-xs text-foreground/90">
+                      {statusUrl || "…"}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="shrink-0"
+                      onClick={() => onCopy(statusUrl, "Status-page link")}
+                      aria-label="Copy status page link"
+                    >
+                      <Copy className="size-4" />
+                    </Button>
+                  </div>
+                  <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Link2 className="size-3 shrink-0" aria-hidden="true" />
+                    Anyone with this link sees monitor names, statuses and uptime — nothing else.
+                    The token is 192-bit random and unguessable.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => statusPageAction("regenerate")}
+                    disabled={spBusy != null}
+                  >
+                    {spBusy === "regenerate" ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="size-3.5" />
+                    )}
+                    New link
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-down hover:text-down"
+                    onClick={() => statusPageAction("disable")}
+                    disabled={spBusy != null}
+                  >
+                    {spBusy === "disable" ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <LockKeyhole className="size-3.5" />
+                    )}
+                    Disable page
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
+                  <LockKeyhole className="size-4 shrink-0" aria-hidden="true" />
+                  The status page is off — no public link exists right now.
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => statusPageAction("enable")}
+                  disabled={spBusy != null}
+                  className="bg-white font-semibold text-black hover:bg-zinc-200"
+                >
+                  {spBusy === "enable" ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" /> Enabling…
+                    </>
+                  ) : (
+                    <>
+                      <Globe className="size-3.5" /> Enable public status page
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
           </Section>
 
           {/* Render Free facts */}

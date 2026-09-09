@@ -24,6 +24,11 @@ and no uptime number is ever shown for a window PING didn't actually measure.
   (“ping my deploy at 09:00”). The scheduler fires it, records the result in
   the monitor's history, and shows it in a dedicated sheet with countdowns,
   notes, and results. Cancel anytime before it fires.
+- **Public status page** — opt in from Settings to get a secret, shareable
+  link (`/?status=<token>`, 192-bit) that shows monitor names, live statuses,
+  7d/30d uptime and a 30-day per-day bar strip — read-only, no login, no
+  URLs or accounts exposed. Regenerate or disable the link anytime; hide
+  individual monitors from their ⋮ menu.
 - **Real health checks** — the server performs the request with a 15 s timeout,
   records status code, response time, and the exact error on failures. History
   is kept for 30 days (capped at 1 000 checks per monitor).

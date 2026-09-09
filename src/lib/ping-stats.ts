@@ -227,6 +227,7 @@ export function toMonitorDTO(
     account: monitor.account ?? null,
     pinned: monitor.pinned,
     position: monitor.position,
+    statusHidden: monitor.statusHidden,
     createdAt: monitor.createdAt.toISOString(),
     lastCheckAt: monitor.lastCheckAt?.toISOString() ?? null,
     lastStatus:

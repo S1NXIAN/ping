@@ -46,6 +46,8 @@ export interface MonitorDTO {
   account: string | null;
   pinned: boolean;
   position: number;
+  /** Excluded from the public status page when true. */
+  statusHidden: boolean;
   createdAt: string;
   lastCheckAt: string | null;
   lastStatus: "up" | "down" | null;
@@ -106,6 +108,40 @@ export interface MonitorDetailResponse {
 }
 
 export type RenderIndicator = "none" | "minor" | "major" | "critical" | "unknown";
+
+/** Monitor as it appears on the public status page (no URL, no account). */
+export interface PublicStatusMonitor {
+  id: string;
+  name: string;
+  status: "up" | "down" | "paused" | "pending";
+  uptime24h: number | null;
+  uptime7d: number | null;
+  uptime30d: number | null;
+  avgMs24h: number | null;
+  lastCheckAt: string | null;
+  lastStatusCode: number | null;
+  lastDownAt: string | null;
+  daily: DailyBucket[]; // days with recorded checks only
+}
+
+export interface PublicStatusResponse {
+  monitors: PublicStatusMonitor[];
+  summary: {
+    total: number;
+    up: number;
+    down: number;
+    paused: number;
+    pending: number;
+    lastCheckAt: string | null;
+  };
+  serverTime: string;
+}
+
+/** Admin-facing status-page state (token only shown to an unlocked admin). */
+export interface StatusPageInfoResponse {
+  enabled: boolean;
+  token: string | null;
+}
 
 export interface RenderStatusResponse {
   ok: boolean;

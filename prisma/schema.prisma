@@ -28,6 +28,7 @@ model Monitor {
   account        String? // optional label: which account/org runs this service
   pinned         Boolean   @default(false) // pinned monitors float to the top
   position       Int       @default(0) // manual order, ascending (within pinned/unpinned groups)
+  statusHidden   Boolean   @default(false) // excluded from the public status page
   createdAt      DateTime  @default(now())
   lastCheckAt    DateTime?
   lastStatus     String? // "up" | "down"
@@ -84,5 +85,6 @@ model Settings {
   id           String   @id @default("main")
   passwordHash String
   passwordSalt String
+  statusToken  String? // public status-page token; null = page disabled
   updatedAt    DateTime @updatedAt
 }
