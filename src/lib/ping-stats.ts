@@ -258,6 +258,8 @@ export function toMonitorDTO(
     pinned: monitor.pinned,
     position: monitor.position,
     statusHidden: monitor.statusHidden,
+    keyword: monitor.keyword ?? null,
+    keywordMode: monitor.keywordMode === "excludes" ? "excludes" : "contains",
     slowThresholdMs: monitor.slowThresholdMs ?? null,
     alertDelay: monitor.alertDelay ?? 0,
     consecutiveDowns: monitor.consecutiveDowns ?? 0,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
+import { KEYWORD_MAX_LENGTH } from "@/lib/checker";
 import { dailyBuckets, toCheckDTO, toMonitorDTO, p95For, emptyStats } from "@/lib/ping-stats";
 import type { MonitorDetailResponse } from "@/lib/ping-types";
 
@@ -119,6 +120,14 @@ const patchSchema = z.object({
   pinned: z.boolean().optional(),
   statusHidden: z.boolean().optional(),
   account: z.string().trim().max(60, "Account label is too long (60 chars max)").nullish(),
+  /** Keyword check: body must contain (or not contain) this string; null clears (off). */
+  keyword: z
+    .string()
+    .trim()
+    .min(1, "Keyword cannot be empty — clear the field to turn the check off")
+    .max(KEYWORD_MAX_LENGTH, `Keyword is too long (${KEYWORD_MAX_LENGTH} chars max)`)
+    .nullish(),
+  keywordMode: z.enum(["contains", "excludes"]).optional(),
   /** Latency-alert threshold in ms; null clears (off). */
   slowThresholdMs: z
     .number()
@@ -155,7 +164,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const data: Record<string, unknown> = {};
-  const { name, url, folderId, intervalSec, enabled, method, pinned, statusHidden, account, slowThresholdMs, alertDelay } = parsed.data;
+  const { name, url, folderId, intervalSec, enabled, method, pinned, statusHidden, account, keyword, keywordMode, slowThresholdMs, alertDelay } = parsed.data;
   if (name !== undefined) data.name = name;
   if (url !== undefined) data.url = url;
   if (intervalSec !== undefined) data.intervalSec = intervalSec;
@@ -168,6 +177,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     data.alertDelay = alertDelay;
     // A changed confirmation policy makes the old streak meaningless.
     data.consecutiveDowns = 0;
+  }
+  // absent → untouched; null or "" → off; string → set. A changed keyword
+  // (or mode) re-targets the check semantics, so the failure streak resets —
+  // the same rule a URL change follows.
+  if (keyword !== undefined) {
+    data.keyword = keyword === "" ? null : keyword ?? null;
+    if ((data.keyword ?? null) !== (monitor.keyword ?? null)) data.consecutiveDowns = 0;
+  }
+  if (keywordMode !== undefined) {
+    data.keywordMode = keywordMode;
+    if (keywordMode !== monitor.keywordMode && monitor.keyword) data.consecutiveDowns = 0;
   }
   // A new target is a fresh start — the old failure streak must not count
   // against (or for) the new URL.

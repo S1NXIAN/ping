@@ -22,6 +22,7 @@ import {
   PinOff,
   Play,
   RefreshCw,
+  ScanSearch,
   Trash2,
   UserRound,
   Wrench,
@@ -392,6 +393,21 @@ export function MonitorCard({
                 >
                   <UserRound className="size-2.5" aria-hidden="true" />
                   {monitor.account}
+                </span>
+              )}
+              {monitor.keyword && (
+                <span
+                  title={
+                    monitor.keywordMode === "excludes"
+                      ? `Keyword check — the response must NOT contain “${monitor.keyword}” (case-insensitive, first 256 KB)`
+                      : `Keyword check — the response must contain “${monitor.keyword}” (case-insensitive, first 256 KB)`
+                  }
+                  className="inline-flex max-w-52 items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-1.5 py-px text-[10px] text-primary/90"
+                >
+                  <ScanSearch className="size-2.5 shrink-0" aria-hidden="true" />
+                  <span className="truncate">
+                    {monitor.keywordMode === "excludes" ? "no" : "has"} “{monitor.keyword}”
+                  </span>
                 </span>
               )}
               {status === "down" &&

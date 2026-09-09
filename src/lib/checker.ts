@@ -12,6 +12,9 @@ export const SCHEDULED_PING_RETENTION_DAYS = 7;
 export const MAINTENANCE_RETENTION_DAYS = 7;
 export const MAX_WINDOWS_PER_MONITOR = 10;
 export const MAX_WINDOWS_TOTAL = 50;
+/** How much of a response body a keyword check is willing to read. */
+export const KEYWORD_BODY_LIMIT_BYTES = 256 * 1024;
+export const KEYWORD_MAX_LENGTH = 200;
 
 export interface TickResult {
   ran: number;
@@ -57,6 +60,65 @@ export async function isUnderMaintenance(monitorId: string, now = new Date()): P
   return n > 0;
 }
 
+/**
+ * Reads at most `limit` bytes of a response body as text (streamed, so a
+ * huge body never gets fully buffered). Binary bodies decode lossily — that
+ * is fine: keyword search still works over the decodable parts.
+ */
+async function readBodyUpTo(res: Response, limit: number): Promise<string> {
+  const reader = res.body?.getReader();
+  if (!reader) return "";
+  const decoder = new TextDecoder();
+  let text = "";
+  let bytes = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        bytes += value.byteLength;
+        text += decoder.decode(value, { stream: true });
+        if (bytes >= limit) {
+          try {
+            await reader.cancel();
+          } catch {
+            /* ignore */
+          }
+          break;
+        }
+      }
+    }
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      /* ignore */
+    }
+  }
+  return text;
+}
+
+/**
+ * Keyword evaluation — case-insensitive substring test over the first
+ * 256 KB of the body. Returns null when the check passes (no error) or a
+ * human-readable failure reason.
+ */
+function keywordFailure(
+  mode: string,
+  keyword: string,
+  body: string,
+): string | null {
+  const hay = body.toLowerCase();
+  const needle = keyword.toLowerCase();
+  const found = hay.includes(needle);
+  if (mode === "excludes") {
+    return found
+      ? `Response contains the excluded keyword “${keyword}”`
+      : null;
+  }
+  return found ? null : `Keyword “${keyword}” not found in the response`;
+}
+
 /** Runs one real HTTP check and persists the result. */
 export async function runCheck(monitor: Monitor) {
   const previousStatus = monitor.lastStatus; // captured BEFORE the check runs
@@ -65,9 +127,14 @@ export async function runCheck(monitor: Monitor) {
   let statusCode: number | null = null;
   let error: string | null = null;
 
+  // A keyword check needs a response body, so it always fetches with GET —
+  // a HEAD response legitimately has none.
+  const keyword = monitor.keyword?.trim() || null;
+  const method = keyword ? "GET" : monitor.method;
+
   try {
     const res = await fetch(monitor.url, {
-      method: monitor.method,
+      method,
       redirect: "follow",
       cache: "no-store",
       signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
@@ -79,15 +146,26 @@ export async function runCheck(monitor: Monitor) {
     statusCode = res.status;
     if (res.status >= 200 && res.status < 400) {
       status = "up";
+      if (keyword) {
+        // Body read stays inside the check timeout (same AbortSignal) and
+        // any transport error while reading marks the check down honestly.
+        const body = await readBodyUpTo(res, KEYWORD_BODY_LIMIT_BYTES);
+        const kwError = keywordFailure(monitor.keywordMode, keyword, body);
+        if (kwError) {
+          status = "down";
+          error = kwError;
+        }
+      } else {
+        // Release the body without fully downloading it — status line is enough.
+        try {
+          await res.body?.cancel();
+        } catch {
+          /* ignore */
+        }
+      }
     } else {
       status = "down";
       error = `HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ""}`;
-    }
-    // Release the body without fully downloading it — status line is enough.
-    try {
-      await res.body?.cancel();
-    } catch {
-      /* ignore */
     }
   } catch (e) {
     status = "down";

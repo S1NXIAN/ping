@@ -29,6 +29,12 @@ model Monitor {
   pinned         Boolean   @default(false) // pinned monitors float to the top
   position       Int       @default(0) // manual order, ascending (within pinned/unpinned groups)
   statusHidden   Boolean   @default(false) // excluded from the public status page
+  // Optional keyword check: after a 2xx/3xx response, the (up to 256 KB of
+  // the) body must contain — or must not contain — this case-insensitive
+  // string for the monitor to count as up. Keyword checks always fetch with
+  // GET (a HEAD response has no body). null = keyword checking off.
+  keyword     String?
+  keywordMode String  @default("contains") // "contains" | "excludes"
   // Optional latency-alert threshold in ms. When an UP check takes longer
   // than this, the monitor shows a "slow/degraded" state and (optionally)
   // fires a "slow" webhook. null = latency alerting off for this monitor.

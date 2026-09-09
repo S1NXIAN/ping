@@ -32,6 +32,8 @@ export async function GET(req: NextRequest) {
       intervalSec: m.intervalSec,
       enabled: m.enabled,
       account: m.account,
+      keyword: m.keyword,
+      keywordMode: m.keywordMode,
       slowThresholdMs: m.slowThresholdMs,
       alertDelay: m.alertDelay,
       folder: folders.find((f) => f.id === m.folderId)?.name ?? null,

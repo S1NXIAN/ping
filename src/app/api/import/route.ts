@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { adminGuard } from "@/lib/ping-auth";
-import { nextMonitorPosition } from "@/lib/checker";
+import { nextMonitorPosition, KEYWORD_MAX_LENGTH } from "@/lib/checker";
 import { MAX_WEBHOOK_CHANNELS } from "@/lib/webhooks";
 import type { ImportResult } from "@/lib/ping-types";
 
@@ -18,6 +18,14 @@ const schema = z.object({
         intervalSec: z.number().int().min(60).max(86400).default(300),
         enabled: z.boolean().default(true),
         account: z.string().trim().max(60).nullish().transform((v) => (v && v.length > 0 ? v : null)),
+        keyword: z
+          .string()
+          .trim()
+          .min(1)
+          .max(KEYWORD_MAX_LENGTH)
+          .nullish()
+          .transform((v) => (v && v.length > 0 ? v : null)),
+        keywordMode: z.enum(["contains", "excludes"]).default("contains"),
         slowThresholdMs: z
           .number()
           .int()
@@ -120,6 +128,8 @@ export async function POST(req: NextRequest) {
         intervalSec: m.intervalSec,
         enabled: m.enabled,
         account: m.account ?? null,
+        keyword: m.keyword ?? null,
+        keywordMode: m.keywordMode,
         slowThresholdMs: m.slowThresholdMs ?? null,
         alertDelay: m.alertDelay ?? 0,
         folderId: m.folder ? (folderIds.get(m.folder) ?? null) : null,

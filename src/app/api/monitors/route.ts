@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
-import { runCheck, nextMonitorPosition } from "@/lib/checker";
+import { runCheck, nextMonitorPosition, KEYWORD_MAX_LENGTH } from "@/lib/checker";
 import { emptyStats, toMonitorDTO } from "@/lib/ping-stats";
 
 const createSchema = z.object({
@@ -29,6 +29,15 @@ const createSchema = z.object({
     .max(60, "Account label is too long (60 chars max)")
     .nullish()
     .transform((v) => (v && v.length > 0 ? v : null)),
+  /** Keyword check: body must contain (or not contain) this string; null/absent = off. */
+  keyword: z
+    .string()
+    .trim()
+    .min(1, "Keyword cannot be empty — clear the field to turn the check off")
+    .max(KEYWORD_MAX_LENGTH, `Keyword is too long (${KEYWORD_MAX_LENGTH} chars max)`)
+    .nullish()
+    .transform((v) => (v && v.length > 0 ? v : null)),
+  keywordMode: z.enum(["contains", "excludes"]).optional(),
   /** Latency-alert threshold in ms; null/absent = off. */
   slowThresholdMs: z
     .number()
@@ -59,7 +68,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { name, url, folderId, intervalSec, method, account, slowThresholdMs, alertDelay } = parsed.data;
+  const { name, url, folderId, intervalSec, method, account, keyword, keywordMode, slowThresholdMs, alertDelay } = parsed.data;
 
   if (folderId) {
     const folder = await db.folder.findUnique({ where: { id: folderId } });
@@ -87,6 +96,8 @@ export async function POST(req: NextRequest) {
       intervalSec: intervalSec ?? 300,
       method: method ?? "GET",
       account,
+      keyword,
+      keywordMode: keywordMode ?? "contains",
       slowThresholdMs: slowThresholdMs ?? null,
       alertDelay: alertDelay ?? 0,
       position,

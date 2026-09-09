@@ -4,6 +4,9 @@
 
 export type MonitorStatus = "up" | "down" | "paused" | "pending";
 
+/** How a keyword check treats its keyword. */
+export type KeywordMode = "contains" | "excludes";
+
 export interface CheckDTO {
   id: string;
   status: "up" | "down";
@@ -48,6 +51,9 @@ export interface MonitorDTO {
   position: number;
   /** Excluded from the public status page when true. */
   statusHidden: boolean;
+  /** Keyword check: body must contain (or must not contain) this string; null = off. */
+  keyword: string | null;
+  keywordMode: KeywordMode;
   /** Latency-alert threshold in ms; null = off. */
   slowThresholdMs: number | null;
   /** Extra consecutive failed checks required before a down webhook (0 = immediate). */

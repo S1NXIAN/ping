@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Gauge, Globe, Loader2, Plus, UserRound } from "lucide-react";
+import { Bell, Gauge, Globe, Loader2, Plus, ScanSearch, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -45,6 +45,12 @@ const ALERT_DELAYS = [
   { value: "5", label: "After 6 failed checks" },
 ];
 
+const KEYWORD_MODES = [
+  { value: "off", label: "Off (status code only)" },
+  { value: "contains", label: "Body must contain it" },
+  { value: "excludes", label: "Body must not contain it" },
+];
+
 export function AddMonitorDialog({
   open,
   onOpenChange,
@@ -69,6 +75,8 @@ export function AddMonitorDialog({
   const [intervalSec, setIntervalSec] = useState("300");
   const [method, setMethod] = useState<"GET" | "HEAD">("GET");
   const [account, setAccount] = useState("");
+  const [keywordMode, setKeywordMode] = useState<"off" | "contains" | "excludes">("off");
+  const [keyword, setKeyword] = useState("");
   const [slowThreshold, setSlowThreshold] = useState("");
   const [alertDelay, setAlertDelay] = useState("0");
   const [busy, setBusy] = useState(false);
@@ -83,6 +91,8 @@ export function AddMonitorDialog({
       setIntervalSec(String(initial.intervalSec));
       setMethod(initial.method);
       setAccount(initial.account ?? "");
+      setKeywordMode(initial.keyword ? initial.keywordMode : "off");
+      setKeyword(initial.keyword ?? "");
       setSlowThreshold(initial.slowThresholdMs != null ? String(initial.slowThresholdMs) : "");
       setAlertDelay(String(initial.alertDelay ?? 0));
     } else {
@@ -92,11 +102,20 @@ export function AddMonitorDialog({
       setIntervalSec("300");
       setMethod("GET");
       setAccount("");
+      setKeywordMode("off");
+      setKeyword("");
       setSlowThreshold("");
       setAlertDelay("0");
     }
     setError(null);
   }, [open, initial, defaultFolderId]);
+
+  // Keyword checks need a response body — a HEAD response has none, so GET
+  // is forced while a keyword is active.
+  const keywordActive = keywordMode !== "off";
+  useEffect(() => {
+    if (keywordActive && method === "HEAD") setMethod("GET");
+  }, [keywordActive, method]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -124,12 +143,20 @@ export function AddMonitorDialog({
       }
     }
 
+    const trimmedKeyword = keyword.trim();
+    if (keywordMode !== "off" && trimmedKeyword === "") {
+      setError("Enter a keyword, or set the keyword check to Off");
+      return;
+    }
+
     const body: Record<string, unknown> = {
       url: normalized,
       intervalSec: Number(intervalSec),
       method,
       folderId: folderId === "none" ? null : folderId,
       account: account.trim(),
+      keyword: keywordMode === "off" ? null : trimmedKeyword,
+      keywordMode: keywordMode === "off" ? "contains" : keywordMode,
       slowThresholdMs: thresholdNum,
       alertDelay: Number(alertDelay),
     };
@@ -245,10 +272,53 @@ export function AddMonitorDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="GET">GET (recommended)</SelectItem>
-                  <SelectItem value="HEAD">HEAD</SelectItem>
+                  <SelectItem value="HEAD" disabled={keywordActive}>
+                    HEAD{keywordActive ? " — needs a body" : ""}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="m-keyword-mode" className="flex items-center gap-1.5">
+              <ScanSearch className="size-3.5 text-muted-foreground" aria-hidden="true" />
+              Keyword check <span className="font-normal text-muted-foreground">(optional)</span>
+            </Label>
+            <Select
+              value={keywordMode}
+              onValueChange={(v) => setKeywordMode(v as "off" | "contains" | "excludes")}
+            >
+              <SelectTrigger id="m-keyword-mode">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {KEYWORD_MODES.map((k) => (
+                  <SelectItem key={k.value} value={k.value}>
+                    {k.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {keywordActive && (
+              <Input
+                id="m-keyword"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                placeholder={
+                  keywordMode === "contains"
+                    ? "e.g. “welcome” — must appear in the page"
+                    : "e.g. “error” — must NOT appear in the page"
+                }
+                maxLength={200}
+                autoComplete="off"
+              />
+            )}
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {keywordActive
+                ? "Case-insensitive text search over the first 256 KB of the response body — catches “HTTP 200 but the page is broken”. Always checked with GET, even if the method above says HEAD."
+                : "Beyond the status code: require (or forbid) a word in the response body, so a 200 from a broken page still counts as down."}
+            </p>
           </div>
 
           <div className="space-y-1.5">
