@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
 
   const up = dtos.filter((m) => m.enabled && m.lastStatus === "up").length;
   const down = dtos.filter((m) => m.enabled && m.lastStatus === "down").length;
+  const degraded = dtos.filter((m) => m.enabled && m.degraded).length;
   const paused = dtos.filter((m) => !m.enabled).length;
   const pending = dtos.filter((m) => m.enabled && m.lastStatus === null).length;
 
@@ -83,6 +84,7 @@ export async function GET(req: NextRequest) {
       monitors: dtos.length,
       up,
       down,
+      degraded,
       paused,
       pending,
       avgUptime24h: uptimes.length ? uptimes.reduce((a, b) => a + b, 0) / uptimes.length : null,

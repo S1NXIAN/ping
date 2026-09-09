@@ -119,6 +119,13 @@ const patchSchema = z.object({
   pinned: z.boolean().optional(),
   statusHidden: z.boolean().optional(),
   account: z.string().trim().max(60, "Account label is too long (60 chars max)").nullish(),
+  /** Latency-alert threshold in ms; null clears (off). */
+  slowThresholdMs: z
+    .number()
+    .int()
+    .min(50, "Threshold must be at least 50 ms")
+    .max(30000, "Threshold must be at most 30000 ms")
+    .nullish(),
 });
 
 export async function PATCH(req: NextRequest, { params }: Params) {
@@ -141,7 +148,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const data: Record<string, unknown> = {};
-  const { name, url, folderId, intervalSec, enabled, method, pinned, statusHidden, account } = parsed.data;
+  const { name, url, folderId, intervalSec, enabled, method, pinned, statusHidden, account, slowThresholdMs } = parsed.data;
   if (name !== undefined) data.name = name;
   if (url !== undefined) data.url = url;
   if (intervalSec !== undefined) data.intervalSec = intervalSec;
@@ -149,6 +156,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (method !== undefined) data.method = method;
   if (pinned !== undefined) data.pinned = pinned;
   if (statusHidden !== undefined) data.statusHidden = statusHidden;
+  if (slowThresholdMs !== undefined) data.slowThresholdMs = slowThresholdMs ?? null;
   // absent → untouched; null or "" → cleared; string → set
   if (account !== undefined) data.account = account === "" ? null : account;
   if (folderId !== undefined) {

@@ -49,6 +49,7 @@ export function NotificationsSection({
   const [url, setUrl] = useState("");
   const [notifyDown, setNotifyDown] = useState(true);
   const [notifyUp, setNotifyUp] = useState(true);
+  const [notifySlow, setNotifySlow] = useState(true);
   const [routeMonitorId, setRouteMonitorId] = useState<string>("all");
   const [adding, setAdding] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -104,6 +105,7 @@ export function NotificationsSection({
           url,
           notifyDown,
           notifyUp,
+          notifySlow,
           monitorId: routeMonitorId === "all" ? null : routeMonitorId,
         }),
       });
@@ -181,10 +183,10 @@ export function NotificationsSection({
         Notifications
       </h2>
       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-        Get a webhook POST the moment a monitor goes down or recovers. Works with Slack
-        incoming-webhook URLs, Discord webhook URLs, and any generic JSON receiver. Each event is
-        one best-effort delivery (10 s timeout, no retries) — the status below is the honest
-        outcome of the latest attempt.
+        Get a webhook POST the moment a monitor goes down or recovers, or when it answers slower
+        than its latency threshold. Works with Slack incoming-webhook URLs, Discord webhook URLs,
+        and any generic JSON receiver. Each event is one best-effort delivery (10 s timeout, no
+        retries) — the status below is the honest outcome of the latest attempt.
       </p>
 
       <div className="mt-3.5 space-y-3.5">
@@ -205,6 +207,7 @@ export function NotificationsSection({
                   <span className="flex items-center gap-1">
                     {ch.notifyDown && <EventBadge tone="down">down</EventBadge>}
                     {ch.notifyUp && <EventBadge tone="up">up</EventBadge>}
+                    {ch.notifySlow && <EventBadge tone="warn">slow</EventBadge>}
                   </span>
                   {monitors.length > 0 && (
                     <Select
@@ -349,6 +352,13 @@ export function NotificationsSection({
               <Checkbox checked={notifyUp} onCheckedChange={(v) => setNotifyUp(v === true)} />
               Notify on recovery
             </label>
+            <label
+              className="flex items-center gap-1.5 text-xs text-muted-foreground"
+              title="Fires when an up check exceeds a monitor's slow threshold (set per monitor)"
+            >
+              <Checkbox checked={notifySlow} onCheckedChange={(v) => setNotifySlow(v === true)} />
+              Notify when slow
+            </label>
             {monitors.length > 0 && (
               <div className="flex items-center gap-1.5">
                 <Label htmlFor="wh-route" className="text-xs text-muted-foreground">
@@ -376,7 +386,7 @@ export function NotificationsSection({
             <Button
               type="submit"
               size="sm"
-              disabled={adding || (!notifyDown && !notifyUp)}
+              disabled={adding || (!notifyDown && !notifyUp && !notifySlow)}
               className="ml-auto h-7 bg-white px-3 text-xs font-semibold text-black hover:bg-zinc-200"
             >
               {adding ? (
@@ -403,14 +413,16 @@ export function NotificationsSection({
   );
 }
 
-function EventBadge({ tone, children }: { tone: "down" | "up"; children: React.ReactNode }) {
+function EventBadge({ tone, children }: { tone: "down" | "up" | "warn"; children: React.ReactNode }) {
   return (
     <span
       className={cn(
         "rounded-full border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide",
         tone === "down"
           ? "border-down/30 bg-down/10 text-down"
-          : "border-up/30 bg-up/10 text-up",
+          : tone === "up"
+            ? "border-up/30 bg-up/10 text-up"
+            : "border-warn/30 bg-warn/10 text-warn",
       )}
     >
       {children}

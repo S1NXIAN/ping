@@ -378,6 +378,15 @@ export function MonitorDetailSheet({
               <ResponseSparkline values={sparkValues} height={48} />
               <p className="px-1 pt-1 text-[10px] text-muted-foreground">
                 Last {detail?.checks.length ?? 0} checks (up responses only) · newest on the right
+                {m?.slowThresholdMs != null && (
+                  <>
+                    {" · "}
+                    <span className="text-warn">
+                      slow threshold {m.slowThresholdMs} ms
+                      {m.degraded && " — currently above it"}
+                    </span>
+                  </>
+                )}
               </p>
             </div>
           </section>

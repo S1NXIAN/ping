@@ -29,6 +29,14 @@ const createSchema = z.object({
     .max(60, "Account label is too long (60 chars max)")
     .nullish()
     .transform((v) => (v && v.length > 0 ? v : null)),
+  /** Latency-alert threshold in ms; null/absent = off. */
+  slowThresholdMs: z
+    .number()
+    .int()
+    .min(50, "Threshold must be at least 50 ms")
+    .max(30000, "Threshold must be at most 30000 ms")
+    .nullish()
+    .transform((v) => (v == null || Number.isNaN(v) ? null : v)),
 });
 
 export async function POST(req: NextRequest) {
@@ -44,7 +52,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { name, url, folderId, intervalSec, method, account } = parsed.data;
+  const { name, url, folderId, intervalSec, method, account, slowThresholdMs } = parsed.data;
 
   if (folderId) {
     const folder = await db.folder.findUnique({ where: { id: folderId } });
@@ -72,6 +80,7 @@ export async function POST(req: NextRequest) {
       intervalSec: intervalSec ?? 300,
       method: method ?? "GET",
       account,
+      slowThresholdMs: slowThresholdMs ?? null,
       position,
     },
   });

@@ -48,6 +48,10 @@ export interface MonitorDTO {
   position: number;
   /** Excluded from the public status page when true. */
   statusHidden: boolean;
+  /** Latency-alert threshold in ms; null = off. */
+  slowThresholdMs: number | null;
+  /** True when the last check was UP but slower than slowThresholdMs. */
+  degraded: boolean;
   createdAt: string;
   lastCheckAt: string | null;
   lastStatus: "up" | "down" | null;
@@ -88,6 +92,8 @@ export interface OverviewSummary {
   monitors: number;
   up: number;
   down: number;
+  /** Up but slower than their slowThresholdMs. */
+  degraded: number;
   paused: number;
   pending: number; // never checked yet
   avgUptime24h: number | null;
@@ -127,6 +133,8 @@ export interface PublicStatusMonitor {
   id: string;
   name: string;
   status: "up" | "down" | "paused" | "pending";
+  /** Up but slower than the admin's latency threshold. */
+  degraded: boolean | null;
   /** Truthy when an active maintenance window covers this monitor. */
   maintenance: boolean | null;
   uptime24h: number | null;
@@ -150,6 +158,22 @@ export interface PublicIncident {
   lastStatusCode: number | null;
   /** True when the down period overlaps a planned maintenance window. */
   duringMaintenance: boolean;
+  /** Admin postmortem/acknowledgment note attached to this incident. */
+  note: string | null;
+}
+
+/** Incident + its admin note, as listed in the admin incidents view. */
+export interface AdminIncidentDTO {
+  monitorId: string;
+  monitorName: string;
+  startedAt: string;
+  endedAt: string | null;
+  downChecks: number;
+  lastStatusCode: number | null;
+  duringMaintenance: boolean;
+  /** Non-null when a note is attached (this is its row id). */
+  noteId: string | null;
+  note: string | null;
 }
 
 /** Maintenance window as shown on the public status page (name + times only). */
@@ -167,6 +191,7 @@ export interface PublicStatusResponse {
     total: number;
     up: number;
     down: number;
+    degraded: number;
     paused: number;
     pending: number;
     lastCheckAt: string | null;
@@ -198,6 +223,7 @@ export interface WebhookChannelDTO {
   monitorName: string | null;
   notifyDown: boolean;
   notifyUp: boolean;
+  notifySlow: boolean;
   enabled: boolean;
   createdAt: string;
   deliveries: number;

@@ -225,6 +225,20 @@ export async function collectMonitorStats(): Promise<StatsBundle> {
   return { statsByMonitor, recentByMonitor };
 }
 
+/** True when the monitor's last check was UP but above its slow threshold. */
+export function isDegraded(monitor: {
+  lastStatus: string | null;
+  lastResponseMs: number | null;
+  slowThresholdMs: number | null;
+}): boolean {
+  return (
+    monitor.slowThresholdMs != null &&
+    monitor.lastStatus === "up" &&
+    monitor.lastResponseMs != null &&
+    monitor.lastResponseMs > monitor.slowThresholdMs
+  );
+}
+
 export function toMonitorDTO(
   monitor: Monitor,
   folder: Folder | null,
@@ -244,6 +258,8 @@ export function toMonitorDTO(
     pinned: monitor.pinned,
     position: monitor.position,
     statusHidden: monitor.statusHidden,
+    slowThresholdMs: monitor.slowThresholdMs ?? null,
+    degraded: isDegraded(monitor),
     createdAt: monitor.createdAt.toISOString(),
     lastCheckAt: monitor.lastCheckAt?.toISOString() ?? null,
     lastStatus:

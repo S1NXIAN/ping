@@ -15,6 +15,7 @@ function toDTO(
     monitorId: string | null;
     notifyDown: boolean;
     notifyUp: boolean;
+    notifySlow: boolean;
     enabled: boolean;
     createdAt: Date;
     deliveries: number;
@@ -37,6 +38,7 @@ const patchSchema = z.object({
   url: urlSchema.optional(),
   notifyDown: z.boolean().optional(),
   notifyUp: z.boolean().optional(),
+  notifySlow: z.boolean().optional(),
   enabled: z.boolean().optional(),
   /** null clears routing (all monitors); a string routes to one monitor. */
   monitorId: z.string().trim().min(1).nullish(),
@@ -63,11 +65,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const data: Record<string, unknown> = {};
-  const { name, url, notifyDown, notifyUp, enabled, monitorId } = parsed.data;
+  const { name, url, notifyDown, notifyUp, notifySlow, enabled, monitorId } = parsed.data;
   if (name !== undefined) data.name = name;
   if (url !== undefined) data.url = url;
   if (notifyDown !== undefined) data.notifyDown = notifyDown;
   if (notifyUp !== undefined) data.notifyUp = notifyUp;
+  if (notifySlow !== undefined) data.notifySlow = notifySlow;
   if (enabled !== undefined) data.enabled = enabled;
   if (monitorId !== undefined) {
     if (monitorId) {
@@ -82,10 +85,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const merged = {
     notifyDown: (data.notifyDown as boolean | undefined) ?? channel.notifyDown,
     notifyUp: (data.notifyUp as boolean | undefined) ?? channel.notifyUp,
+    notifySlow: (data.notifySlow as boolean | undefined) ?? channel.notifySlow,
   };
-  if (!merged.notifyDown && !merged.notifyUp) {
+  if (!merged.notifyDown && !merged.notifyUp && !merged.notifySlow) {
     return NextResponse.json(
-      { error: "Enable at least one event (down, up or both)" },
+      { error: "Enable at least one event (down, up, or slow)" },
       { status: 400 },
     );
   }

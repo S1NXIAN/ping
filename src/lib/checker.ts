@@ -147,6 +147,36 @@ export async function runCheck(monitor: Monitor) {
       ...(lastNotifiedStatus !== undefined ? { lastNotifiedStatus } : {}),
     },
   });
+
+  // Latency alerting (optional per-monitor threshold): a "slow" event fires
+  // when an UP check exceeds the threshold and the previous check didn't.
+  // It is skipped when an up/down event already fired this check (a recovery
+  // message already carries the response time) and suppressed during active
+  // maintenance — a missed slow alert during planned work is acceptable,
+  // unlike a missed down alert.
+  if (monitor.slowThresholdMs != null && status === "up" && responseMs > monitor.slowThresholdMs) {
+    const wasSlow =
+      previousStatus === "up" &&
+      monitor.lastResponseMs != null &&
+      monitor.lastResponseMs > monitor.slowThresholdMs;
+    if (!wasSlow && !event) {
+      const inMaintenance = await isUnderMaintenance(monitor.id);
+      if (inMaintenance) {
+        console.log(
+          `[PING] slow transition for "${monitor.name}" suppressed — active maintenance window`,
+        );
+      } else {
+        void fireWebhooks("slow", monitor, {
+          status,
+          statusCode,
+          responseMs,
+          error: null,
+          checkedAt: check.checkedAt.toISOString(),
+        });
+      }
+    }
+  }
+
   return check;
 }
 
@@ -230,6 +260,12 @@ export async function pruneChecks(): Promise<{ deleted: number }> {
   // Maintenance windows that ended more than a week ago are no longer useful.
   await db.maintenanceWindow.deleteMany({
     where: { endsAt: { lt: new Date(Date.now() - MAINTENANCE_RETENTION_DAYS * 86400_000) } },
+  });
+
+  // Incident notes older than the 30-day incident lookback can never match
+  // a derived incident again.
+  await db.incidentNote.deleteMany({
+    where: { startedAt: { lt: new Date(Date.now() - (RETENTION_DAYS + 2) * 86400_000) } },
   });
 
   const monitors = await db.monitor.findMany({ select: { id: true } });

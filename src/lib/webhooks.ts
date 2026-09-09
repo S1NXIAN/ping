@@ -9,7 +9,7 @@ import { db } from "./db";
 export const WEBHOOK_TIMEOUT_MS = 10_000;
 export const MAX_WEBHOOK_CHANNELS = 5;
 
-export type WebhookEvent = "down" | "up" | "test";
+export type WebhookEvent = "down" | "up" | "slow" | "test";
 
 export interface WebhookPayload {
   /** Human-readable one-liner (also used by Slack). */
@@ -41,6 +41,10 @@ function eventMessage(event: WebhookEvent, monitor: Pick<Monitor, "name" | "url"
           ? check.error
           : "request failed";
     return `PING: DOWN — “${monitor.name}” (${where}) failed its check: ${why}`;
+  }
+  if (event === "slow") {
+    const ms = check?.responseMs != null ? ` in ${check.responseMs} ms` : "";
+    return `PING: SLOW — “${monitor.name}” (${where}) responded${ms}, above its latency threshold`;
   }
   const ms = check?.responseMs != null ? ` in ${check.responseMs} ms` : "";
   const code = check?.statusCode != null ? ` (HTTP ${check.statusCode})` : "";
@@ -111,7 +115,7 @@ export async function deliverWebhook(url: string, payload: WebhookPayload): Prom
 }
 
 /**
- * Fires an up/down/test event to every enabled channel subscribed to that
+ * Fires an up/down/slow/test event to every enabled channel subscribed to that
  * event AND routed to this monitor (channels with a monitorId only receive
  * that monitor's events; null receives everything), updating each channel's
  * honest last-attempt stats. Fire-and-forget safe: callers may `void` it;
@@ -123,12 +127,17 @@ export async function fireWebhooks(
   check: WebhookPayload["check"],
 ): Promise<{ notified: number }> {
   try {
+    const eventFlag: Record<Exclude<WebhookEvent, "test">, string> = {
+      down: "notifyDown",
+      up: "notifyUp",
+      slow: "notifySlow",
+    };
     const where =
       event === "test"
         ? { enabled: true, OR: [{ monitorId: null }, { monitorId: monitor.id }] }
         : {
             enabled: true,
-            [event === "down" ? "notifyDown" : "notifyUp"]: true,
+            [eventFlag[event]]: true,
             OR: [{ monitorId: null }, { monitorId: monitor.id }],
           };
     const channels = await db.webhookChannel.findMany({ where });

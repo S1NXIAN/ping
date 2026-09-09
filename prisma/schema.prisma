@@ -29,6 +29,11 @@ model Monitor {
   pinned         Boolean   @default(false) // pinned monitors float to the top
   position       Int       @default(0) // manual order, ascending (within pinned/unpinned groups)
   statusHidden   Boolean   @default(false) // excluded from the public status page
+  // Optional latency-alert threshold in ms. When an UP check takes longer
+  // than this, the monitor shows a "slow/degraded" state and (optionally)
+  // fires a "slow" webhook. null = latency alerting off for this monitor.
+  slowThresholdMs Int?
+  incidentNotes  IncidentNote[]
   createdAt      DateTime  @default(now())
   lastCheckAt    DateTime?
   lastStatus     String? // "up" | "down"
@@ -63,6 +68,22 @@ model ScheduledPing {
 
   @@index([status, runAt])
   @@index([monitorId, status])
+}
+
+// A postmortem/acknowledgment note the admin attaches to one derived
+// incident (a down period). Matched to the incident by the exact timestamp
+// of its first failed check — the same key the incident derivation uses —
+// and shown on the public status page under that incident.
+model IncidentNote {
+  id        String   @id @default(cuid())
+  monitorId String
+  monitor   Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  startedAt DateTime // first failed check of the incident
+  note      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([monitorId, startedAt])
 }
 
 // A planned maintenance window for one monitor (e.g. a deploy). Checks keep
@@ -115,6 +136,7 @@ model WebhookChannel {
   monitor        Monitor?  @relation(fields: [monitorId], references: [id], onDelete: SetNull)
   notifyDown     Boolean   @default(true)
   notifyUp       Boolean   @default(true)
+  notifySlow     Boolean   @default(true) // "slow" events (latency threshold exceeded)
   enabled        Boolean   @default(true)
   createdAt      DateTime  @default(now())
   deliveries     Int       @default(0)

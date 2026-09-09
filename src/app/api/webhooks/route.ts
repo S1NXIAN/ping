@@ -13,6 +13,7 @@ function toDTO(
     monitorId: string | null;
     notifyDown: boolean;
     notifyUp: boolean;
+    notifySlow: boolean;
     enabled: boolean;
     createdAt: Date;
     deliveries: number;
@@ -64,6 +65,7 @@ const createSchema = z.object({
   url: urlSchema,
   notifyDown: z.boolean().optional().default(true),
   notifyUp: z.boolean().optional().default(true),
+  notifySlow: z.boolean().optional().default(true),
   /** Route events for this monitor only; omit/null = every monitor. */
   monitorId: z.string().trim().min(1).nullish(),
 });
@@ -90,10 +92,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { name, url, notifyDown, notifyUp, monitorId } = parsed.data;
-  if (!notifyDown && !notifyUp) {
+  const { name, url, notifyDown, notifyUp, notifySlow, monitorId } = parsed.data;
+  if (!notifyDown && !notifyUp && !notifySlow) {
     return NextResponse.json(
-      { error: "Enable at least one event (down, up or both)" },
+      { error: "Enable at least one event (down, up, or slow)" },
       { status: 400 },
     );
   }
@@ -104,13 +106,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Monitor not found" }, { status: 404 });
     }
     const channel = await db.webhookChannel.create({
-      data: { name, url, notifyDown, notifyUp, monitorId },
+      data: { name, url, notifyDown, notifyUp, notifySlow, monitorId },
     });
     return NextResponse.json(toDTO(channel, monitor.name), { status: 201 });
   }
 
   const channel = await db.webhookChannel.create({
-    data: { name, url, notifyDown, notifyUp, monitorId: null },
+    data: { name, url, notifyDown, notifyUp, notifySlow, monitorId: null },
   });
   return NextResponse.json(toDTO(channel, null), { status: 201 });
 }

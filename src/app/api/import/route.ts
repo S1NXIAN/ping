@@ -18,6 +18,13 @@ const schema = z.object({
         intervalSec: z.number().int().min(60).max(86400).default(300),
         enabled: z.boolean().default(true),
         account: z.string().trim().max(60).nullish().transform((v) => (v && v.length > 0 ? v : null)),
+        slowThresholdMs: z
+          .number()
+          .int()
+          .min(50)
+          .max(30000)
+          .nullish()
+          .transform((v) => (v == null || Number.isNaN(v) ? null : v)),
         folder: z.string().trim().max(40).nullish(),
       }),
     )
@@ -30,6 +37,7 @@ const schema = z.object({
         url: z.string().trim().min(8).max(500),
         notifyDown: z.boolean().default(true),
         notifyUp: z.boolean().default(true),
+        notifySlow: z.boolean().default(true),
         enabled: z.boolean().default(true),
         monitor: z.string().trim().max(80).nullish(),
       }),
@@ -111,6 +119,7 @@ export async function POST(req: NextRequest) {
         intervalSec: m.intervalSec,
         enabled: m.enabled,
         account: m.account ?? null,
+        slowThresholdMs: m.slowThresholdMs ?? null,
         folderId: m.folder ? (folderIds.get(m.folder) ?? null) : null,
         position: nextPosition,
       },
@@ -143,6 +152,7 @@ export async function POST(req: NextRequest) {
           url: ch.url,
           notifyDown: ch.notifyDown,
           notifyUp: ch.notifyUp,
+          notifySlow: ch.notifySlow,
           enabled: ch.enabled,
           monitorId: ch.monitor ? (monitorIdByName.get(ch.monitor) ?? null) : null,
         },

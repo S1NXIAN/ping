@@ -12,6 +12,7 @@ import {
   EyeOff,
   Folder,
   FolderInput,
+  Gauge,
   GripVertical,
   Loader2,
   MoreVertical,
@@ -130,6 +131,9 @@ export function MonitorCard({
         ? "down"
         : "pending";
 
+  // Up but above the admin's latency threshold — an honest middle state.
+  const degraded = status === "up" && monitor.degraded;
+
   // Maintenance context: is the window active right now, or upcoming?
   const maintenanceNow =
     maintenanceWindow != null &&
@@ -140,10 +144,12 @@ export function MonitorCard({
 
   const statusTone =
     status === "up"
-      ? "bg-up/10 text-up border-up/25"
+      ? degraded
+        ? "bg-warn/15 text-warn border-warn/40"
+        : "bg-up/10 text-up border-up/25"
       : status === "down"
         ? maintenanceNow
-          ? "bg-warn/10 text-warn border-warn/30"
+          ? "bg-warn/15 text-warn border-warn/40"
           : "bg-down/10 text-down border-down/25"
         : "bg-muted text-muted-foreground border-border";
 
@@ -277,6 +283,8 @@ export function MonitorCard({
           "ping-fade-up group relative cursor-pointer rounded-lg border bg-card p-4 outline-none transition-colors sm:p-5",
           "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40",
           status === "down" && !maintenanceNow && "border-down/30 hover:border-down/50",
+          degraded && !maintenanceNow &&
+            "border-warn/30 hover:border-warn/50 hover:bg-warn/[0.03]",
           !monitor.pinned && !maintenanceNow &&
             "hover:border-primary/40 hover:bg-card/70",
           monitor.pinned && !maintenanceNow &&
@@ -288,7 +296,7 @@ export function MonitorCard({
           dnd?.isDragging && !dragArmed && "transition-transform",
         )}
         aria-label={`Monitor ${monitor.name}, status ${
-          status === "down" && maintenanceNow ? "under maintenance" : statusLabel(status)
+          status === "down" && maintenanceNow ? "under maintenance" : degraded ? "slow" : statusLabel(status)
         }${monitor.pinned ? ", pinned" : ""}${maintenanceNow ? ", maintenance active" : ""}`}
       >
         <div className="flex items-start gap-2 sm:gap-3">
@@ -337,8 +345,27 @@ export function MonitorCard({
                   statusTone,
                 )}
               >
-                {checking ? "checking…" : status === "down" && maintenanceNow ? "maintenance" : statusLabel(status)}
+                {checking
+                  ? "checking…"
+                  : status === "down" && maintenanceNow
+                    ? "maintenance"
+                    : degraded
+                      ? "slow"
+                      : statusLabel(status)}
               </span>
+              {degraded && monitor.slowThresholdMs != null && (
+                <span
+                  title={`Response time above the ${monitor.slowThresholdMs} ms latency threshold${
+                    monitor.lastResponseMs != null ? ` — last check ${formatMs(monitor.lastResponseMs)}` : ""
+                  }`}
+                  className="inline-flex items-center gap-1 rounded-full border border-warn/40 bg-warn/15 px-1.5 py-px text-[10px] font-medium text-warn"
+                >
+                  <Gauge className="size-2.5" aria-hidden="true" />
+                  {monitor.lastResponseMs != null
+                    ? `${formatMs(monitor.lastResponseMs)} > ${monitor.slowThresholdMs} ms`
+                    : `> ${monitor.slowThresholdMs} ms`}
+                </span>
+              )}
               {maintenanceNow && (
                 <span
                   title={`Maintenance until ${new Date(maintenanceWindow!.endsAt).toLocaleString()} — alerts silenced`}
@@ -397,13 +424,18 @@ export function MonitorCard({
               <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
             </a>
 
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
               <span>
                 Last updated{" "}
                 <span className="text-foreground/80">{timeAgo(monitor.lastCheckAt)}</span>
               </span>
               {monitor.lastResponseMs != null && (
-                <span className="inline-flex items-center gap-1">
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1",
+                    degraded && "text-warn",
+                  )}
+                >
                   <Activity className="size-3" aria-hidden="true" />
                   {formatMs(monitor.lastResponseMs)}
                 </span>

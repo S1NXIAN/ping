@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
+  AlertTriangle,
   ArrowDownAZ,
   ArrowUpAZ,
   CalendarClock,
@@ -52,6 +53,7 @@ import { SchedulePingDialog } from "./schedule-ping-dialog";
 import { ScheduledPingsSheet } from "./scheduled-pings-sheet";
 import { MaintenanceDialog } from "./maintenance-dialog";
 import { MaintenanceSheet } from "./maintenance-sheet";
+import { IncidentsSheet } from "./incidents-sheet";
 import { TextPromptDialog } from "./text-prompt-dialog";
 import { StatCard } from "./stat-card";
 
@@ -111,6 +113,9 @@ export function DashboardView({
   // maintenance — sheet + per-monitor dialog
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [maintenanceTargetId, setMaintenanceTargetId] = useState<string | null>(null);
+
+  // incidents — postmortem-note sheet
+  const [incidentsOpen, setIncidentsOpen] = useState(false);
 
   // drag-and-drop reorder (manual sort only)
   const [dragId, setDragId] = useState<string | null>(null);
@@ -393,6 +398,8 @@ export function DashboardView({
               <div className="hidden items-center gap-1.5 md:flex">
                 {headerPill("up", summary.up, "border-up/25 bg-up/10 text-up")}
                 {headerPill("down", summary.down, "border-down/25 bg-down/10 text-down")}
+                {summary.degraded > 0 &&
+                  headerPill("slow", summary.degraded, "border-warn/30 bg-warn/10 text-warn")}
                 {summary.paused > 0 && headerPill("paused", summary.paused, "border-border bg-muted text-muted-foreground")}
               </div>
             )}
@@ -583,9 +590,13 @@ export function DashboardView({
             <StatCard
               label="Monitors"
               value={summary ? `${summary.up}/${summary.monitors}` : "—"}
-              sub={summary ? `${summary.up} up · ${summary.down} down${summary.paused ? ` · ${summary.paused} paused` : ""}` : undefined}
+              sub={
+                summary
+                  ? `${summary.up} up · ${summary.down} down${summary.degraded ? ` · ${summary.degraded} slow` : ""}${summary.paused ? ` · ${summary.paused} paused` : ""}`
+                  : undefined
+              }
               icon={Activity}
-              tone={summary && summary.down > 0 ? "down" : "up"}
+              tone={summary && summary.down > 0 ? "down" : summary && summary.degraded > 0 ? "warn" : "up"}
             />
             <StatCard
               label="Uptime 24h"
@@ -708,6 +719,18 @@ export function DashboardView({
                   {activeMaintenanceCount}
                 </span>
               )}
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIncidentsOpen(true)}
+              className="relative h-9 shrink-0 gap-1.5 text-xs"
+              aria-label="Incidents and postmortem notes"
+              title="Incidents — down periods over the last 30 days, with postmortem notes shown on the public status page"
+            >
+              <AlertTriangle className="size-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Incidents</span>
             </Button>
           </div>
 
@@ -879,6 +902,8 @@ export function DashboardView({
         onCancel={cancelMaintenance}
         serverTime={data?.serverTime ?? null}
       />
+
+      <IncidentsSheet open={incidentsOpen} onOpenChange={setIncidentsOpen} />
 
       <TextPromptDialog
         open={folderDialog.open}

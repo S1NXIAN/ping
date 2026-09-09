@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
       intervalSec: m.intervalSec,
       enabled: m.enabled,
       account: m.account,
+      slowThresholdMs: m.slowThresholdMs,
       folder: folders.find((f) => f.id === m.folderId)?.name ?? null,
     })),
     webhookChannels: channels.map((ch) => ({
@@ -39,6 +40,7 @@ export async function GET(req: NextRequest) {
       url: ch.url,
       notifyDown: ch.notifyDown,
       notifyUp: ch.notifyUp,
+      notifySlow: ch.notifySlow,
       enabled: ch.enabled,
       monitor: ch.monitorId ? (monitorById.get(ch.monitorId)?.name ?? null) : null,
     })),

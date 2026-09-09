@@ -24,6 +24,19 @@ and no uptime number is ever shown for a window PING didn't actually measure.
   (“ping my deploy at 09:00”). The scheduler fires it, records the result in
   the monitor's history, and shows it in a dedicated sheet with countdowns,
   notes, and results. Cancel anytime before it fires.
+- **Latency alerting (slow/degraded)** — optional per-monitor threshold
+  (50–30000 ms, set in the monitor form). When an up check takes longer than
+  the threshold, the monitor card shows an amber “slow” state with the exact
+  response time, the public status page marks the service **degraded** (amber
+  banner + badge), and channels with slow alerts get a “slow” webhook. Events
+  fire on fast→slow transitions only, are suppressed during active
+  maintenance, and are skipped when a down/recovery event already fired (the
+  recovery message carries the response time).
+- **Incident postmortem notes** — from the Incidents sheet, attach a short
+  note (500 chars) to any derived incident; it appears under that incident on
+  the public status page (e.g. “what happened and what fixed it”). Notes are
+  keyed to the incident's exact start, editable, removable, and pruned once
+  older than the 30-day incident window.
 - **Maintenance windows** — planned work on a service (e.g. a deploy):
   checks keep running and stay recorded — the data stays honest — but
   down/recovery webhook alerts are silenced and the public status page shows
@@ -40,12 +53,13 @@ and no uptime number is ever shown for a window PING didn't actually measure.
   incident history (stitched from real checks, with a clear “ongoing” state),
   and active/upcoming maintenance windows (with notes) are included; down
   periods fully inside a maintenance window are not listed as incidents.
-- **Webhook notifications** — when a monitor goes down or recovers, PING
-  POSTs one JSON event to each configured channel (Slack `text`, Discord
-  `content`, plus a structured `{ event, monitor, check }` object). Events
-  fire on up↔down transitions only — no per-check spam, and they are
-  suppressed during active maintenance windows. Channels can be routed to a
-  single monitor (or all monitors). Best-effort delivery (10 s timeout, no
+- **Webhook notifications** — when a monitor goes down, recovers, or answers
+  slower than its latency threshold, PING POSTs one JSON event to each
+  configured channel (Slack `text`, Discord `content`, plus a structured
+  `{ event, monitor, check }` object). Events fire on transitions only — no
+  per-check spam, and they are suppressed during active maintenance windows.
+  Channels can be routed to a single monitor (or all monitors) and subscribe
+  per event type (down / up / slow). Best-effort delivery (10 s timeout, no
   retries) with the honest outcome of the last attempt shown in Settings,
   and a built-in “Send test” button.
 - **Real health checks** — the server performs the request with a 15 s timeout,
@@ -126,7 +140,8 @@ without triggering checks.
 - Next.js (App Router) single-page app, dark Render-style theme, no chart
   libraries — the sparkline and uptime bars are hand-rolled SVG.
 - Prisma + SQLite: `Folder`, `Monitor`, `Check`, `ScheduledPing`,
-  `MaintenanceWindow`, `WebhookChannel`, `Session`, `Settings`.
+  `MaintenanceWindow`, `IncidentNote`, `WebhookChannel`, `Session`,
+  `Settings`.
 - An in-process scheduler (via `instrumentation.ts`) wakes every 30 s and
   checks every enabled monitor whose interval elapsed (concurrency-capped).
 - Auth: scrypt password hash + opaque session tokens in httpOnly cookies.
@@ -144,6 +159,7 @@ without triggering checks.
 | `POST /api/admin/password`, `GET /api/admin/info` | settings & runtime info |
 | `GET/POST /api/webhooks`, `PATCH/DELETE /api/webhooks/[id]`, `POST /api/webhooks/[id]/test` | notification channels (per-monitor routing via `monitorId`) |
 | `GET/POST /api/scheduled-pings`, `DELETE /api/scheduled-pings/[id]` | scheduled pings |
+| `GET/POST/DELETE /api/incidents` | incident list + postmortem notes |
 | `GET/POST /api/maintenance`, `DELETE /api/maintenance/[id]` | maintenance windows |
 | `GET /api/public/status?token=` | public status page (no auth; token-gated) |
 | `GET /api/render-status` | live status from status.render.com (5 min cache) |

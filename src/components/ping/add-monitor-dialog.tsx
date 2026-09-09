@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Globe, Loader2, Plus, UserRound } from "lucide-react";
+import { Gauge, Globe, Loader2, Plus, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -60,6 +60,7 @@ export function AddMonitorDialog({
   const [intervalSec, setIntervalSec] = useState("300");
   const [method, setMethod] = useState<"GET" | "HEAD">("GET");
   const [account, setAccount] = useState("");
+  const [slowThreshold, setSlowThreshold] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,6 +73,7 @@ export function AddMonitorDialog({
       setIntervalSec(String(initial.intervalSec));
       setMethod(initial.method);
       setAccount(initial.account ?? "");
+      setSlowThreshold(initial.slowThresholdMs != null ? String(initial.slowThresholdMs) : "");
     } else {
       setName("");
       setUrl("");
@@ -79,6 +81,7 @@ export function AddMonitorDialog({
       setIntervalSec("300");
       setMethod("GET");
       setAccount("");
+      setSlowThreshold("");
     }
     setError(null);
   }, [open, initial, defaultFolderId]);
@@ -97,12 +100,25 @@ export function AddMonitorDialog({
       return;
     }
 
+    const thresholdNum = slowThreshold.trim() === "" ? null : Number(slowThreshold.trim());
+    if (thresholdNum != null) {
+      if (!Number.isInteger(thresholdNum)) {
+        setError("Slow threshold must be a whole number of milliseconds");
+        return;
+      }
+      if (thresholdNum < 50 || thresholdNum > 30000) {
+        setError("Slow threshold must be between 50 and 30000 ms");
+        return;
+      }
+    }
+
     const body: Record<string, unknown> = {
       url: normalized,
       intervalSec: Number(intervalSec),
       method,
       folderId: folderId === "none" ? null : folderId,
       account: account.trim(),
+      slowThresholdMs: thresholdNum,
     };
     const trimmedName = name.trim();
     if (trimmedName) body.name = trimmedName;
@@ -220,6 +236,26 @@ export function AddMonitorDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="m-slow" className="flex items-center gap-1.5">
+              <Gauge className="size-3.5 text-muted-foreground" aria-hidden="true" />
+              Slow threshold <span className="font-normal text-muted-foreground">(ms, optional)</span>
+            </Label>
+            <Input
+              id="m-slow"
+              value={slowThreshold}
+              onChange={(e) => setSlowThreshold(e.target.value.replace(/[^0-9]/g, ""))}
+              placeholder="e.g. 800 — blank = off"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={5}
+            />
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              When an up check takes longer than this, the monitor shows a "slow" state, the public
+              status page marks it degraded, and channels with slow alerts are notified. 50–30000 ms.
+            </p>
           </div>
 
           <div className="space-y-1.5">

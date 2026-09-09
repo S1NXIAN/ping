@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Activity, AlertTriangle, CalendarClock, Hammer, RefreshCw, Wrench } from "lucide-react";
+import { Activity, AlertTriangle, CalendarClock, Gauge, Hammer, RefreshCw, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api, ApiError, formatDateTime, formatDuration, formatMs, formatUptime, timeAgo } from "@/lib/ping-client";
 import type {
@@ -151,6 +151,7 @@ export function PublicStatusView({ token }: { token: string }) {
                     <>
                       {summary.up} up
                       {summary.down > 0 && ` · ${summary.down} down`}
+                      {summary.degraded > 0 && ` · ${summary.degraded} degraded`}
                       {summary.paused > 0 && ` · ${summary.paused} paused`}
                       {summary.pending > 0 && ` · ${summary.pending} awaiting first check`}
                       {banner.maintCount > 0 && ` · ${banner.maintCount} under maintenance`}
@@ -163,12 +164,12 @@ export function PublicStatusView({ token }: { token: string }) {
               </div>
               {banner.maintCount > 0 ? (
                 <Hammer
-                  className="ml-auto hidden size-8 shrink-0 opacity-40 sm:block"
+                  className="ml-auto hidden size-8 shrink-0 opacity-60 sm:block"
                   aria-hidden="true"
                 />
               ) : (
                 <CalendarClock
-                  className="ml-auto hidden size-8 shrink-0 opacity-40 sm:block"
+                  className="ml-auto hidden size-8 shrink-0 opacity-60 sm:block"
                   aria-hidden="true"
                 />
               )}
@@ -252,6 +253,17 @@ function bannerState(
       maintCount,
     };
   }
+  if (summary.degraded > 0) {
+    return {
+      headline:
+        summary.degraded === 1
+          ? "One service is degraded — slower than usual"
+          : `${summary.degraded} services are degraded — slower than usual`,
+      tone: "border-warn/35 bg-warn/[0.08]",
+      dot: "paused",
+      maintCount,
+    };
+  }
   if (maintCount > 0) {
     return {
       headline:
@@ -290,17 +302,28 @@ function bannerState(
 function MonitorRow({ monitor, now }: { monitor: PublicStatusMonitor; now: number }) {
   const maintenance =
     monitor.maintenance === true && monitor.status !== "paused" ? monitor : null;
+  const degraded = monitor.degraded === true && monitor.status === "up";
   return (
     <article
       className={cn(
         "ping-fade-up rounded-xl border bg-card p-4 transition-colors hover:border-primary/30 hover:bg-card/80",
         monitor.status === "down" && !maintenance && "border-down/30 hover:border-down/50",
+        degraded && !maintenance && "border-warn/30 hover:border-warn/50",
         maintenance && "border-warn/30 hover:border-warn/50",
       )}
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <StatusDot status={monitor.status} pulse={monitor.status === "up" || monitor.status === "down"} />
         <h2 className="min-w-0 truncate text-sm font-medium text-foreground">{monitor.name}</h2>
+        {degraded && (
+          <span
+            title="Up, but the latest check was slower than this service's latency threshold"
+            className="inline-flex items-center gap-1 rounded-full border border-warn/35 bg-warn/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-warn"
+          >
+            <Gauge className="size-2.5" aria-hidden="true" />
+            degraded
+          </span>
+        )}
         {maintenance && (
           <span
             title="Planned maintenance — checks continue and are recorded; “down” here is expected"
@@ -324,7 +347,9 @@ function MonitorRow({ monitor, now }: { monitor: PublicStatusMonitor; now: numbe
             <span>7d —</span>
           )}
           {monitor.avgMs24h != null && (
-            <span className="inline-flex items-center gap-1 tabular-nums">
+            <span
+              className={cn("inline-flex items-center gap-1 tabular-nums", degraded && "text-warn")}
+            >
               <Activity className="size-3" aria-hidden="true" />
               {formatMs(monitor.avgMs24h)}
             </span>
@@ -408,6 +433,11 @@ function IncidentList({ incidents, now }: { incidents: PublicIncident[]; now: nu
                   <span className="tabular-nums">HTTP {inc.lastStatusCode}</span>
                 )}
               </div>
+              {inc.note && (
+                <p className="mt-1.5 rounded-md border-l-2 border-primary/30 bg-muted/40 px-2.5 py-1.5 text-xs italic leading-relaxed text-foreground/75">
+                  {inc.note}
+                </p>
+              )}
             </li>
           );
         })}
