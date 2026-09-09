@@ -1,0 +1,28 @@
+# Keeps a deployed PING instance awake and ticking.
+#
+# Setup:
+#   1. Deploy PING (see render.yaml).
+#   2. Add a repository secret named PING_URL with the deployment origin,
+#      e.g. https://ping-xxxx.onrender.com   (no trailing slash, no /api path).
+#
+# Every run hits PING's /api/cron/tick endpoint, which:
+#   - counts as inbound traffic (keeps the Render free instance awake), and
+#   - runs every monitor whose check interval has elapsed.
+#
+# Free on public repositories. GitHub cron can drift by a few minutes —
+# that's fine here, since the tick only runs checks that are actually due.
+name: PING keep-alive
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # every 10 minutes
+  workflow_dispatch: # manual "Run workflow" button
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tick PING (runs all due checks)
+        run: |
+          curl -fsS --max-time 90 "${{ secrets.PING_URL }}/api/cron/tick" \
+            || echo "::warning::PING tick failed — is PING_URL set and the service up?"
