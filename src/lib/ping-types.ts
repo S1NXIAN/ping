@@ -42,6 +42,10 @@ export interface MonitorDTO {
   enabled: boolean;
   folderId: string | null;
   folderName: string | null;
+  /** Optional label for which account/org runs this service (e.g. a Render account). */
+  account: string | null;
+  pinned: boolean;
+  position: number;
   createdAt: string;
   lastCheckAt: string | null;
   lastStatus: "up" | "down" | null;
@@ -50,6 +54,21 @@ export interface MonitorDTO {
   lastError: string | null;
   stats: MonitorStatsDTO;
   recentChecks: CheckDTO[]; // newest first, small window for sparklines
+}
+
+/** A one-off check the user explicitly scheduled for a specific moment. */
+export interface ScheduledPingDTO {
+  id: string;
+  monitorId: string;
+  monitorName: string;
+  runAt: string; // ISO — when it should fire
+  note: string | null;
+  status: "pending" | "running" | "done";
+  ranAt: string | null;
+  up: boolean | null; // null = not run yet / outcome unknown
+  statusCode: number | null;
+  responseMs: number | null;
+  error: string | null;
 }
 
 export interface OverviewSummary {
@@ -68,6 +87,8 @@ export interface OverviewResponse {
   folders: FolderDTO[];
   monitors: MonitorDTO[];
   summary: OverviewSummary;
+  /** Pending + recently finished scheduled pings (newest activity first). */
+  scheduledPings: ScheduledPingDTO[];
   serverTime: string;
 }
 

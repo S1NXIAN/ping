@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { adminGuard } from "@/lib/ping-auth";
+import { nextMonitorPosition } from "@/lib/checker";
 import type { ImportResult } from "@/lib/ping-types";
 
 const schema = z.object({
@@ -15,6 +16,7 @@ const schema = z.object({
         method: z.enum(["GET", "HEAD"]).default("GET"),
         intervalSec: z.number().int().min(60).max(86400).default(300),
         enabled: z.boolean().default(true),
+        account: z.string().trim().max(60).nullish().transform((v) => (v && v.length > 0 ? v : null)),
         folder: z.string().trim().max(40).nullish(),
       }),
     )
@@ -65,6 +67,7 @@ export async function POST(req: NextRequest) {
 
   let created = 0;
   let skipped = 0;
+  let nextPosition = await nextMonitorPosition();
   for (const m of monitors) {
     if (existingUrls.has(m.url)) {
       skipped += 1;
@@ -77,9 +80,12 @@ export async function POST(req: NextRequest) {
         method: m.method,
         intervalSec: m.intervalSec,
         enabled: m.enabled,
+        account: m.account ?? null,
         folderId: m.folder ? (folderIds.get(m.folder) ?? null) : null,
+        position: nextPosition,
       },
     });
+    nextPosition += 1;
     existingUrls.add(m.url);
     created += 1;
   }

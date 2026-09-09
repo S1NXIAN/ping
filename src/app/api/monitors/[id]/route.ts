@@ -116,6 +116,8 @@ const patchSchema = z.object({
   intervalSec: z.number().int().min(60).max(86400).optional(),
   enabled: z.boolean().optional(),
   method: z.enum(["GET", "HEAD"]).optional(),
+  pinned: z.boolean().optional(),
+  account: z.string().trim().max(60, "Account label is too long (60 chars max)").nullish(),
 });
 
 export async function PATCH(req: NextRequest, { params }: Params) {
@@ -138,12 +140,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const data: Record<string, unknown> = {};
-  const { name, url, folderId, intervalSec, enabled, method } = parsed.data;
+  const { name, url, folderId, intervalSec, enabled, method, pinned, account } = parsed.data;
   if (name !== undefined) data.name = name;
   if (url !== undefined) data.url = url;
   if (intervalSec !== undefined) data.intervalSec = intervalSec;
   if (enabled !== undefined) data.enabled = enabled;
   if (method !== undefined) data.method = method;
+  if (pinned !== undefined) data.pinned = pinned;
+  // absent → untouched; null or "" → cleared; string → set
+  if (account !== undefined) data.account = account === "" ? null : account;
   if (folderId !== undefined) {
     if (folderId === null) {
       data.folderId = null;

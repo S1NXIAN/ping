@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
+  ArrowDownAZ,
+  ArrowUpAZ,
+  CalendarClock,
   FolderPlus,
   Folder,
   Gauge,
@@ -11,6 +14,7 @@ import {
   LockKeyhole,
   LockOpen,
   LogOut,
+  MoveVertical,
   Plus,
   RefreshCw,
   Search,
@@ -20,6 +24,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,11 +44,16 @@ import { api, ApiError, formatUptime, timeAgo } from "@/lib/ping-client";
 import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
-import { MonitorCard } from "./monitor-card";
+import { MonitorCard, type CardDnd } from "./monitor-card";
 import { MonitorDetailSheet } from "./monitor-detail-sheet";
 import { AddMonitorDialog } from "./add-monitor-dialog";
+import { SchedulePingDialog } from "./schedule-ping-dialog";
+import { ScheduledPingsSheet } from "./scheduled-pings-sheet";
 import { TextPromptDialog } from "./text-prompt-dialog";
 import { StatCard } from "./stat-card";
+
+export type SortMode = "manual" | "az" | "za" | "status";
+const SORT_STORAGE_KEY = "ping.sort";
 
 export function DashboardView({
   adminUnlocked,
@@ -65,29 +81,103 @@ export function DashboardView({
     folder?: FolderDTO;
   }>({ open: false, mode: "create" });
 
+  // sort — persisted per device
+  const [sortMode, setSortMode] = useState<SortMode>("manual");
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(SORT_STORAGE_KEY);
+      if (v === "manual" || v === "az" || v === "za" || v === "status") setSortMode(v);
+    } catch {
+      /* private browsing etc. */
+    }
+  }, []);
+  function changeSort(v: string) {
+    const mode = (v as SortMode) ?? "manual";
+    setSortMode(mode);
+    try {
+      localStorage.setItem(SORT_STORAGE_KEY, mode);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // scheduled pings — sheet + per-monitor dialog
+  const [pingsOpen, setPingsOpen] = useState(false);
+  const [scheduleTargetId, setScheduleTargetId] = useState<string | null>(null);
+
+  // drag-and-drop reorder (manual sort only)
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<MonitorDTO[] | null>(null);
+  const committingRef = useRef(false);
+
   const monitors = data?.monitors ?? [];
   const folders = data?.folders ?? [];
   const summary = data?.summary;
 
   const detailMonitor = detailId ? (monitors.find((m) => m.id === detailId) ?? null) : null;
+  const scheduleMonitor = scheduleTargetId
+    ? (monitors.find((m) => m.id === scheduleTargetId) ?? null)
+    : null;
+
+  // the manual-order list: server order (pinned → position), or the live
+  // drag preview while reordering
+  const manualList = preview ?? monitors;
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = monitors;
+    let list: MonitorDTO[] = manualList;
     if (activeFolder !== "all") list = list.filter((m) => m.folderId === activeFolder);
     if (q) {
       list = list.filter(
         (m) =>
           m.name.toLowerCase().includes(q) ||
           m.url.toLowerCase().includes(q) ||
-          (m.folderName ?? "").toLowerCase().includes(q),
+          (m.folderName ?? "").toLowerCase().includes(q) ||
+          (m.account ?? "").toLowerCase().includes(q),
       );
     }
-    // down first, then pending, then up, then paused; newest created first within ties
-    const rank = (m: MonitorDTO) =>
-      !m.enabled ? 3 : m.lastStatus === "down" ? 0 : m.lastStatus === null ? 1 : 2;
-    return [...list].sort((a, b) => rank(a) - rank(b));
-  }, [monitors, activeFolder, query]);
+
+    if (sortMode === "status") {
+      // down first, then pending, then up, then paused; pinned wins within a rank
+      const rank = (m: MonitorDTO) =>
+        !m.enabled ? 3 : m.lastStatus === "down" ? 0 : m.lastStatus === null ? 1 : 2;
+      return [...list].sort(
+        (a, b) => rank(a) - rank(b) || Number(b.pinned) - Number(a.pinned) || a.position - b.position,
+      );
+    }
+
+    if (sortMode === "az" || sortMode === "za") {
+      const dir = sortMode === "az" ? 1 : -1;
+      const sorted = [...list].sort(
+        (a, b) =>
+          dir *
+            a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }) ||
+          a.position - b.position,
+      );
+      // pinned monitors always float to the top, even when browsing alphabetically
+      return [...sorted.filter((m) => m.pinned), ...sorted.filter((m) => !m.pinned)];
+    }
+
+    // manual: list already arrives pinned-first in position order (server
+    // order, or the live drag preview)
+    return list;
+  }, [manualList, activeFolder, query, sortMode]);
+
+  // next pending scheduled ping per monitor (for the card badge)
+  const nextPingByMonitor = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of data?.scheduledPings ?? []) {
+      if (p.status === "done") continue;
+      const existing = map.get(p.monitorId);
+      if (!existing || p.runAt < existing) map.set(p.monitorId, p.runAt);
+    }
+    return map;
+  }, [data?.scheduledPings]);
+
+  const pendingPingCount = useMemo(
+    () => (data?.scheduledPings ?? []).filter((p) => p.status !== "done").length,
+    [data?.scheduledPings],
+  );
 
   const folderStats = useMemo(() => {
     const map = new Map<string, { total: number; down: number }>();
@@ -128,6 +218,104 @@ export function DashboardView({
         variant: "destructive",
       });
     }
+  }
+
+  // ---------- reorder / pin engine ----------
+
+  /**
+   * After moving `movedId` inside `list`, decides whether it should be
+   * pinned: the pinned zone is the block of OTHER pinned monitors at the
+   * top — dropping strictly inside it pins the card, landing at or below
+   * the boundary (first unpinned slot) unpins it.
+   */
+  function pinnedSetAfterMove(list: MonitorDTO[], movedId: string): Set<string> {
+    const pinned = new Set(list.filter((m) => m.pinned).map((m) => m.id));
+    const idx = list.findIndex((m) => m.id === movedId);
+    if (idx >= 0) {
+      const otherPinned = list.filter((m) => m.id !== movedId && m.pinned).length;
+      if (idx < otherPinned) pinned.add(movedId);
+      else pinned.delete(movedId);
+    }
+    return pinned;
+  }
+
+  /** Persists an order (and pin set) to the server, then refreshes. */
+  async function commitOrder(list: MonitorDTO[], movedId: string | null) {
+    if (committingRef.current) return;
+    committingRef.current = true;
+    const ids = list.map((m) => m.id);
+    const pinned = movedId
+      ? pinnedSetAfterMove(list, movedId)
+      : new Set(list.filter((m) => m.pinned).map((m) => m.id));
+    try {
+      await api("/api/monitors/reorder", {
+        method: "PATCH",
+        body: JSON.stringify({ ids, pinnedIds: [...pinned] }),
+      });
+      if (movedId) {
+        const before = monitors.find((m) => m.id === movedId)?.pinned ?? false;
+        if (before !== pinned.has(movedId)) {
+          toast({
+            description: pinned.has(movedId)
+              ? "Moved into the pinned zone — pinned to top"
+              : "Moved below the pinned zone — unpinned",
+          });
+        }
+      }
+    } catch (e) {
+      toast({
+        description: e instanceof Error ? e.message : "Could not save the new order",
+        variant: "destructive",
+      });
+    } finally {
+      committingRef.current = false;
+      setPreview(null);
+      setDragId(null);
+      refresh(true);
+    }
+  }
+
+  /** Move up/down via the card menu — works everywhere incl. touch. */
+  async function moveMonitor(id: string, dir: "up" | "down") {
+    if (sortMode !== "manual") return;
+    const list = [...manualList];
+    const i = list.findIndex((m) => m.id === id);
+    const j = dir === "up" ? i - 1 : i + 1;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    setPreview(list); // instant feedback
+    await commitOrder(list, id);
+  }
+
+  // contract handed to each card (manual sort only)
+  const dnd: CardDnd | null =
+    sortMode === "manual" && monitors.length > 0
+      ? {
+          isDragging: dragId != null,
+          onDragStart: (id) => setDragId(id),
+          onDragOverCard: (targetId) => {
+            if (!dragId || dragId === targetId) return;
+            setPreview((prev) => {
+              const list = prev ?? monitors;
+              const from = list.findIndex((m) => m.id === dragId);
+              const to = list.findIndex((m) => m.id === targetId);
+              if (from < 0 || to < 0 || from === to) return list;
+              const next = [...list];
+              const [moved] = next.splice(from, 1);
+              next.splice(to, 0, moved);
+              return next;
+            });
+          },
+          onDragEnd: () => {
+            if (!dragId) return;
+            void commitOrder(preview ?? monitors, dragId);
+          },
+        }
+      : null;
+
+  async function cancelScheduledPing(id: string) {
+    await api(`/api/scheduled-pings/${id}`, { method: "DELETE" });
+    refresh(true);
   }
 
   async function logout() {
@@ -376,14 +564,15 @@ export function DashboardView({
             />
           </div>
 
-          {/* search row (desktop also has sidebar add) */}
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
+          {/* toolbar: search + sort + scheduled pings */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-0 flex-1 basis-44">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search monitors…"
+                placeholder="Search…"
+                title="Search by name, URL, folder, or account"
                 className="pl-9"
                 aria-label="Search monitors"
               />
@@ -397,7 +586,68 @@ export function DashboardView({
                 </button>
               )}
             </div>
+
+            <Select value={sortMode} onValueChange={changeSort}>
+              <SelectTrigger
+                aria-label="Sort monitors"
+                title="How the monitor list is ordered — manual drag order, alphabetical, or status"
+                className="h-9 w-[112px] shrink-0 text-xs"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="manual">
+                  <span className="flex items-center gap-2">
+                    <MoveVertical className="size-3.5" aria-hidden="true" /> Manual
+                  </span>
+                </SelectItem>
+                <SelectItem value="az">
+                  <span className="flex items-center gap-2">
+                    <ArrowDownAZ className="size-3.5" aria-hidden="true" /> A–Z
+                  </span>
+                </SelectItem>
+                <SelectItem value="za">
+                  <span className="flex items-center gap-2">
+                    <ArrowUpAZ className="size-3.5" aria-hidden="true" /> Z–A
+                  </span>
+                </SelectItem>
+                <SelectItem value="status">
+                  <span className="flex items-center gap-2">
+                    <Activity className="size-3.5" aria-hidden="true" /> Status
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPingsOpen(true)}
+              className="relative h-9 shrink-0 gap-1.5 text-xs"
+              aria-label={`Scheduled pings${pendingPingCount ? ` (${pendingPingCount} upcoming)` : ""}`}
+              title="Scheduled pings — one-off checks at a specific time"
+            >
+              <CalendarClock className="size-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Scheduled</span>
+              {pendingPingCount > 0 && (
+                <span
+                  className={cn(
+                    "ml-0.5 grid min-w-4 place-items-center rounded-full px-1 text-[10px] font-semibold tabular-nums",
+                    "bg-primary/15 text-primary",
+                  )}
+                >
+                  {pendingPingCount}
+                </span>
+              )}
+            </Button>
           </div>
+
+          {sortMode === "manual" && monitors.length > 1 && (
+            <p className="-mt-1 text-[11px] text-muted-foreground/80">
+              Drag the <span className="text-muted-foreground">⠿</span> handle to reorder, or use
+              ⋮ → Move up/down. Pin a monitor to keep it at the top.
+            </p>
+          )}
 
           {/* error */}
           {error && (
@@ -443,18 +693,28 @@ export function DashboardView({
             </div>
           ) : (
             <div className="space-y-2.5">
-              {visible.map((m) => (
-                <MonitorCard
-                  key={m.id}
-                  monitor={m}
-                  folders={folders}
-                  onOpen={() => setDetailId(m.id)}
-                  onRenamed={() => refresh(true)}
-                  onEdited={() => refresh(true)}
-                  onDeleted={() => refresh(true)}
-                  onCheckNow={() => refresh(true)}
-                />
-              ))}
+              {visible.map((m) => {
+                const mi = manualList.findIndex((x) => x.id === m.id);
+                return (
+                  <MonitorCard
+                    key={m.id}
+                    monitor={m}
+                    folders={folders}
+                    onOpen={() => setDetailId(m.id)}
+                    onRenamed={() => refresh(true)}
+                    onEdited={() => refresh(true)}
+                    onDeleted={() => refresh(true)}
+                    onCheckNow={() => refresh(true)}
+                    onSchedulePing={() => setScheduleTargetId(m.id)}
+                    nextPingAt={nextPingByMonitor.get(m.id) ?? null}
+                    canReorder={sortMode === "manual" && manualList.length > 1}
+                    canMoveUp={mi > 0}
+                    canMoveDown={mi >= 0 && mi < manualList.length - 1}
+                    onMove={(dir) => void moveMonitor(m.id, dir)}
+                    dnd={dnd}
+                  />
+                );
+              })}
             </div>
           )}
         </main>
@@ -511,6 +771,24 @@ export function DashboardView({
         }}
         onChanged={() => refresh(true)}
         onDeleted={() => refresh(true)}
+      />
+
+      <SchedulePingDialog
+        open={!!scheduleTargetId}
+        onOpenChange={(o) => {
+          if (!o) setScheduleTargetId(null);
+        }}
+        monitor={scheduleMonitor}
+        pings={data?.scheduledPings ?? []}
+        onChanged={() => refresh(true)}
+      />
+
+      <ScheduledPingsSheet
+        open={pingsOpen}
+        onOpenChange={setPingsOpen}
+        pings={data?.scheduledPings ?? []}
+        onCancel={cancelScheduledPing}
+        serverTime={data?.serverTime ?? null}
       />
 
       <TextPromptDialog

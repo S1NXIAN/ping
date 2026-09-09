@@ -5,12 +5,15 @@ import {
   Activity,
   BarChart3,
   ExternalLink,
+  Folder,
   History,
   Loader2,
   Pause,
+  Pin,
   Play,
   RefreshCw,
   Trash2,
+  UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -232,6 +235,23 @@ export function MonitorDetailSheet({
               <History className="size-3" aria-hidden="true" /> every{" "}
               {m ? formatInterval(m.intervalSec) : "—"} · {m?.method ?? "GET"}
             </span>
+            {m?.folderName && (
+              <span className="inline-flex items-center gap-1">
+                <Folder className="size-3" aria-hidden="true" /> {m.folderName}
+              </span>
+            )}
+            {m?.account && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-teal/25 bg-teal/10 px-1.5 py-px text-[10px] text-teal">
+                <UserRound className="size-2.5" aria-hidden="true" />
+                {m.account}
+              </span>
+            )}
+            {m?.pinned && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-1.5 py-px text-[10px] text-primary">
+                <Pin className="size-2.5" aria-hidden="true" />
+                pinned
+              </span>
+            )}
             <span>Last updated {timeAgo(m?.lastCheckAt)}</span>
           </SheetDescription>
 

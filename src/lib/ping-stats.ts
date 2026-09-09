@@ -3,7 +3,7 @@
 // is no data the value is null, never an estimate.
 import type { Check, Folder, Monitor } from "@prisma/client";
 import { db } from "./db";
-import type { CheckDTO, MonitorDTO, MonitorStatsDTO } from "./ping-types";
+import type { CheckDTO, MonitorDTO, MonitorStatsDTO, ScheduledPingDTO } from "./ping-types";
 
 const H24 = 24 * 60 * 60 * 1000;
 
@@ -60,6 +60,26 @@ export function toCheckDTO(c: Check): CheckDTO {
     responseMs: c.responseMs ?? null,
     error: c.error ?? null,
     checkedAt: c.checkedAt.toISOString(),
+  };
+}
+
+/** Maps a ScheduledPing row to its DTO (monitor name resolved by the caller). */
+export function toScheduledPingDTO(
+  p: { id: string; monitorId: string; runAt: Date; note: string | null; status: string; ranAt: Date | null; up: boolean | null; statusCode: number | null; responseMs: number | null; error: string | null },
+  monitorName: string,
+): ScheduledPingDTO {
+  return {
+    id: p.id,
+    monitorId: p.monitorId,
+    monitorName,
+    runAt: p.runAt.toISOString(),
+    note: p.note ?? null,
+    status: p.status === "done" ? "done" : p.status === "running" ? "running" : "pending",
+    ranAt: p.ranAt?.toISOString() ?? null,
+    up: p.up ?? null,
+    statusCode: p.statusCode ?? null,
+    responseMs: p.responseMs ?? null,
+    error: p.error ?? null,
   };
 }
 
@@ -204,6 +224,9 @@ export function toMonitorDTO(
     enabled: monitor.enabled,
     folderId: monitor.folderId,
     folderName: folder?.name ?? null,
+    account: monitor.account ?? null,
+    pinned: monitor.pinned,
+    position: monitor.position,
     createdAt: monitor.createdAt.toISOString(),
     lastCheckAt: monitor.lastCheckAt?.toISOString() ?? null,
     lastStatus:

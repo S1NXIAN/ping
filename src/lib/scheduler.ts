@@ -1,7 +1,7 @@
 // PING background scheduler: checks due monitors every 30 s and prunes
 // old data hourly. Started once from instrumentation.ts and guarded so
 // hot reloads never spawn duplicates.
-import { pruneChecks, runDueChecks, runtimeState } from "./checker";
+import { pruneChecks, runDueChecks, runDueScheduledPings, runtimeState } from "./checker";
 
 export const TICK_INTERVAL_SEC = 30;
 
@@ -12,13 +12,17 @@ export function startScheduler() {
   runtimeState.schedulerStarted = true;
 
   console.log(`[PING] scheduler started — checking due monitors every ${TICK_INTERVAL_SEC}s`);
-  runtimeState.schedulerStarted = true;
 
   const tick = async () => {
     try {
       await runDueChecks();
     } catch (e) {
       console.error("[PING] scheduler tick failed:", e);
+    }
+    try {
+      await runDueScheduledPings();
+    } catch (e) {
+      console.error("[PING] scheduled-ping tick failed:", e);
     }
   };
 

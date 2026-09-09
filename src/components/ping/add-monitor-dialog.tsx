@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Globe, Loader2, Plus } from "lucide-react";
+import { Globe, Loader2, Plus, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -59,6 +59,7 @@ export function AddMonitorDialog({
   const [folderId, setFolderId] = useState<string>("none");
   const [intervalSec, setIntervalSec] = useState("300");
   const [method, setMethod] = useState<"GET" | "HEAD">("GET");
+  const [account, setAccount] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,12 +71,14 @@ export function AddMonitorDialog({
       setFolderId(initial.folderId ?? "none");
       setIntervalSec(String(initial.intervalSec));
       setMethod(initial.method);
+      setAccount(initial.account ?? "");
     } else {
       setName("");
       setUrl("");
       setFolderId(defaultFolderId ?? "none");
       setIntervalSec("300");
       setMethod("GET");
+      setAccount("");
     }
     setError(null);
   }, [open, initial, defaultFolderId]);
@@ -99,6 +102,7 @@ export function AddMonitorDialog({
       intervalSec: Number(intervalSec),
       method,
       folderId: folderId === "none" ? null : folderId,
+      account: account.trim(),
     };
     const trimmedName = name.trim();
     if (trimmedName) body.name = trimmedName;
@@ -166,6 +170,25 @@ export function AddMonitorDialog({
               placeholder="Optional — defaults to the host"
               maxLength={80}
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="m-account" className="flex items-center gap-1.5">
+              <UserRound className="size-3.5 text-muted-foreground" aria-hidden="true" />
+              Account used <span className="font-normal text-muted-foreground">(optional)</span>
+            </Label>
+            <Input
+              id="m-account"
+              value={account}
+              onChange={(e) => setAccount(e.target.value)}
+              placeholder="e.g. render — personal@mail.com"
+              maxLength={60}
+              autoComplete="off"
+            />
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              A label for which account runs this service — useful when you juggle several Render/GitHub
+              accounts. Shown as a chip on the card and searchable.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

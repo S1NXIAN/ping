@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runDueChecks, runtimeState } from "@/lib/checker";
+import { runDueChecks, runDueScheduledPings, runtimeState } from "@/lib/checker";
 
 /**
  * External trigger endpoint for schedulers (GitHub Actions, cron-job.org,
  * UptimeRobot, …). Each hit runs every monitor whose interval has elapsed —
- * so pinging PING both wakes it up and performs the real checks.
+ * so pinging PING both wakes it up and performs the real checks. Due
+ * scheduled pings are fired here too (their runner has its own overlap guard).
  *
  * Optionally set the CRON_SECRET env var to require ?token=<secret>.
  * A 20 s global throttle stops abuse; it never blocks the in-process
@@ -35,12 +36,14 @@ async function handle(req: NextRequest) {
   runtimeState.lastTickAttemptAt = now;
 
   const result = await runDueChecks();
+  const pings = await runDueScheduledPings();
   return NextResponse.json({
     ok: true,
     throttled: false,
     ran: result.ran,
     up: result.up,
     down: result.down,
+    scheduledPingsRan: pings.ran,
     durationMs: result.durationMs,
     serverTime: new Date().toISOString(),
   });

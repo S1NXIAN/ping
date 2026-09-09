@@ -3,22 +3,30 @@
 import { useState } from "react";
 import {
   Activity,
+  ArrowDown,
+  ArrowUp,
   ChevronRight,
+  Clock,
   ExternalLink,
   Folder,
   FolderInput,
+  GripVertical,
   Loader2,
   MoreVertical,
   Pencil,
+  Pin,
+  PinOff,
   Play,
   RefreshCw,
   Trash2,
+  UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -36,11 +44,28 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { api, ApiError, formatInterval, formatMs, formatUptime, hostOf, timeAgo } from "@/lib/ping-client";
+import {
+  api,
+  ApiError,
+  formatCountdown,
+  formatInterval,
+  formatMs,
+  formatUptime,
+  hostOf,
+  timeAgo,
+} from "@/lib/ping-client";
 import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { StatusDot, statusLabel } from "./status-dot";
 import { checksToSegments, UptimeBars } from "./uptime-bars";
+
+/** Drag-and-drop contract owned by the dashboard (manual sort mode only). */
+export interface CardDnd {
+  isDragging: boolean;
+  onDragStart: (id: string) => void;
+  onDragOverCard: (id: string) => void;
+  onDragEnd: () => void;
+}
 
 export function MonitorCard({
   monitor,
@@ -50,6 +75,13 @@ export function MonitorCard({
   onEdited,
   onDeleted,
   onCheckNow,
+  onSchedulePing,
+  nextPingAt,
+  canReorder,
+  canMoveUp,
+  canMoveDown,
+  onMove,
+  dnd,
 }: {
   monitor: MonitorDTO;
   folders: FolderDTO[];
@@ -58,11 +90,19 @@ export function MonitorCard({
   onEdited: () => void;
   onDeleted: () => void;
   onCheckNow: () => void;
+  onSchedulePing: () => void;
+  nextPingAt: string | null;
+  canReorder: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMove: (dir: "up" | "down") => void;
+  dnd: CardDnd | null;
 }) {
   const { toast } = useToast();
   const [checking, setChecking] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [dragArmed, setDragArmed] = useState(false);
 
   const status: "up" | "down" | "paused" | "pending" = !monitor.enabled
     ? "paused"
@@ -78,6 +118,8 @@ export function MonitorCard({
       : status === "down"
         ? "bg-down/10 text-down border-down/25"
         : "bg-muted text-muted-foreground border-border";
+
+  const beingDragged = dnd?.isDragging === true && dragArmed;
 
   async function runAction(key: string, fn: () => Promise<unknown>, success: string) {
     setBusyAction(key);
@@ -149,26 +191,93 @@ export function MonitorCard({
     onDeleted();
   }
 
+  async function pinToggle() {
+    await patch(
+      { pinned: !monitor.pinned },
+      monitor.pinned ? "Unpinned" : "Pinned to top",
+      "pin",
+    );
+  }
+
   return (
     <>
       <div
         role="button"
         tabIndex={0}
-        onClick={onOpen}
+        onClick={() => {
+          if (dnd?.isDragging || dragArmed) return;
+          onOpen();
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             onOpen();
           }
         }}
+        draggable={!!dnd && canReorder && dragArmed}
+        onDragStart={(e) => {
+          if (!dnd || !canReorder) {
+            e.preventDefault();
+            return;
+          }
+          // real drags only start on draggable elements (armed via the
+          // handle); accepting any dispatched dragstart is harmless
+          e.dataTransfer.effectAllowed = "move";
+          try {
+            e.dataTransfer.setData("text/plain", monitor.id);
+          } catch {
+            /* some browsers require data — ignore failures */
+          }
+          dnd.onDragStart(monitor.id);
+        }}
+        onDragOver={(e) => {
+          if (!dnd || !dnd.isDragging) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          dnd.onDragOverCard(monitor.id);
+        }}
+        onDrop={(e) => {
+          // The browser fires dragend on the source right after a drop —
+          // commit happens there, so here we only allow the drop.
+          e.preventDefault();
+        }}
+        onDragEnd={() => {
+          setDragArmed(false);
+          dnd?.onDragEnd();
+        }}
         className={cn(
           "ping-fade-up group relative cursor-pointer rounded-lg border bg-card p-4 outline-none transition-colors",
           "hover:border-primary/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40",
           status === "down" && "border-down/30 hover:border-down/50",
+          monitor.pinned && "border-primary/35 bg-primary/[0.03] hover:border-primary/50",
+          status === "down" && monitor.pinned && "border-down/40 bg-down/[0.04]",
+          beingDragged && "opacity-40",
+          dnd?.isDragging && !dragArmed && "transition-transform",
         )}
-        aria-label={`Monitor ${monitor.name}, status ${statusLabel(status)}`}
+        aria-label={`Monitor ${monitor.name}, status ${statusLabel(status)}${monitor.pinned ? ", pinned" : ""}`}
       >
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-2 sm:gap-3">
+          {/* drag handle — desktop, manual sort only */}
+          {canReorder && (
+            <button
+              type="button"
+              aria-label={`Reorder ${monitor.name} (drag, or use Move up/down in the menu)`}
+              title="Drag to reorder"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={() => setDragArmed(true)}
+              onPointerUp={() => setDragArmed(false)}
+              onPointerCancel={() => setDragArmed(false)}
+              draggable={false}
+              className={cn(
+                "mt-1 hidden size-6 shrink-0 cursor-grab touch-none place-items-center rounded text-muted-foreground/50 transition-colors active:cursor-grabbing sm:grid",
+                "hover:text-foreground focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                dragArmed && "text-foreground",
+              )}
+            >
+              <GripVertical className="size-4" aria-hidden="true" />
+            </button>
+          )}
+
           <div className="mt-1.5">
             <StatusDot status={checking ? "checking" : status} pulse={status === "up" || status === "down" || checking} />
           </div>
@@ -178,6 +287,15 @@ export function MonitorCard({
               <span className="truncate font-medium leading-tight text-foreground">
                 {monitor.name}
               </span>
+              {monitor.pinned && (
+                <span
+                  title="Pinned to top"
+                  className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-1.5 py-px text-[10px] font-medium text-primary"
+                >
+                  <Pin className="size-2.5" aria-hidden="true" />
+                  pinned
+                </span>
+              )}
               <span
                 className={cn(
                   "rounded-full border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide",
@@ -186,6 +304,15 @@ export function MonitorCard({
               >
                 {checking ? "checking…" : statusLabel(status)}
               </span>
+              {monitor.account && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full border border-teal/25 bg-teal/10 px-1.5 py-px text-[10px] text-teal"
+                  title={`Account used: ${monitor.account}`}
+                >
+                  <UserRound className="size-2.5" aria-hidden="true" />
+                  {monitor.account}
+                </span>
+              )}
               {monitor.folderName && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary px-1.5 py-px text-[10px] text-muted-foreground">
                   <Folder className="size-2.5" aria-hidden="true" />
@@ -195,6 +322,15 @@ export function MonitorCard({
               <span className="rounded-full border border-border bg-secondary px-1.5 py-px text-[10px] text-muted-foreground">
                 every {formatInterval(monitor.intervalSec)}
               </span>
+              {nextPingAt && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-1.5 py-px text-[10px] text-primary/90"
+                  title={`Scheduled ping ${formatCountdown(nextPingAt)} — ${new Date(nextPingAt).toLocaleString()}`}
+                >
+                  <Clock className="size-2.5" aria-hidden="true" />
+                  ping {formatCountdown(nextPingAt)}
+                </span>
+              )}
             </div>
 
             <a
@@ -254,6 +390,29 @@ export function MonitorCard({
               <Button
                 variant="ghost"
                 size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void pinToggle();
+                }}
+                disabled={busyAction === "pin"}
+                aria-label={monitor.pinned ? "Unpin monitor" : "Pin to top"}
+                title={monitor.pinned ? "Unpin" : "Pin to top"}
+                className={cn(
+                  "h-8 w-8",
+                  monitor.pinned
+                    ? "text-primary hover:text-primary"
+                    : "text-muted-foreground/60 hover:text-primary",
+                )}
+              >
+                {monitor.pinned ? (
+                  <Pin className="size-4" aria-hidden="true" />
+                ) : (
+                  <PinOff className="size-4" aria-hidden="true" />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={checkNow}
                 disabled={checking}
                 aria-label="Check now"
@@ -285,6 +444,9 @@ export function MonitorCard({
                   <DropdownMenuItem onClick={onOpen}>
                     Stats &amp; history <ChevronRight className="size-4" />
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onSchedulePing}>
+                    <Clock className="size-4" /> Schedule ping…
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled={busyAction === "pause"}
                     onClick={() => patch({ enabled: !monitor.enabled }, monitor.enabled ? "Paused" : "Resumed", "pause")}
@@ -312,6 +474,21 @@ export function MonitorCard({
                       ))}
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
+
+                  {canReorder && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+                        Reorder
+                      </DropdownMenuLabel>
+                      <DropdownMenuItem disabled={!canMoveUp} onClick={() => onMove("up")}>
+                        <ArrowUp className="size-4" /> Move up
+                      </DropdownMenuItem>
+                      <DropdownMenuItem disabled={!canMoveDown} onClick={() => onMove("down")}>
+                        <ArrowDown className="size-4" /> Move down
+                      </DropdownMenuItem>
+                    </>
+                  )}
 
                   <DropdownMenuSeparator />
                   <DropdownMenuItem

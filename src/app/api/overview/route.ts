@@ -1,17 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
-import { collectMonitorStats, toMonitorDTO } from "@/lib/ping-stats";
-import type { OverviewResponse } from "@/lib/ping-types";
+import { collectMonitorStats, toMonitorDTO, toScheduledPingDTO } from "@/lib/ping-stats";
+import type { OverviewResponse, ScheduledPingDTO } from "@/lib/ping-types";
 
 export async function GET(req: NextRequest) {
   const unauthorized = await guard(req);
   if (unauthorized) return unauthorized;
 
-  const [monitors, folders, bundle] = await Promise.all([
-    db.monitor.findMany({ orderBy: { createdAt: "asc" } }),
+  const [monitors, folders, bundle, pingRows] = await Promise.all([
+    // Pinned first, then the user's manual order, then oldest-created as a tiebreak.
+    db.monitor.findMany({ orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }] }),
     db.folder.findMany({ orderBy: { createdAt: "asc" } }),
     collectMonitorStats(),
+    // Pending (soonest first) + the most recent finished ones.
+    db.$transaction([
+      db.scheduledPing.findMany({
+        where: { status: { in: ["pending", "running"] } },
+        orderBy: { runAt: "asc" },
+        take: 50,
+      }),
+      db.scheduledPing.findMany({
+        where: { status: "done" },
+        orderBy: { ranAt: "desc" },
+        take: 20,
+      }),
+    ]),
   ]);
 
   const folderById = new Map(folders.map((f) => [f.id, f]));
@@ -23,6 +37,11 @@ export async function GET(req: NextRequest) {
       bundle.recentByMonitor.get(m.id),
     ),
   );
+
+  const monitorNameById = new Map(monitors.map((m) => [m.id, m.name]));
+  const scheduledPings: ScheduledPingDTO[] = [...pingRows[0], ...pingRows[1]]
+    .filter((p) => monitorNameById.has(p.monitorId))
+    .map((p) => toScheduledPingDTO(p, monitorNameById.get(p.monitorId) ?? "?"));
 
   const up = dtos.filter((m) => m.enabled && m.lastStatus === "up").length;
   const down = dtos.filter((m) => m.enabled && m.lastStatus === "down").length;
@@ -62,6 +81,7 @@ export async function GET(req: NextRequest) {
       monitorsWithFailures24h,
       lastCheckAt,
     },
+    scheduledPings,
     serverTime: new Date().toISOString(),
   };
 

@@ -7,6 +7,7 @@ export const CHECK_TIMEOUT_MS = 15_000;
 export const MAX_CONCURRENCY = 5;
 export const RETENTION_DAYS = 30;
 export const MAX_CHECKS_PER_MONITOR = 1000;
+export const SCHEDULED_PING_RETENTION_DAYS = 7;
 
 export interface TickResult {
   ran: number;
@@ -19,6 +20,7 @@ export interface TickResult {
 /** Module-level runtime state, exposed via /api/admin/info (real values only). */
 export const runtimeState = {
   running: false,
+  pingsRunning: false,
   lastTickAt: null as string | null,
   lastTick: null as TickResult | null,
   lastTickAttemptAt: 0,
@@ -168,11 +170,16 @@ export async function runDueChecks(): Promise<TickResult> {
   }
 }
 
-/** Prunes old checks (retention) and per-monitor caps; also drops expired sessions. */
+/** Prunes old checks (retention) and per-monitor caps; also drops expired sessions and old scheduled-ping records. */
 export async function pruneChecks(): Promise<{ deleted: number }> {
   const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
   const old = await db.check.deleteMany({ where: { checkedAt: { lt: cutoff } } });
   let capped = 0;
+
+  // Finished scheduled pings only matter shortly after they ran — drop old ones.
+  await db.scheduledPing.deleteMany({
+    where: { status: "done", ranAt: { lt: new Date(Date.now() - SCHEDULED_PING_RETENTION_DAYS * 86400_000) } },
+  });
 
   const monitors = await db.monitor.findMany({ select: { id: true } });
   for (const m of monitors) {
@@ -193,4 +200,92 @@ export async function pruneChecks(): Promise<{ deleted: number }> {
 
   await db.session.deleteMany({ where: { expiresAt: { lt: new Date() } } });
   return { deleted: old.count + capped };
+}
+
+/**
+ * Runs every pending scheduled ping whose time has come. Each result is a
+ * REAL check: it is written to the Check table (so it counts in history and
+ * stats) and the scheduled-ping row is updated with the outcome. Runs even
+ * for paused monitors — an explicitly scheduled ping is user intent.
+ *
+ * Statuses: pending → running → done. Rows stuck in "running" (e.g. the
+ * process died mid-run) are picked up again on the next tick. A module-level
+ * guard stops overlapping runs inside this process.
+ */
+export async function runDueScheduledPings(): Promise<{ ran: number }> {
+  if (runtimeState.pingsRunning) return { ran: 0 };
+  runtimeState.pingsRunning = true;
+  try {
+    const now = Date.now();
+    // small grace so a ping whose runAt is within a few seconds still fires
+    const due = await db.scheduledPing.findMany({
+      where: {
+        OR: [
+          { status: "pending", runAt: { lte: new Date(now + 5_000) } },
+          { status: "running" }, // stale claim from a crashed run — re-run
+        ],
+      },
+      orderBy: { runAt: "asc" },
+      take: 25,
+    });
+    if (due.length === 0) return { ran: 0 };
+
+    const monitorIds = [...new Set(due.map((p) => p.monitorId))];
+    const monitors = await db.monitor.findMany({ where: { id: { in: monitorIds } } });
+    const monitorById = new Map(monitors.map((m) => [m.id, m]));
+
+    let ran = 0;
+    for (let i = 0; i < due.length; i += MAX_CONCURRENCY) {
+      const batch = due.slice(i, i + MAX_CONCURRENCY);
+      await Promise.all(
+        batch.map(async (ping) => {
+          // Claim the row so a concurrent trigger can't run it twice.
+          const claimed = await db.scheduledPing.updateMany({
+            where: { id: ping.id, status: ping.status },
+            data: { status: "running" },
+          });
+          if (claimed.count === 0) return;
+
+          const monitor = monitorById.get(ping.monitorId);
+          if (!monitor) {
+            // monitor vanished between query and run — drop the ping
+            await db.scheduledPing.delete({ where: { id: ping.id } });
+            return;
+          }
+          const check = await runCheck(monitor).catch((err) => {
+            console.error(`[PING] scheduled ping for "${monitor.name}" failed:`, err);
+            return null;
+          });
+          // runCheck already persisted a Check row; record the outcome on the
+          // ping. A null check means an internal error, not a down site.
+          await db.scheduledPing.update({
+            where: { id: ping.id },
+            data: {
+              status: "done",
+              ranAt: new Date(),
+              up: check ? check.status === "up" : null,
+              statusCode: check?.statusCode ?? null,
+              responseMs: check?.responseMs ?? null,
+              error: check?.error ?? (check ? null : "Internal error while running the scheduled ping"),
+            },
+          });
+          ran += 1;
+          console.log(
+            `[PING] scheduled ping → ${monitor.name}: ${check?.status ?? "error"}${
+              check?.statusCode != null ? ` (HTTP ${check.statusCode})` : ""
+            }`,
+          );
+        }),
+      );
+    }
+    return { ran };
+  } finally {
+    runtimeState.pingsRunning = false;
+  }
+}
+
+/** Next free manual-order position for a new monitor (appends at the end). */
+export async function nextMonitorPosition(): Promise<number> {
+  const agg = await db.monitor.aggregate({ _max: { position: true } });
+  return (agg._max.position ?? -1) + 1;
 }

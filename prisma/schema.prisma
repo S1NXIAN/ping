@@ -25,6 +25,9 @@ model Monitor {
   enabled        Boolean   @default(true)
   folderId       String?
   folder         Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  account        String? // optional label: which account/org runs this service
+  pinned         Boolean   @default(false) // pinned monitors float to the top
+  position       Int       @default(0) // manual order, ascending (within pinned/unpinned groups)
   createdAt      DateTime  @default(now())
   lastCheckAt    DateTime?
   lastStatus     String? // "up" | "down"
@@ -32,6 +35,27 @@ model Monitor {
   lastResponseMs Int?
   lastError      String?
   checks         Check[]
+  scheduledPings ScheduledPing[]
+}
+
+// A one-off check explicitly scheduled for a specific moment
+// (e.g. "ping my deploy at 09:00 right after it goes live").
+model ScheduledPing {
+  id         String    @id @default(cuid())
+  monitorId  String
+  monitor    Monitor   @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  runAt      DateTime
+  note       String?
+  status     String    @default("pending") // pending | done
+  ranAt      DateTime?
+  up         Boolean?
+  statusCode Int?
+  responseMs Int?
+  error      String?
+  createdAt  DateTime  @default(now())
+
+  @@index([status, runAt])
+  @@index([monitorId, status])
 }
 
 // One health-check result. Only real, recorded checks exist here.

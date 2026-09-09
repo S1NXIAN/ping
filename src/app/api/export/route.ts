@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
       method: m.method,
       intervalSec: m.intervalSec,
       enabled: m.enabled,
+      account: m.account,
       folder: folders.find((f) => f.id === m.folderId)?.name ?? null,
     })),
   };

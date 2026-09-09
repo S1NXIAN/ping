@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
-import { runCheck } from "@/lib/checker";
+import { runCheck, nextMonitorPosition } from "@/lib/checker";
 import { emptyStats, toMonitorDTO } from "@/lib/ping-stats";
 
 const createSchema = z.object({
@@ -23,6 +23,12 @@ const createSchema = z.object({
   folderId: z.string().trim().min(1).nullish(),
   intervalSec: z.number().int().min(60).max(86400).optional(),
   method: z.enum(["GET", "HEAD"]).optional(),
+  account: z
+    .string()
+    .trim()
+    .max(60, "Account label is too long (60 chars max)")
+    .nullish()
+    .transform((v) => (v && v.length > 0 ? v : null)),
 });
 
 export async function POST(req: NextRequest) {
@@ -38,7 +44,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { name, url, folderId, intervalSec, method } = parsed.data;
+  const { name, url, folderId, intervalSec, method, account } = parsed.data;
 
   if (folderId) {
     const folder = await db.folder.findUnique({ where: { id: folderId } });
@@ -56,6 +62,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // New monitors append at the end of the manual order.
+  const position = await nextMonitorPosition();
   const monitor = await db.monitor.create({
     data: {
       name: displayName,
@@ -63,6 +71,8 @@ export async function POST(req: NextRequest) {
       folderId: folderId ?? null,
       intervalSec: intervalSec ?? 300,
       method: method ?? "GET",
+      account,
+      position,
     },
   });
 

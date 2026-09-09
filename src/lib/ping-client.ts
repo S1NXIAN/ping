@@ -148,3 +148,25 @@ export function formatClock(iso: string | null | undefined): string {
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
+
+/** Future ISO → "in 45s" / "in 4m" / "in 2h 10m" / "in 3d". */
+export function formatCountdown(iso: string, now?: number): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "—";
+  const s = Math.floor((t - (now ?? Date.now())) / 1000);
+  if (s <= 0) return "due now";
+  if (s < 60) return `in ${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `in ${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) {
+    const rm = m % 60;
+    return rm > 0 ? `in ${h}h ${rm}m` : `in ${h}h`;
+  }
+  const d = Math.floor(h / 24);
+  if (d < 30) {
+    const rh = h % 24;
+    return rh > 0 ? `in ${d}d ${rh}h` : `in ${d}d`;
+  }
+  return `in ${Math.floor(d / 30)}mo`;
+}

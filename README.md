@@ -13,7 +13,17 @@ and no uptime number is ever shown for a window PING didn't actually measure.
 
 - **Monitors** — any http(s) URL, custom name, GET or HEAD, intervals from 1
   minute to 1 day. Group monitors into **folders**, rename anything, pause or
-  resume individual monitors.
+  resume individual monitors, and tag each with the **account used** (optional
+  label for whichever account runs the service — searchable).
+- **Ordering** — pin monitors to the top, drag to reorder (desktop) or move
+  up/down from the menu (works on touch), and switch the list between manual,
+  A–Z, Z–A, and status-first sorting. Pinned monitors float to the top in
+  every sort mode; dropping a card into the pinned zone pins it
+  automatically. Your sort choice is remembered per device.
+- **Scheduled pings** — run one real check at an exact future moment
+  (“ping my deploy at 09:00”). The scheduler fires it, records the result in
+  the monitor's history, and shows it in a dedicated sheet with countdowns,
+  notes, and results. Cancel anytime before it fires.
 - **Real health checks** — the server performs the request with a 15 s timeout,
   records status code, response time, and the exact error on failures. History
   is kept for 30 days (capped at 1 000 checks per monitor).
@@ -24,10 +34,11 @@ and no uptime number is ever shown for a window PING didn't actually measure.
   limits Render documents (with links), and honest guidance about free-tier
   sleep and instance-hour math.
 - **Auth** — single-password login, hashed with scrypt; change the password in
-  Settings (this signs out all other sessions).
+  Settings (this signs out all other sessions). Settings itself is gated by a
+  second, 15-minute admin unlock.
 - **Keep-awake strategy** — an external scheduler hits `/api/cron/tick`, which
   both wakes PING and runs every due check (see below).
-- **Import/export** — your monitor configuration as JSON.
+- **Import/export** — your monitor configuration as JSON (includes accounts).
 
 ## Run locally
 
