@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Gauge, Globe, Loader2, Plus, UserRound } from "lucide-react";
+import { Bell, Gauge, Globe, Loader2, Plus, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -36,6 +36,15 @@ const INTERVALS = [
   { value: "86400", label: "1 day" },
 ];
 
+/** value = extra confirmations; label = total failed checks needed. */
+const ALERT_DELAYS = [
+  { value: "0", label: "Immediately (1st failed check)" },
+  { value: "1", label: "After 2 failed checks" },
+  { value: "2", label: "After 3 failed checks" },
+  { value: "3", label: "After 4 failed checks" },
+  { value: "5", label: "After 6 failed checks" },
+];
+
 export function AddMonitorDialog({
   open,
   onOpenChange,
@@ -61,6 +70,7 @@ export function AddMonitorDialog({
   const [method, setMethod] = useState<"GET" | "HEAD">("GET");
   const [account, setAccount] = useState("");
   const [slowThreshold, setSlowThreshold] = useState("");
+  const [alertDelay, setAlertDelay] = useState("0");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,6 +84,7 @@ export function AddMonitorDialog({
       setMethod(initial.method);
       setAccount(initial.account ?? "");
       setSlowThreshold(initial.slowThresholdMs != null ? String(initial.slowThresholdMs) : "");
+      setAlertDelay(String(initial.alertDelay ?? 0));
     } else {
       setName("");
       setUrl("");
@@ -82,6 +93,7 @@ export function AddMonitorDialog({
       setMethod("GET");
       setAccount("");
       setSlowThreshold("");
+      setAlertDelay("0");
     }
     setError(null);
   }, [open, initial, defaultFolderId]);
@@ -119,6 +131,7 @@ export function AddMonitorDialog({
       folderId: folderId === "none" ? null : folderId,
       account: account.trim(),
       slowThresholdMs: thresholdNum,
+      alertDelay: Number(alertDelay),
     };
     const trimmedName = name.trim();
     if (trimmedName) body.name = trimmedName;
@@ -255,6 +268,29 @@ export function AddMonitorDialog({
             <p className="text-[11px] leading-relaxed text-muted-foreground">
               When an up check takes longer than this, the monitor shows a "slow" state, the public
               status page marks it degraded, and channels with slow alerts are notified. 50–30000 ms.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="m-alert-delay" className="flex items-center gap-1.5">
+              <Bell className="size-3.5 text-muted-foreground" aria-hidden="true" />
+              Down-alert delay
+            </Label>
+            <Select value={alertDelay} onValueChange={setAlertDelay}>
+              <SelectTrigger id="m-alert-delay">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ALERT_DELAYS.map((d) => (
+                  <SelectItem key={d.value} value={d.value}>
+                    {d.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Wait for consecutive failures before a “down” webhook fires — avoids false alarms from
+              one flaky check. Downtime is recorded and shown immediately either way.
             </p>
           </div>
 

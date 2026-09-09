@@ -126,6 +126,13 @@ const patchSchema = z.object({
     .min(50, "Threshold must be at least 50 ms")
     .max(30000, "Threshold must be at most 30000 ms")
     .nullish(),
+  /** Extra consecutive failed checks before a down webhook (0–10). */
+  alertDelay: z
+    .number()
+    .int()
+    .min(0, "Alert delay must be 0 or more")
+    .max(10, "Alert delay can be at most 10 extra checks")
+    .optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: Params) {
@@ -148,7 +155,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const data: Record<string, unknown> = {};
-  const { name, url, folderId, intervalSec, enabled, method, pinned, statusHidden, account, slowThresholdMs } = parsed.data;
+  const { name, url, folderId, intervalSec, enabled, method, pinned, statusHidden, account, slowThresholdMs, alertDelay } = parsed.data;
   if (name !== undefined) data.name = name;
   if (url !== undefined) data.url = url;
   if (intervalSec !== undefined) data.intervalSec = intervalSec;
@@ -157,6 +164,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (pinned !== undefined) data.pinned = pinned;
   if (statusHidden !== undefined) data.statusHidden = statusHidden;
   if (slowThresholdMs !== undefined) data.slowThresholdMs = slowThresholdMs ?? null;
+  if (alertDelay !== undefined) {
+    data.alertDelay = alertDelay;
+    // A changed confirmation policy makes the old streak meaningless.
+    data.consecutiveDowns = 0;
+  }
+  // A new target is a fresh start — the old failure streak must not count
+  // against (or for) the new URL.
+  if (url !== undefined && url !== monitor.url) data.consecutiveDowns = 0;
   // absent → untouched; null or "" → cleared; string → set
   if (account !== undefined) data.account = account === "" ? null : account;
   if (folderId !== undefined) {

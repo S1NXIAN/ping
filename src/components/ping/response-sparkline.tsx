@@ -3,11 +3,20 @@ export function ResponseSparkline({
   values,
   height = 44,
   className = "",
+  gradientId = "ping-spark-fill",
+  stroke = "#8b5cf6",
+  dot = "#2dd4bf",
 }: {
   /** chronological ms values (up checks only); null entries create gaps */
   values: Array<number | null>;
   height?: number;
   className?: string;
+  /** Unique per instance when several sparklines share a page (SVG ids). */
+  gradientId?: string;
+  /** Line color — brand violet by default. */
+  stroke?: string;
+  /** Latest-point marker color — teal by default. */
+  dot?: string;
 }) {
   const pts = values.filter((v): v is number => v != null && !Number.isNaN(v));
   if (pts.length < 2) {
@@ -45,14 +54,22 @@ export function ResponseSparkline({
       aria-label={`Response time sparkline, latest ${Math.round(pts[pts.length - 1])} ms`}
     >
       <defs>
-        <linearGradient id="ping-spark-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#8b5cf6" stopOpacity="0.28" />
-          <stop offset="1" stopColor="#8b5cf6" stopOpacity="0" />
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={stroke} stopOpacity="0.28" />
+          <stop offset="1" stopColor={stroke} stopOpacity="0" />
         </linearGradient>
       </defs>
-      <path d={area} fill="url(#ping-spark-fill)" />
-      <path d={path} fill="none" stroke="#8b5cf6" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      <circle cx={lastX} cy={lastY} r="2.5" fill="#2dd4bf" />
+      <path d={area} fill={`url(#${gradientId})`} />
+      <path
+        d={path}
+        fill="none"
+        stroke={stroke}
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+      <circle cx={lastX} cy={lastY} r="2.5" fill={dot} />
     </svg>
   );
 }

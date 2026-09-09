@@ -32,6 +32,14 @@ and no uptime number is ever shown for a window PING didn't actually measure.
   fire on fast→slow transitions only, are suppressed during active
   maintenance, and are skipped when a down/recovery event already fired (the
   recovery message carries the response time).
+- **Down-alert delay (confirmations)** — per-monitor setting (monitor form:
+  “Down-alert delay”): wait for N consecutive failed checks before the down
+  webhook fires (immediate → after 6 checks). Downtime is always recorded and
+  shown right away — only the notification waits for confirmation. The card
+  and detail sheet show a live “confirming 2/3” pill while a failure streak is
+  still under the threshold. Held events are deferred, never lost: if the
+  service stays down past the threshold the alert fires exactly then. Editing
+  a monitor's delay or URL resets the streak.
 - **Incident postmortem notes** — from the Incidents sheet, attach a short
   note (500 chars) to any derived incident; it appears under that incident on
   the public status page (e.g. “what happened and what fixed it”). Notes are
@@ -47,7 +55,8 @@ and no uptime number is ever shown for a window PING didn't actually measure.
   with active/upcoming/recently-ended states.
 - **Public status page** — opt in from Settings to get a secret, shareable
   link (`/?status=<token>`, 192-bit) that shows monitor names, live statuses,
-  7d/30d uptime and a 30-day per-day bar strip — read-only, no login, no
+  7d/30d uptime, a 30-day per-day bar strip on a labelled track, and a
+  response-time sparkline of the last 20 checks — read-only, no login, no
   URLs or accounts exposed. Regenerate or disable the link anytime; hide
   individual monitors from their ⋮ menu. A custom page title, a 30-day
   incident history (stitched from real checks, with a clear “ongoing” state),

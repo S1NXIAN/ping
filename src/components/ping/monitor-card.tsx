@@ -14,6 +14,7 @@ import {
   FolderInput,
   Gauge,
   GripVertical,
+  Hourglass,
   Loader2,
   MoreVertical,
   Pencil,
@@ -393,6 +394,18 @@ export function MonitorCard({
                   {monitor.account}
                 </span>
               )}
+              {status === "down" &&
+                !maintenanceNow &&
+                monitor.alertDelay > 0 &&
+                monitor.consecutiveDowns <= monitor.alertDelay && (
+                  <span
+                    title={`Down alerts fire after ${monitor.alertDelay + 1} consecutive failed checks — the status above is already honest downtime`}
+                    className="inline-flex items-center gap-1 rounded-full border border-warn/25 bg-warn/[0.08] px-1.5 py-px text-[10px] font-medium text-warn/90"
+                  >
+                    <Hourglass className="size-2.5" aria-hidden="true" />
+                    confirming {monitor.consecutiveDowns}/{monitor.alertDelay + 1}
+                  </span>
+                )}
               {monitor.folderName && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary px-1.5 py-px text-[10px] text-muted-foreground">
                   <Folder className="size-2.5" aria-hidden="true" />

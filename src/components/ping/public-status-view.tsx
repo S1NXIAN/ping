@@ -13,6 +13,7 @@ import type {
 } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
+import { ResponseSparkline } from "./response-sparkline";
 import { StatusDot } from "./status-dot";
 
 const REFRESH_MS = 30_000;
@@ -106,7 +107,7 @@ export function PublicStatusView({ token }: { token: string }) {
             onClick={() => refresh()}
             disabled={refreshing}
             aria-label="Refresh"
-            className="h-8 w-8 text-muted-foreground hover:text-teal"
+            className="h-8 w-8 text-muted-foreground transition-all hover:bg-secondary/60 hover:text-teal active:scale-90"
           >
             <RefreshCw className={cn("size-4", refreshing && "animate-spin")} />
           </Button>
@@ -146,7 +147,7 @@ export function PublicStatusView({ token }: { token: string }) {
                   </p>
                 )}
                 <h1 className="text-lg font-semibold leading-snug">{banner.headline}</h1>
-                <p className="mt-0.5 text-xs text-muted-foreground">
+                <p className="mt-0.5 text-xs text-foreground/70">
                   {summary && summary.total > 0 ? (
                     <>
                       {summary.up} up
@@ -213,8 +214,8 @@ export function PublicStatusView({ token }: { token: string }) {
       </main>
 
       <footer className="sticky bottom-0 z-20 mt-auto border-t bg-background/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-2xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[11px] text-muted-foreground">
-          <span className="font-medium text-foreground/75">PING</span>
+        <div className="mx-auto flex max-w-2xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[11px] text-foreground/60">
+          <span className="font-medium text-foreground/85">PING</span>
           <span>honest uptime monitoring</span>
           <span className="ml-auto">not affiliated with render.com</span>
         </div>
@@ -341,7 +342,7 @@ function MonitorRow({ monitor, now }: { monitor: PublicStatusMonitor; now: numbe
         <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
           {monitor.uptime7d != null ? (
             <span className="tabular-nums">
-              7d <span className="font-medium text-foreground/80">{formatUptime(monitor.uptime7d)}</span>
+              7d <span className="font-medium text-foreground/85">{formatUptime(monitor.uptime7d)}</span>
             </span>
           ) : (
             <span>7d —</span>
@@ -359,9 +360,23 @@ function MonitorRow({ monitor, now }: { monitor: PublicStatusMonitor; now: numbe
 
       <DayBars daily={monitor.daily} />
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+      {monitor.spark.filter((v) => v != null).length >= 3 && (
+        <div className="mt-2.5 flex items-center gap-3">
+          <ResponseSparkline
+            values={monitor.spark}
+            height={26}
+            gradientId={`ping-spark-${monitor.id}`}
+            className="min-w-0 flex-1"
+          />
+          <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/90">
+            response · last {monitor.spark.length} checks
+          </span>
+        </div>
+      )}
+
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-foreground/60">
         <span>
-          last check <span className="text-foreground/80">{timeAgo(monitor.lastCheckAt, now)}</span>
+          last check <span className="text-foreground/85">{timeAgo(monitor.lastCheckAt, now)}</span>
         </span>
         {monitor.lastStatusCode != null && (
           <span
@@ -375,7 +390,7 @@ function MonitorRow({ monitor, now }: { monitor: PublicStatusMonitor; now: numbe
         )}
         {monitor.uptime30d != null ? (
           <span>
-            30d <span className="tabular-nums text-foreground/80">{formatUptime(monitor.uptime30d)}</span>
+            30d <span className="tabular-nums text-foreground/85">{formatUptime(monitor.uptime30d)}</span>
           </span>
         ) : (
           <span>30d —</span>
@@ -529,31 +544,37 @@ function DayBars({ daily }: { daily: DailyBucket[] }) {
   }
 
   return (
-    <div
-      className="mt-3 flex items-stretch gap-[2px]"
-      role="img"
-      aria-label="Uptime over the last 30 days — one bar per day, green means all checks passed"
-    >
-      {days.map(({ key, bucket }, i) => {
-        const up = bucket?.up ?? 0;
-        const down = bucket?.down ?? 0;
-        const title = bucket
-          ? `${key} — ${up} up / ${down} down${down > 0 ? ` (${formatUptime(up / (up + down))} uptime)` : ""}`
-          : `${key} — no checks recorded`;
-        return (
-          <div
-            key={key}
-            title={title}
-            className={cn(
-              "h-8 flex-1 rounded-[3px] transition-colors",
-              !bucket && "bg-muted/50",
-              bucket && down === 0 && "bg-up/60 hover:bg-up/80",
-              bucket && down > 0 && "bg-down/70 hover:bg-down",
-              i === days.length - 1 && "ring-1 ring-inset ring-primary/30",
-            )}
-          />
-        );
-      })}
+    <div className="mt-3">
+      <div
+        className="flex items-stretch gap-[2px] rounded-md bg-secondary/25 p-1"
+        role="img"
+        aria-label="Uptime over the last 30 days — one bar per day, green means all checks passed"
+      >
+        {days.map(({ key, bucket }, i) => {
+          const up = bucket?.up ?? 0;
+          const down = bucket?.down ?? 0;
+          const title = bucket
+            ? `${key} — ${up} up / ${down} down${down > 0 ? ` (${formatUptime(up / (up + down))} uptime)` : ""}`
+            : `${key} — no checks recorded`;
+          return (
+            <div
+              key={key}
+              title={title}
+              className={cn(
+                "h-7 flex-1 rounded-[3px] transition-colors",
+                !bucket && "border border-dashed border-border/60",
+                bucket && down === 0 && "bg-up/60 hover:bg-up/80",
+                bucket && down > 0 && "bg-down/70 hover:bg-down",
+                i === days.length - 1 && "ring-1 ring-inset ring-primary/30",
+              )}
+            />
+          );
+        })}
+      </div>
+      <div className="mt-1 flex items-center justify-between text-[9px] font-medium uppercase tracking-wider text-muted-foreground/80">
+        <span>30 days ago</span>
+        <span>today</span>
+      </div>
     </div>
   );
 }

@@ -37,6 +37,13 @@ const createSchema = z.object({
     .max(30000, "Threshold must be at most 30000 ms")
     .nullish()
     .transform((v) => (v == null || Number.isNaN(v) ? null : v)),
+  /** Extra consecutive failed checks before a down webhook (0–10). */
+  alertDelay: z
+    .number()
+    .int()
+    .min(0, "Alert delay must be 0 or more")
+    .max(10, "Alert delay can be at most 10 extra checks")
+    .optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -52,7 +59,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { name, url, folderId, intervalSec, method, account, slowThresholdMs } = parsed.data;
+  const { name, url, folderId, intervalSec, method, account, slowThresholdMs, alertDelay } = parsed.data;
 
   if (folderId) {
     const folder = await db.folder.findUnique({ where: { id: folderId } });
@@ -81,6 +88,7 @@ export async function POST(req: NextRequest) {
       method: method ?? "GET",
       account,
       slowThresholdMs: slowThresholdMs ?? null,
+      alertDelay: alertDelay ?? 0,
       position,
     },
   });

@@ -54,6 +54,13 @@ export async function GET(req: NextRequest) {
   const rows: PublicStatusMonitor[] = monitors.map((m, i) => {
     const stats = bundle.statsByMonitor.get(m.id);
     const up = m.lastStatus === "up";
+    // Response-time sparkline series: newest ≤20 checks (48h window) that
+    // collectMonitorStats already fetched — chronological order, null for
+    // failed checks so the sparkline shows gaps, never fake zeroes.
+    const spark = (bundle.recentByMonitor.get(m.id) ?? [])
+      .slice()
+      .reverse()
+      .map((c) => (c.status === "up" ? c.responseMs : null));
     return {
       id: m.id,
       name: m.name,
@@ -74,6 +81,7 @@ export async function GET(req: NextRequest) {
       lastDownAt: stats?.lastDownAt ?? null,
       daily: dailies[i] ?? [],
       maintenance: activeMaintenance.has(m.id) || null,
+      spark,
     };
   });
 

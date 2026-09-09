@@ -105,14 +105,34 @@ export async function runCheck(monitor: Monitor) {
     },
   });
 
-  // Notification logic — maintenance-aware. lastNotifiedStatus is the last
-  // status a webhook was actually sent for. It diverges from lastStatus while
-  // a maintenance window suppresses events, so a service that went down
-  // during maintenance (and stayed down) still raises "down" on the first
-  // check AFTER the window ends. Downtime itself is always recorded honestly.
+  // Consecutive-failure streak, counting THIS check — powers the alert delay
+  // and is reset by any success.
+  const consecutiveDowns = status === "down" ? (monitor.consecutiveDowns ?? 0) + 1 : 0;
+
+  // Notification logic — maintenance- and delay-aware. lastNotifiedStatus is
+  // the last status a webhook was actually sent for. It diverges from
+  // lastStatus while a maintenance window suppresses events or an alert
+  // delay is still confirming, so a service that went down during either
+  // still raises "down" on the first check after it ends. Downtime itself is
+  // always recorded honestly.
   const effectivePrevious = monitor.lastNotifiedStatus ?? previousStatus;
-  const event = isTransition(effectivePrevious, status);
+  let event = isTransition(effectivePrevious, status);
   let lastNotifiedStatus: string | undefined;
+  if (
+    event === "down" &&
+    monitor.alertDelay > 0 &&
+    consecutiveDowns <= monitor.alertDelay
+  ) {
+    // Hold the down event until enough consecutive failures confirm it.
+    // Persist the last NOTIFIED state (which can never be "down" here — a
+    // transition only exists when it differs), so the pending event is
+    // re-evaluated on every later check — deferred, never lost.
+    console.log(
+      `[PING] down event for "${monitor.name}" held — alert delay ${consecutiveDowns}/${monitor.alertDelay + 1} confirmations`,
+    );
+    lastNotifiedStatus = monitor.lastNotifiedStatus ?? previousStatus ?? "unknown";
+    event = null;
+  }
   if (event) {
     const inMaintenance = await isUnderMaintenance(monitor.id);
     if (inMaintenance) {
@@ -144,6 +164,7 @@ export async function runCheck(monitor: Monitor) {
       lastStatusCode: statusCode,
       lastResponseMs: responseMs,
       lastError: error ? error.slice(0, 200) : null,
+      consecutiveDowns,
       ...(lastNotifiedStatus !== undefined ? { lastNotifiedStatus } : {}),
     },
   });

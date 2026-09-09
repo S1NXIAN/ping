@@ -25,6 +25,7 @@ const schema = z.object({
           .max(30000)
           .nullish()
           .transform((v) => (v == null || Number.isNaN(v) ? null : v)),
+        alertDelay: z.number().int().min(0).max(10).optional(),
         folder: z.string().trim().max(40).nullish(),
       }),
     )
@@ -120,6 +121,7 @@ export async function POST(req: NextRequest) {
         enabled: m.enabled,
         account: m.account ?? null,
         slowThresholdMs: m.slowThresholdMs ?? null,
+        alertDelay: m.alertDelay ?? 0,
         folderId: m.folder ? (folderIds.get(m.folder) ?? null) : null,
         position: nextPosition,
       },

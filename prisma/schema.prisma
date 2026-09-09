@@ -33,6 +33,13 @@ model Monitor {
   // than this, the monitor shows a "slow/degraded" state and (optionally)
   // fires a "slow" webhook. null = latency alerting off for this monitor.
   slowThresholdMs Int?
+  // Alert delay: how many EXTRA consecutive failed checks must land before
+  // a "down" webhook fires (0 = notify on the very first failure). Downtime
+  // is always recorded honestly regardless of this setting — only the
+  // notification waits for confirmation.
+  alertDelay       Int       @default(0)
+  // Running count of consecutive failed checks (reset by any success).
+  consecutiveDowns Int       @default(0)
   incidentNotes  IncidentNote[]
   createdAt      DateTime  @default(now())
   lastCheckAt    DateTime?

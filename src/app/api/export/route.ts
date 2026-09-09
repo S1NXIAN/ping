@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
       enabled: m.enabled,
       account: m.account,
       slowThresholdMs: m.slowThresholdMs,
+      alertDelay: m.alertDelay,
       folder: folders.find((f) => f.id === m.folderId)?.name ?? null,
     })),
     webhookChannels: channels.map((ch) => ({

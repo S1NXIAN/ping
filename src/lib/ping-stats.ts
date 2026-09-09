@@ -259,6 +259,8 @@ export function toMonitorDTO(
     position: monitor.position,
     statusHidden: monitor.statusHidden,
     slowThresholdMs: monitor.slowThresholdMs ?? null,
+    alertDelay: monitor.alertDelay ?? 0,
+    consecutiveDowns: monitor.consecutiveDowns ?? 0,
     degraded: isDegraded(monitor),
     createdAt: monitor.createdAt.toISOString(),
     lastCheckAt: monitor.lastCheckAt?.toISOString() ?? null,

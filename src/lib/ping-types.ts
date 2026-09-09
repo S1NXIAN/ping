@@ -50,6 +50,10 @@ export interface MonitorDTO {
   statusHidden: boolean;
   /** Latency-alert threshold in ms; null = off. */
   slowThresholdMs: number | null;
+  /** Extra consecutive failed checks required before a down webhook (0 = immediate). */
+  alertDelay: number;
+  /** Current consecutive failed-check streak (reset by any success). */
+  consecutiveDowns: number;
   /** True when the last check was UP but slower than slowThresholdMs. */
   degraded: boolean;
   createdAt: string;
@@ -145,6 +149,8 @@ export interface PublicStatusMonitor {
   lastStatusCode: number | null;
   lastDownAt: string | null;
   daily: DailyBucket[]; // days with recorded checks only
+  /** Response ms of the newest ≤20 checks (48h), chronological; null = failed check. */
+  spark: Array<number | null>;
 }
 
 /** A down period on the public status page, derived from recorded checks. */
