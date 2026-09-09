@@ -1,0 +1,34 @@
+# Deploy PING itself on Render.
+#
+# Honest notes about the free plan:
+# - Free web services have an ephemeral filesystem. This blueprint mounts a
+#   persistent disk (paid feature) so your SQLite database survives restarts
+#   and deploys. On a strictly-free deployment without a disk, the database
+#   resets on every restart — use Settings → "Export monitors" to back up,
+#   or point DATABASE_URL at a durable location instead.
+# - Free instances spin down after 15 minutes without traffic. Pair this with
+#   an external keep-alive scheduler hitting /api/cron/tick (see README).
+# - Free instance hours are pooled per workspace (~750/month) — only one free
+#   service can realistically stay awake 24/7.
+#
+# Render Blueprint docs: https://render.com/docs/blueprints
+services:
+  - type: web
+    name: ping
+    runtime: node
+    plan: starter # required for the disk below; use `free` to try without persistence
+    buildCommand: npm ci --omit=dev=false && npx prisma generate && npm run build
+    startCommand: npx prisma db push --accept-data-loss && npm run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        value: file:/var/data/ping.db
+      - key: NODE_ENV
+        value: production
+      # Optional: require ?token=<secret> on /api/cron/tick
+      # - key: CRON_SECRET
+      #   generateValue: true
+    disk:
+      name: ping-data
+      mountPath: /var/data
+      sizeGB: 1

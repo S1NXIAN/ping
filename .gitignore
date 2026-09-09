@@ -1,0 +1,75 @@
+# ── Dependencies ────────────────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# ── Build output / generated files ──────────────────────────────────────────
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# ── Caches ──────────────────────────────────────────────────────────────────
+.turbo/
+.cache/
+.parcel-cache/
+.eslintcache
+.vercel/
+coverage/
+
+# ── Environment / secrets (commit .env.example instead) ─────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Database (contains password hash & user data — never commit) ────────────
+db/*.db
+db/*.db-journal
+db/*.sqlite*
+*.sqlite
+*.sqlite3
+
+# ── Logs / temporary files ──────────────────────────────────────────────────
+*.log
+dev.log
+dev.out.log
+logs/
+*.pid
+*.seed
+*.tmp
+tmp/
+
+# ── OS / editor ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+
+# ── Local development / sandbox artifacts (not part of the app) ─────────────
+# internal dev-process notes (contains credentials)
+worklog.md
+# local reference screenshots
+upload/
+download/
+.zscripts/
+.claude/
+.z-ai-config/
+skills/
+# local gateway config
+Caddyfile
+mini-services/
+examples/
+tests/
+
+# ── Misc ────────────────────────────────────────────────────────────────────
+*.pem
+*.local

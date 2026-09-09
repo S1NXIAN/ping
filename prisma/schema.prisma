@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// A folder groups monitors (e.g. "Render Free services")
+model Folder {
+  id        String    @id @default(cuid())
+  name      String
+  createdAt DateTime  @default(now())
+  monitors  Monitor[]
+}
+
+// A monitored website / service
+model Monitor {
+  id             String    @id @default(cuid())
+  name           String
+  url            String
+  method         String    @default("GET") // GET | HEAD
+  intervalSec    Int       @default(300) // seconds between checks (min 60)
+  enabled        Boolean   @default(true)
+  folderId       String?
+  folder         Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  createdAt      DateTime  @default(now())
+  lastCheckAt    DateTime?
+  lastStatus     String? // "up" | "down"
+  lastStatusCode Int?
+  lastResponseMs Int?
+  lastError      String?
+  checks         Check[]
+}
+
+// One health-check result. Only real, recorded checks exist here.
+model Check {
+  id          String   @id @default(cuid())
+  monitorId   String
+  monitor     Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  status      String // "up" | "down"
+  statusCode  Int?
+  responseMs  Int?
+  error       String?
+  checkedAt   DateTime @default(now())
+
+  @@index([monitorId, checkedAt])
+}
+
+// Server-side sessions for the single-password auth
+model Session {
+  token     String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// Singleton row holding app settings (id = "main")
+model Settings {
+  id           String   @id @default("main")
+  passwordHash String
+  passwordSalt String
+  updatedAt    DateTime @updatedAt
+}
