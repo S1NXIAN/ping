@@ -9,6 +9,9 @@ export const MAX_CONCURRENCY = 5;
 export const RETENTION_DAYS = 30;
 export const MAX_CHECKS_PER_MONITOR = 1000;
 export const SCHEDULED_PING_RETENTION_DAYS = 7;
+export const MAINTENANCE_RETENTION_DAYS = 7;
+export const MAX_WINDOWS_PER_MONITOR = 10;
+export const MAX_WINDOWS_TOTAL = 50;
 
 export interface TickResult {
   ran: number;
@@ -44,6 +47,14 @@ function describeError(e: unknown): string {
   if (code === "UND_ERR_CONNECT_TIMEOUT") return "Connection timed out";
   if (code) return `Network error (${code})`;
   return (err?.message ?? "Request failed").slice(0, 200);
+}
+
+/** True while `monitorId` is inside an active maintenance window right now. */
+export async function isUnderMaintenance(monitorId: string, now = new Date()): Promise<boolean> {
+  const n = await db.maintenanceWindow.count({
+    where: { monitorId, startsAt: { lte: now }, endsAt: { gte: now } },
+  });
+  return n > 0;
 }
 
 /** Runs one real HTTP check and persists the result. */
@@ -93,6 +104,38 @@ export async function runCheck(monitor: Monitor) {
       error: error ? error.slice(0, 200) : null,
     },
   });
+
+  // Notification logic — maintenance-aware. lastNotifiedStatus is the last
+  // status a webhook was actually sent for. It diverges from lastStatus while
+  // a maintenance window suppresses events, so a service that went down
+  // during maintenance (and stayed down) still raises "down" on the first
+  // check AFTER the window ends. Downtime itself is always recorded honestly.
+  const effectivePrevious = monitor.lastNotifiedStatus ?? previousStatus;
+  const event = isTransition(effectivePrevious, status);
+  let lastNotifiedStatus: string | undefined;
+  if (event) {
+    const inMaintenance = await isUnderMaintenance(monitor.id);
+    if (inMaintenance) {
+      // Suppress: keep the old lastNotifiedStatus so the divergence is
+      // remembered and the event re-fires once the window is over. "unknown"
+      // is the sentinel for "no notification has ever been sent" — it keeps
+      // a first-check event alive through a window that started before it.
+      lastNotifiedStatus = monitor.lastNotifiedStatus ?? previousStatus ?? "unknown";
+      console.log(
+        `[PING] ${event} transition for "${monitor.name}" suppressed — active maintenance window`,
+      );
+    } else {
+      void fireWebhooks(event, monitor, {
+        status,
+        statusCode,
+        responseMs,
+        error: error ? error.slice(0, 200) : null,
+        checkedAt: check.checkedAt.toISOString(),
+      });
+      lastNotifiedStatus = status;
+    }
+  }
+
   await db.monitor.update({
     where: { id: monitor.id },
     data: {
@@ -101,19 +144,9 @@ export async function runCheck(monitor: Monitor) {
       lastStatusCode: statusCode,
       lastResponseMs: responseMs,
       lastError: error ? error.slice(0, 200) : null,
+      ...(lastNotifiedStatus !== undefined ? { lastNotifiedStatus } : {}),
     },
   });
-  // Notify webhook channels on up↔down transitions (fire-and-forget, never throws).
-  const event = isTransition(previousStatus, status);
-  if (event) {
-    void fireWebhooks(event, monitor, {
-      status,
-      statusCode,
-      responseMs,
-      error: error ? error.slice(0, 200) : null,
-      checkedAt: check.checkedAt.toISOString(),
-    });
-  }
   return check;
 }
 
@@ -183,7 +216,7 @@ export async function runDueChecks(): Promise<TickResult> {
   }
 }
 
-/** Prunes old checks (retention) and per-monitor caps; also drops expired sessions and old scheduled-ping records. */
+/** Prunes old checks (retention) and per-monitor caps; also drops expired sessions, old scheduled-ping records and long-past maintenance windows. */
 export async function pruneChecks(): Promise<{ deleted: number }> {
   const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
   const old = await db.check.deleteMany({ where: { checkedAt: { lt: cutoff } } });
@@ -192,6 +225,11 @@ export async function pruneChecks(): Promise<{ deleted: number }> {
   // Finished scheduled pings only matter shortly after they ran — drop old ones.
   await db.scheduledPing.deleteMany({
     where: { status: "done", ranAt: { lt: new Date(Date.now() - SCHEDULED_PING_RETENTION_DAYS * 86400_000) } },
+  });
+
+  // Maintenance windows that ended more than a week ago are no longer useful.
+  await db.maintenanceWindow.deleteMany({
+    where: { endsAt: { lt: new Date(Date.now() - MAINTENANCE_RETENTION_DAYS * 86400_000) } },
   });
 
   const monitors = await db.monitor.findMany({ select: { id: true } });

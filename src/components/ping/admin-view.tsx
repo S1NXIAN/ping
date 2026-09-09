@@ -272,6 +272,14 @@ export function AdminView({
       toast({
         description: `Imported ${r.created} monitor${r.created === 1 ? "" : "s"}${
           r.skipped ? `, skipped ${r.skipped} duplicate${r.skipped === 1 ? "" : "s"}` : ""
+        }${
+          r.channelsCreated
+            ? `, ${r.channelsCreated} webhook channel${r.channelsCreated === 1 ? "" : "s"}`
+            : ""
+        }${
+          r.windowsCreated
+            ? `, ${r.windowsCreated} maintenance window${r.windowsCreated === 1 ? "" : "s"}`
+            : ""
         }`,
       });
       loadInfo();

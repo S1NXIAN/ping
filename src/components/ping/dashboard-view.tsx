@@ -19,6 +19,7 @@ import {
   RefreshCw,
   Search,
   Settings,
+  Wrench,
   X,
   XCircle,
 } from "lucide-react";
@@ -41,7 +42,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useOverview } from "@/hooks/use-overview";
 import { api, ApiError, formatUptime, timeAgo } from "@/lib/ping-client";
-import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
+import type { FolderDTO, MaintenanceWindowDTO, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
 import { MonitorCard, type CardDnd } from "./monitor-card";
@@ -49,6 +50,8 @@ import { MonitorDetailSheet } from "./monitor-detail-sheet";
 import { AddMonitorDialog } from "./add-monitor-dialog";
 import { SchedulePingDialog } from "./schedule-ping-dialog";
 import { ScheduledPingsSheet } from "./scheduled-pings-sheet";
+import { MaintenanceDialog } from "./maintenance-dialog";
+import { MaintenanceSheet } from "./maintenance-sheet";
 import { TextPromptDialog } from "./text-prompt-dialog";
 import { StatCard } from "./stat-card";
 
@@ -105,6 +108,10 @@ export function DashboardView({
   const [pingsOpen, setPingsOpen] = useState(false);
   const [scheduleTargetId, setScheduleTargetId] = useState<string | null>(null);
 
+  // maintenance — sheet + per-monitor dialog
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
+  const [maintenanceTargetId, setMaintenanceTargetId] = useState<string | null>(null);
+
   // drag-and-drop reorder (manual sort only)
   const [dragId, setDragId] = useState<string | null>(null);
   const [preview, setPreview] = useState<MonitorDTO[] | null>(null);
@@ -117,6 +124,9 @@ export function DashboardView({
   const detailMonitor = detailId ? (monitors.find((m) => m.id === detailId) ?? null) : null;
   const scheduleMonitor = scheduleTargetId
     ? (monitors.find((m) => m.id === scheduleTargetId) ?? null)
+    : null;
+  const maintenanceMonitor = maintenanceTargetId
+    ? (monitors.find((m) => m.id === maintenanceTargetId) ?? null)
     : null;
 
   // the manual-order list: server order (pinned → position), or the live
@@ -178,6 +188,37 @@ export function DashboardView({
     () => (data?.scheduledPings ?? []).filter((p) => p.status !== "done").length,
     [data?.scheduledPings],
   );
+
+  // maintenance windows — the window to surface on each card: the active one
+  // if any, else the next upcoming one
+  const maintenanceByMonitor = useMemo(() => {
+    const now = Date.now();
+    const map = new Map<string, MaintenanceWindowDTO>();
+    for (const w of data?.maintenance ?? []) {
+      const end = new Date(w.endsAt).getTime();
+      if (end <= now) continue;
+      const existing = map.get(w.monitorId);
+      if (!existing) {
+        map.set(w.monitorId, w);
+        continue;
+      }
+      const exStart = new Date(existing.startsAt).getTime();
+      const wStart = new Date(w.startsAt).getTime();
+      // prefer the active window; otherwise the soonest upcoming
+      const wActive = wStart <= now;
+      const exActive = exStart <= now;
+      if (wActive && !exActive) map.set(w.monitorId, w);
+      else if (wActive === exActive && wStart < exStart) map.set(w.monitorId, w);
+    }
+    return map;
+  }, [data?.maintenance]);
+
+  const activeMaintenanceCount = useMemo(() => {
+    const now = Date.now();
+    return (data?.maintenance ?? []).filter(
+      (w) => new Date(w.startsAt).getTime() <= now && new Date(w.endsAt).getTime() > now,
+    ).length;
+  }, [data?.maintenance]);
 
   const folderStats = useMemo(() => {
     const map = new Map<string, { total: number; down: number }>();
@@ -318,6 +359,11 @@ export function DashboardView({
     refresh(true);
   }
 
+  async function cancelMaintenance(id: string) {
+    await api(`/api/maintenance/${id}`, { method: "DELETE" });
+    refresh(true);
+  }
+
   async function logout() {
     try {
       await api("/api/auth/logout", { method: "POST" });
@@ -423,15 +469,15 @@ export function DashboardView({
           <button
             onClick={() => setActiveFolder("all")}
             className={cn(
-              "flex items-center gap-2 rounded-md border-l-2 px-2.5 py-2 text-sm transition-colors",
+              "flex items-center gap-2.5 rounded-md border-l-2 px-2.5 py-2.5 text-sm transition-colors",
               activeFolder === "all"
                 ? "border-primary bg-secondary font-medium text-foreground"
                 : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
             )}
           >
-            <LayoutGrid className="size-4" aria-hidden="true" />
-            All monitors
-            <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+            <LayoutGrid className="size-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">All monitors</span>
+            <span className="ml-auto rounded-full bg-secondary/80 px-1.5 text-[10px] font-medium tabular-nums text-muted-foreground">
               {monitors.length}
             </span>
           </button>
@@ -444,15 +490,15 @@ export function DashboardView({
                 <button
                   onClick={() => setActiveFolder(f.id)}
                   className={cn(
-                    "flex w-full items-center gap-2 rounded-md border-l-2 px-2.5 py-2 text-sm transition-colors",
+                    "flex w-full items-center gap-2.5 rounded-md border-l-2 px-2.5 py-2.5 text-sm transition-colors",
                     active
                       ? "border-primary bg-secondary font-medium text-foreground"
                       : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
                   )}
                 >
-                  <Folder className={cn("size-4", s?.down ? "text-down" : "text-muted-foreground")} aria-hidden="true" />
+                  <Folder className={cn("size-4 shrink-0", s?.down ? "text-down" : "text-muted-foreground")} aria-hidden="true" />
                   <span className="truncate">{f.name}</span>
-                  <span className="ml-auto pr-6 text-xs tabular-nums text-muted-foreground">
+                  <span className="ml-auto rounded-full bg-secondary/80 px-1.5 pr-5.5 text-[10px] font-medium tabular-nums text-muted-foreground">
                     {s?.total ?? 0}
                   </span>
                 </button>
@@ -564,9 +610,9 @@ export function DashboardView({
             />
           </div>
 
-          {/* toolbar: search + sort + scheduled pings */}
+          {/* toolbar: search + sort + scheduled pings + maintenance */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-0 flex-1 basis-44">
+            <div className="relative min-w-0 basis-full sm:basis-44 sm:flex-1">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input
                 value={query}
@@ -591,7 +637,7 @@ export function DashboardView({
               <SelectTrigger
                 aria-label="Sort monitors"
                 title="How the monitor list is ordered — manual drag order, alphabetical, or status"
-                className="h-9 w-[112px] shrink-0 text-xs"
+                className="h-9 w-[124px] shrink-0 text-xs"
               >
                 <SelectValue />
               </SelectTrigger>
@@ -637,6 +683,29 @@ export function DashboardView({
                   )}
                 >
                   {pendingPingCount}
+                </span>
+              )}
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMaintenanceOpen(true)}
+              className={cn(
+                "relative h-9 shrink-0 gap-1.5 text-xs",
+                activeMaintenanceCount > 0 &&
+                  "border-warn/45 bg-warn/15 text-warn hover:bg-warn/20 hover:text-warn",
+              )}
+              aria-label={`Maintenance windows${activeMaintenanceCount ? ` (${activeMaintenanceCount} active)` : ""}`}
+              title="Maintenance windows — silence alerts during planned work"
+            >
+              <Wrench className="size-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Maintenance</span>
+              {activeMaintenanceCount > 0 && (
+                <span
+                  className="ml-0.5 grid min-w-4 place-items-center rounded-full bg-warn/20 px-1 text-[10px] font-semibold tabular-nums text-warn"
+                >
+                  {activeMaintenanceCount}
                 </span>
               )}
             </Button>
@@ -706,7 +775,9 @@ export function DashboardView({
                     onDeleted={() => refresh(true)}
                     onCheckNow={() => refresh(true)}
                     onSchedulePing={() => setScheduleTargetId(m.id)}
+                    onScheduleMaintenance={() => setMaintenanceTargetId(m.id)}
                     nextPingAt={nextPingByMonitor.get(m.id) ?? null}
+                    maintenanceWindow={maintenanceByMonitor.get(m.id) ?? null}
                     canReorder={sortMode === "manual" && manualList.length > 1}
                     canMoveUp={mi > 0}
                     canMoveDown={mi >= 0 && mi < manualList.length - 1}
@@ -738,7 +809,7 @@ export function DashboardView({
           <span>honest uptime for Render Free</span>
           <span className="ml-auto flex items-center gap-3">
             <span>not affiliated with render.com</span>
-            <span className="tabular-nums">
+            <span className="tabular-nums text-foreground/70">
               updated {data ? timeAgo(data.serverTime) : "…"}
             </span>
           </span>
@@ -788,6 +859,24 @@ export function DashboardView({
         onOpenChange={setPingsOpen}
         pings={data?.scheduledPings ?? []}
         onCancel={cancelScheduledPing}
+        serverTime={data?.serverTime ?? null}
+      />
+
+      <MaintenanceDialog
+        open={!!maintenanceTargetId}
+        onOpenChange={(o) => {
+          if (!o) setMaintenanceTargetId(null);
+        }}
+        monitor={maintenanceMonitor}
+        windows={data?.maintenance ?? []}
+        onChanged={() => refresh(true)}
+      />
+
+      <MaintenanceSheet
+        open={maintenanceOpen}
+        onOpenChange={setMaintenanceOpen}
+        windows={data?.maintenance ?? []}
+        onCancel={cancelMaintenance}
         serverTime={data?.serverTime ?? null}
       />
 

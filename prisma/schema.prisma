@@ -35,8 +35,14 @@ model Monitor {
   lastStatusCode Int?
   lastResponseMs Int?
   lastError      String?
+  // Last status a webhook was actually sent for. Diverges from lastStatus
+  // while a maintenance window suppresses notifications, so a service that
+  // went down during maintenance still raises "down" once it ends.
+  lastNotifiedStatus String?
   checks         Check[]
   scheduledPings ScheduledPing[]
+  maintenanceWindows MaintenanceWindow[]
+  webhookChannels   WebhookChannel[]
 }
 
 // A one-off check explicitly scheduled for a specific moment
@@ -57,6 +63,23 @@ model ScheduledPing {
 
   @@index([status, runAt])
   @@index([monitorId, status])
+}
+
+// A planned maintenance window for one monitor (e.g. a deploy). Checks keep
+// running and being recorded — data stays honest — but down/recovery webhook
+// notifications are suppressed, and the public status page shows a
+// maintenance state instead of a red outage.
+model MaintenanceWindow {
+  id        String   @id @default(cuid())
+  monitorId String
+  monitor   Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  startsAt  DateTime
+  endsAt    DateTime
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([monitorId])
+  @@index([startsAt, endsAt])
 }
 
 // One health-check result. Only real, recorded checks exist here.
@@ -83,10 +106,13 @@ model Session {
 // A webhook endpoint notified when a monitor goes down or recovers.
 // Each event is one fire-and-forget POST (10s timeout, no retries) —
 // lastDelivery* fields record the honest outcome of the latest attempt.
+// monitorId routes events for that monitor only; null = every monitor.
 model WebhookChannel {
   id             String    @id @default(cuid())
   name           String
   url            String
+  monitorId      String?
+  monitor        Monitor?  @relation(fields: [monitorId], references: [id], onDelete: SetNull)
   notifyDown     Boolean   @default(true)
   notifyUp       Boolean   @default(true)
   enabled        Boolean   @default(true)

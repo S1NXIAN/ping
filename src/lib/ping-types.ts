@@ -73,6 +73,17 @@ export interface ScheduledPingDTO {
   error: string | null;
 }
 
+/** A planned maintenance window for one monitor. */
+export interface MaintenanceWindowDTO {
+  id: string;
+  monitorId: string;
+  monitorName: string;
+  startsAt: string; // ISO
+  endsAt: string; // ISO
+  note: string | null;
+  createdAt: string;
+}
+
 export interface OverviewSummary {
   monitors: number;
   up: number;
@@ -91,6 +102,8 @@ export interface OverviewResponse {
   summary: OverviewSummary;
   /** Pending + recently finished scheduled pings (newest activity first). */
   scheduledPings: ScheduledPingDTO[];
+  /** Active, upcoming and recently-ended maintenance windows. */
+  maintenance: MaintenanceWindowDTO[];
   serverTime: string;
 }
 
@@ -114,6 +127,8 @@ export interface PublicStatusMonitor {
   id: string;
   name: string;
   status: "up" | "down" | "paused" | "pending";
+  /** Truthy when an active maintenance window covers this monitor. */
+  maintenance: boolean | null;
   uptime24h: number | null;
   uptime7d: number | null;
   uptime30d: number | null;
@@ -133,6 +148,17 @@ export interface PublicIncident {
   endedAt: string | null;
   downChecks: number;
   lastStatusCode: number | null;
+  /** True when the down period overlaps a planned maintenance window. */
+  duringMaintenance: boolean;
+}
+
+/** Maintenance window as shown on the public status page (name + times only). */
+export interface PublicMaintenance {
+  monitorId: string;
+  monitorName: string;
+  startsAt: string;
+  endsAt: string;
+  note: string | null;
 }
 
 export interface PublicStatusResponse {
@@ -149,6 +175,8 @@ export interface PublicStatusResponse {
   title: string | null;
   /** Down periods in the last 30 days, newest first (derived from real checks). */
   incidents: PublicIncident[];
+  /** Active + upcoming maintenance windows for visible monitors. */
+  maintenance: PublicMaintenance[];
   serverTime: string;
 }
 
@@ -165,6 +193,9 @@ export interface WebhookChannelDTO {
   id: string;
   name: string;
   url: string;
+  /** Routes events for this monitor only; null = every monitor. */
+  monitorId: string | null;
+  monitorName: string | null;
   notifyDown: boolean;
   notifyUp: boolean;
   enabled: boolean;
@@ -225,4 +256,8 @@ export interface ImportResult {
   created: number;
   skipped: number;
   foldersCreated: number;
+  /** Webhook channels imported (0 for v1 exports without channel data). */
+  channelsCreated: number;
+  /** Future maintenance windows imported. */
+  windowsCreated: number;
 }

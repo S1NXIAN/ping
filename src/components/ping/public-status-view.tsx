@@ -1,10 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Activity, AlertTriangle, CalendarClock, RefreshCw } from "lucide-react";
+import { Activity, AlertTriangle, CalendarClock, Hammer, RefreshCw, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api, ApiError, formatDateTime, formatDuration, formatMs, formatUptime, timeAgo } from "@/lib/ping-client";
-import type { DailyBucket, PublicIncident, PublicStatusMonitor, PublicStatusResponse } from "@/lib/ping-types";
+import type {
+  DailyBucket,
+  PublicIncident,
+  PublicMaintenance,
+  PublicStatusMonitor,
+  PublicStatusResponse,
+} from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
 import { StatusDot } from "./status-dot";
@@ -80,7 +86,7 @@ export function PublicStatusView({ token }: { token: string }) {
   }
 
   const summary = data?.summary;
-  const banner = bannerState(summary);
+  const banner = bannerState(summary, data?.maintenance ?? [], now);
 
   return (
     <div className="ping-ambient flex min-h-dvh flex-col">
@@ -147,6 +153,7 @@ export function PublicStatusView({ token }: { token: string }) {
                       {summary.down > 0 && ` · ${summary.down} down`}
                       {summary.paused > 0 && ` · ${summary.paused} paused`}
                       {summary.pending > 0 && ` · ${summary.pending} awaiting first check`}
+                      {banner.maintCount > 0 && ` · ${banner.maintCount} under maintenance`}
                       {" · checks are real HTTP requests"}
                     </>
                   ) : (
@@ -154,10 +161,17 @@ export function PublicStatusView({ token }: { token: string }) {
                   )}
                 </p>
               </div>
-              <CalendarClock
-                className="ml-auto hidden size-8 shrink-0 opacity-40 sm:block"
-                aria-hidden="true"
-              />
+              {banner.maintCount > 0 ? (
+                <Hammer
+                  className="ml-auto hidden size-8 shrink-0 opacity-40 sm:block"
+                  aria-hidden="true"
+                />
+              ) : (
+                <CalendarClock
+                  className="ml-auto hidden size-8 shrink-0 opacity-40 sm:block"
+                  aria-hidden="true"
+                />
+              )}
             </section>
 
             {/* monitor rows */}
@@ -171,6 +185,11 @@ export function PublicStatusView({ token }: { token: string }) {
                   <MonitorRow key={m.id} monitor={m} now={now} />
                 ))}
               </div>
+            )}
+
+            {/* scheduled maintenance (planned windows, from real data) */}
+            {data.maintenance.length > 0 && (
+              <MaintenanceList maintenance={data.maintenance} now={now} />
             )}
 
             {/* incidents (derived from real checks only) */}
@@ -194,7 +213,7 @@ export function PublicStatusView({ token }: { token: string }) {
 
       <footer className="sticky bottom-0 z-20 mt-auto border-t bg-background/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-2xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[11px] text-muted-foreground">
-          <span className="font-medium text-foreground/70">PING</span>
+          <span className="font-medium text-foreground/75">PING</span>
           <span>honest uptime monitoring</span>
           <span className="ml-auto">not affiliated with render.com</span>
         </div>
@@ -203,16 +222,25 @@ export function PublicStatusView({ token }: { token: string }) {
   );
 }
 
-function bannerState(summary: PublicStatusResponse["summary"] | undefined): {
+function bannerState(
+  summary: PublicStatusResponse["summary"] | undefined,
+  maintenance: PublicMaintenance[],
+  now: number,
+): {
   headline: string;
   tone: string;
   dot: "up" | "down" | "paused" | "pending";
+  maintCount: number;
 } {
+  const maintCount = maintenance.filter(
+    (w) => new Date(w.startsAt).getTime() <= now && new Date(w.endsAt).getTime() > now,
+  ).length;
   if (!summary || summary.total === 0) {
     return {
       headline: "Nothing tracked yet",
       tone: "border-border bg-card",
       dot: "paused",
+      maintCount,
     };
   }
   if (summary.down > 0) {
@@ -221,6 +249,18 @@ function bannerState(summary: PublicStatusResponse["summary"] | undefined): {
         summary.down === 1 ? "One service is down" : `${summary.down} services are down`,
       tone: "border-down/40 bg-down/10",
       dot: "down",
+      maintCount,
+    };
+  }
+  if (maintCount > 0) {
+    return {
+      headline:
+        maintCount === 1
+          ? "All systems operational · one service under maintenance"
+          : `All systems operational · ${maintCount} services under maintenance`,
+      tone: "border-warn/35 bg-warn/[0.08]",
+      dot: "paused",
+      maintCount,
     };
   }
   if (summary.up > 0) {
@@ -228,6 +268,7 @@ function bannerState(summary: PublicStatusResponse["summary"] | undefined): {
       headline: "All systems operational",
       tone: "border-up/30 bg-up/10",
       dot: "up",
+      maintCount,
     };
   }
   if (summary.pending > 0) {
@@ -235,26 +276,40 @@ function bannerState(summary: PublicStatusResponse["summary"] | undefined): {
       headline: "Waiting for the first checks",
       tone: "border-border bg-card",
       dot: "pending",
+      maintCount,
     };
   }
   return {
     headline: "All monitors are paused",
     tone: "border-border bg-card",
     dot: "paused",
+    maintCount,
   };
 }
 
 function MonitorRow({ monitor, now }: { monitor: PublicStatusMonitor; now: number }) {
+  const maintenance =
+    monitor.maintenance === true && monitor.status !== "paused" ? monitor : null;
   return (
     <article
       className={cn(
-        "ping-fade-up rounded-xl border bg-card p-4",
-        monitor.status === "down" && "border-down/30",
+        "ping-fade-up rounded-xl border bg-card p-4 transition-colors hover:border-primary/30 hover:bg-card/80",
+        monitor.status === "down" && !maintenance && "border-down/30 hover:border-down/50",
+        maintenance && "border-warn/30 hover:border-warn/50",
       )}
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <StatusDot status={monitor.status} pulse={monitor.status === "up" || monitor.status === "down"} />
         <h2 className="min-w-0 truncate text-sm font-medium text-foreground">{monitor.name}</h2>
+        {maintenance && (
+          <span
+            title="Planned maintenance — checks continue and are recorded; “down” here is expected"
+            className="inline-flex items-center gap-1 rounded-full border border-warn/35 bg-warn/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-warn"
+          >
+            <Wrench className="size-2.5" aria-hidden="true" />
+            maintenance
+          </span>
+        )}
         {monitor.status === "paused" && (
           <span className="rounded-full border border-border bg-muted px-1.5 py-px text-[10px] uppercase tracking-wide text-muted-foreground">
             paused
@@ -332,6 +387,14 @@ function IncidentList({ incidents, now }: { incidents: PublicIncident[]; now: nu
                     ongoing
                   </span>
                 )}
+                {inc.duringMaintenance && (
+                  <span
+                    title="This down period overlapped a planned maintenance window"
+                    className="rounded-full border border-warn/35 bg-warn/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-warn"
+                  >
+                    during maintenance
+                  </span>
+                )}
                 <span className="ml-auto text-xs tabular-nums text-muted-foreground">
                   {formatDuration(Math.round(durationMs / 1000))}
                 </span>
@@ -351,7 +414,73 @@ function IncidentList({ incidents, now }: { incidents: PublicIncident[]; now: nu
       </ul>
       <p className="mt-2.5 text-[10px] leading-relaxed text-muted-foreground/80">
         Incidents are stitched from recorded checks — consecutive failed checks count as one
-        incident. Gaps with no recorded data never count as downtime.
+        incident. Gaps with no recorded data never count as downtime, and down periods fully
+        inside planned maintenance are not listed as incidents.
+      </p>
+    </section>
+  );
+}
+
+/** Active + upcoming planned maintenance windows (real rows, not derived). */
+function MaintenanceList({ maintenance, now }: { maintenance: PublicMaintenance[]; now: number }) {
+  const active = maintenance.filter(
+    (w) => new Date(w.startsAt).getTime() <= now,
+  );
+  const upcoming = maintenance.filter((w) => new Date(w.startsAt).getTime() > now);
+  return (
+    <section className="ping-fade-up rounded-xl border bg-card p-4">
+      <h2 className="flex items-center gap-2 text-sm font-semibold">
+        <Wrench className="size-4 text-warn" aria-hidden="true" />
+        Maintenance <span className="font-normal text-muted-foreground">· planned windows</span>
+      </h2>
+      <ul className="mt-3 divide-y divide-border">
+        {[...active, ...upcoming].map((w, i) => {
+          const start = new Date(w.startsAt).getTime();
+          const end = new Date(w.endsAt).getTime();
+          const isActive = start <= now;
+          const minsLeft = Math.max(0, Math.round((end - now) / 60_000));
+          const minsToStart = Math.max(0, Math.round((start - now) / 60_000));
+          return (
+            <li key={`${w.monitorId}-${w.startsAt}-${i}`} className="py-2.5 first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span className="text-sm font-medium text-foreground">{w.monitorName}</span>
+                <span
+                  className={cn(
+                    "rounded-full border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide",
+                    isActive
+                      ? "border-warn/40 bg-warn/10 text-warn"
+                      : "border-border bg-muted text-muted-foreground",
+                  )}
+                >
+                  {isActive ? "in progress" : "scheduled"}
+                </span>
+                <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+                  {formatDuration(Math.round((end - start) / 1000))}
+                </span>
+              </div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                <span>
+                  {formatDateTime(w.startsAt)} → {formatDateTime(w.endsAt)}
+                </span>
+                {isActive && (
+                  <span className="text-warn">
+                    {minsLeft <= 0 ? "ending…" : minsLeft < 60 ? `${minsLeft}m left` : `${Math.round(minsLeft / 60)}h left`}
+                  </span>
+                )}
+                {!isActive && (
+                  <span>
+                    {minsToStart < 60 ? `starts in ${minsToStart}m` : `starts in ${Math.round(minsToStart / 60)}h`}
+                  </span>
+                )}
+                {w.note && <span className="italic">{w.note}</span>}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-2.5 text-[10px] leading-relaxed text-muted-foreground/80">
+        During maintenance, checks still run and are recorded — failures are expected and do not
+        raise alerts.
       </p>
     </section>
   );

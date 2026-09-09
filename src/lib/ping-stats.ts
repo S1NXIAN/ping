@@ -3,7 +3,7 @@
 // is no data the value is null, never an estimate.
 import type { Check, Folder, Monitor } from "@prisma/client";
 import { db } from "./db";
-import type { CheckDTO, MonitorDTO, MonitorStatsDTO, ScheduledPingDTO } from "./ping-types";
+import type { CheckDTO, MaintenanceWindowDTO, MonitorDTO, MonitorStatsDTO, ScheduledPingDTO } from "./ping-types";
 
 const H24 = 24 * 60 * 60 * 1000;
 
@@ -80,6 +80,22 @@ export function toScheduledPingDTO(
     statusCode: p.statusCode ?? null,
     responseMs: p.responseMs ?? null,
     error: p.error ?? null,
+  };
+}
+
+/** Maps a MaintenanceWindow row to its DTO (monitor name resolved by the caller). */
+export function toMaintenanceDTO(
+  w: { id: string; monitorId: string; startsAt: Date; endsAt: Date; note: string | null; createdAt: Date },
+  monitorName: string,
+): MaintenanceWindowDTO {
+  return {
+    id: w.id,
+    monitorId: w.monitorId,
+    monitorName,
+    startsAt: w.startsAt.toISOString(),
+    endsAt: w.endsAt.toISOString(),
+    note: w.note ?? null,
+    createdAt: w.createdAt.toISOString(),
   };
 }
 

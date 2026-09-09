@@ -112,8 +112,10 @@ export async function deliverWebhook(url: string, payload: WebhookPayload): Prom
 
 /**
  * Fires an up/down/test event to every enabled channel subscribed to that
- * event, updating each channel's honest last-attempt stats. Fire-and-forget
- * safe: callers may `void` it; it never rejects.
+ * event AND routed to this monitor (channels with a monitorId only receive
+ * that monitor's events; null receives everything), updating each channel's
+ * honest last-attempt stats. Fire-and-forget safe: callers may `void` it;
+ * it never rejects.
  */
 export async function fireWebhooks(
   event: WebhookEvent,
@@ -123,8 +125,12 @@ export async function fireWebhooks(
   try {
     const where =
       event === "test"
-        ? { enabled: true }
-        : { enabled: true, [event === "down" ? "notifyDown" : "notifyUp"]: true };
+        ? { enabled: true, OR: [{ monitorId: null }, { monitorId: monitor.id }] }
+        : {
+            enabled: true,
+            [event === "down" ? "notifyDown" : "notifyUp"]: true,
+            OR: [{ monitorId: null }, { monitorId: monitor.id }],
+          };
     const channels = await db.webhookChannel.findMany({ where });
     if (channels.length === 0) return { notified: 0 };
 

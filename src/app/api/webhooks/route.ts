@@ -5,21 +5,26 @@ import { adminGuard } from "@/lib/ping-auth";
 import { MAX_WEBHOOK_CHANNELS } from "@/lib/webhooks";
 import type { WebhookChannelDTO } from "@/lib/ping-types";
 
-function toDTO(ch: {
-  id: string;
-  name: string;
-  url: string;
-  notifyDown: boolean;
-  notifyUp: boolean;
-  enabled: boolean;
-  createdAt: Date;
-  deliveries: number;
-  lastDeliveryAt: Date | null;
-  lastOk: boolean | null;
-  lastError: string | null;
-}): WebhookChannelDTO {
+function toDTO(
+  ch: {
+    id: string;
+    name: string;
+    url: string;
+    monitorId: string | null;
+    notifyDown: boolean;
+    notifyUp: boolean;
+    enabled: boolean;
+    createdAt: Date;
+    deliveries: number;
+    lastDeliveryAt: Date | null;
+    lastOk: boolean | null;
+    lastError: string | null;
+  },
+  monitorName: string | null,
+): WebhookChannelDTO {
   return {
     ...ch,
+    monitorName,
     createdAt: ch.createdAt.toISOString(),
     lastDeliveryAt: ch.lastDeliveryAt?.toISOString() ?? null,
   };
@@ -44,8 +49,14 @@ export async function GET(req: NextRequest) {
   const unauthorized = await adminGuard(req);
   if (unauthorized) return unauthorized;
 
-  const channels = await db.webhookChannel.findMany({ orderBy: { createdAt: "asc" } });
-  return NextResponse.json(channels.map(toDTO), { headers: { "Cache-Control": "no-store" } });
+  const channels = await db.webhookChannel.findMany({
+    orderBy: { createdAt: "asc" },
+    include: { monitor: { select: { name: true } } },
+  });
+  return NextResponse.json(
+    channels.map((ch) => toDTO(ch, ch.monitor?.name ?? null)),
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 const createSchema = z.object({
@@ -53,6 +64,8 @@ const createSchema = z.object({
   url: urlSchema,
   notifyDown: z.boolean().optional().default(true),
   notifyUp: z.boolean().optional().default(true),
+  /** Route events for this monitor only; omit/null = every monitor. */
+  monitorId: z.string().trim().min(1).nullish(),
 });
 
 /** Creates a notification channel (admin unlock required). */
@@ -77,7 +90,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { name, url, notifyDown, notifyUp } = parsed.data;
+  const { name, url, notifyDown, notifyUp, monitorId } = parsed.data;
   if (!notifyDown && !notifyUp) {
     return NextResponse.json(
       { error: "Enable at least one event (down, up or both)" },
@@ -85,8 +98,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (monitorId) {
+    const monitor = await db.monitor.findUnique({ where: { id: monitorId }, select: { id: true, name: true } });
+    if (!monitor) {
+      return NextResponse.json({ error: "Monitor not found" }, { status: 404 });
+    }
+    const channel = await db.webhookChannel.create({
+      data: { name, url, notifyDown, notifyUp, monitorId },
+    });
+    return NextResponse.json(toDTO(channel, monitor.name), { status: 201 });
+  }
+
   const channel = await db.webhookChannel.create({
-    data: { name, url, notifyDown, notifyUp },
+    data: { name, url, notifyDown, notifyUp, monitorId: null },
   });
-  return NextResponse.json(toDTO(channel), { status: 201 });
+  return NextResponse.json(toDTO(channel, null), { status: 201 });
 }

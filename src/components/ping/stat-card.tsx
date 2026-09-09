@@ -31,15 +31,15 @@ export function StatCard({
         className,
       )}
     >
-      <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        {Icon && <Icon className="size-3.5" aria-hidden="true" />}
+      <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/85">
+        {Icon && <Icon className="size-3.5 shrink-0" aria-hidden="true" />}
         {label}
       </div>
-      <div className={cn("mt-1.5 text-lg font-semibold tabular-nums leading-tight", toneClass)}>
+      <div className={cn("mt-1.5 text-xl font-bold tabular-nums leading-tight tracking-tight", toneClass)}>
         {value}
       </div>
       {sub != null && (
-        <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{sub}</div>
+        <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground/75">{sub}</div>
       )}
     </div>
   );

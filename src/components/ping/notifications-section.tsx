@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Bell,
   Check,
+  Crosshair,
   Loader2,
   MessageSquareWarning,
   Plus,
@@ -16,10 +17,17 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { api, ApiError, timeAgo } from "@/lib/ping-client";
-import type { WebhookChannelDTO } from "@/lib/ping-types";
+import type { MonitorDTO, WebhookChannelDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -36,10 +44,12 @@ export function NotificationsSection({
 }) {
   const { toast } = useToast();
   const [channels, setChannels] = useState<WebhookChannelDTO[] | null>(null);
+  const [monitors, setMonitors] = useState<MonitorDTO[]>([]);
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [notifyDown, setNotifyDown] = useState(true);
   const [notifyUp, setNotifyUp] = useState(true);
+  const [routeMonitorId, setRouteMonitorId] = useState<string>("all");
   const [adding, setAdding] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -72,6 +82,10 @@ export function NotificationsSection({
 
   useEffect(() => {
     load();
+    // monitor list for routing dropdowns (session-guarded, no admin lock needed)
+    api<{ monitors: MonitorDTO[] }>("/api/overview")
+      .then((r) => setMonitors(r.monitors))
+      .catch(() => undefined);
   }, [load]);
 
   useEffect(() => {
@@ -85,11 +99,18 @@ export function NotificationsSection({
     try {
       const ch = await api<WebhookChannelDTO>("/api/webhooks", {
         method: "POST",
-        body: JSON.stringify({ name, url, notifyDown, notifyUp }),
+        body: JSON.stringify({
+          name,
+          url,
+          notifyDown,
+          notifyUp,
+          monitorId: routeMonitorId === "all" ? null : routeMonitorId,
+        }),
       });
       setChannels((prev) => [...(prev ?? []), ch]);
       setName("");
       setUrl("");
+      setRouteMonitorId("all");
       toast({ description: `Channel “${ch.name}” added — send it a test to verify` });
     } catch (err) {
       const msg = handleErr(err, "Failed to add channel");
@@ -185,6 +206,41 @@ export function NotificationsSection({
                     {ch.notifyDown && <EventBadge tone="down">down</EventBadge>}
                     {ch.notifyUp && <EventBadge tone="up">up</EventBadge>}
                   </span>
+                  {monitors.length > 0 && (
+                    <Select
+                      value={ch.monitorId ?? "all"}
+                      onValueChange={(v) =>
+                        patchChannel(ch.id, { monitorId: v === "all" ? null : v })
+                      }
+                      disabled={busyId === ch.id}
+                    >
+                      <SelectTrigger
+                        className={cn(
+                          "h-6 w-auto max-w-[150px] gap-1 rounded-full border px-2 text-[10px] font-medium",
+                          ch.monitorId
+                            ? "border-primary/30 bg-primary/10 text-primary"
+                            : "border-border bg-muted text-muted-foreground",
+                        )}
+                        aria-label={`Route channel ${ch.name} to a monitor`}
+                        title={
+                          ch.monitorId
+                            ? `Only events for ${ch.monitorName ?? "this monitor"}`
+                            : "Receives events for every monitor"
+                        }
+                      >
+                        <Crosshair className="size-3 shrink-0" aria-hidden="true" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All monitors</SelectItem>
+                        {monitors.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            <span className="max-w-[220px] truncate">{m.name}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <span
                     className={cn(
                       "ml-auto text-[11px]",
@@ -293,6 +349,30 @@ export function NotificationsSection({
               <Checkbox checked={notifyUp} onCheckedChange={(v) => setNotifyUp(v === true)} />
               Notify on recovery
             </label>
+            {monitors.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="wh-route" className="text-xs text-muted-foreground">
+                  Route
+                </Label>
+                <Select value={routeMonitorId} onValueChange={setRouteMonitorId}>
+                  <SelectTrigger
+                    id="wh-route"
+                    className="h-8 w-[150px] text-xs"
+                    aria-label="Route this channel"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All monitors</SelectItem>
+                    {monitors.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        <span className="max-w-[220px] truncate">{m.name}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <Button
               type="submit"
               size="sm"
@@ -311,6 +391,7 @@ export function NotificationsSection({
             </Button>
           </div>
           <p className="text-[10px] leading-relaxed text-muted-foreground/80">
+            Route a channel to one monitor to keep that monitor&rsquo;s alerts separate from the rest.
             Payload: <code className="rounded bg-muted px-1">text</code> (Slack),{" "}
             <code className="rounded bg-muted px-1">content</code> (Discord) and a structured{" "}
             <code className="rounded bg-muted px-1">{"{ event, monitor, check }"}</code> object —

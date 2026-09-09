@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Trash2,
   UserRound,
+  Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,10 +57,20 @@ import {
   hostOf,
   timeAgo,
 } from "@/lib/ping-client";
-import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
+import type { FolderDTO, MaintenanceWindowDTO, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { StatusDot, statusLabel } from "./status-dot";
 import { checksToSegments, UptimeBars } from "./uptime-bars";
+
+/** Time left in an active maintenance window: "12m left" / "1h 05m left". */
+function formatMaintenanceLeft(endsAt: string): string {
+  const s = Math.max(0, (new Date(endsAt).getTime() - Date.now()) / 1000);
+  if (s <= 0) return "ending…";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m left`;
+  const h = Math.floor(m / 60);
+  return h < 24 ? `${h}h ${String(m % 60).padStart(2, "0")}m left` : `${Math.floor(h / 24)}d ${h % 24}h left`;
+}
 
 /** Drag-and-drop contract owned by the dashboard (manual sort mode only). */
 export interface CardDnd {
@@ -78,7 +89,9 @@ export function MonitorCard({
   onDeleted,
   onCheckNow,
   onSchedulePing,
+  onScheduleMaintenance,
   nextPingAt,
+  maintenanceWindow,
   canReorder,
   canMoveUp,
   canMoveDown,
@@ -93,7 +106,10 @@ export function MonitorCard({
   onDeleted: () => void;
   onCheckNow: () => void;
   onSchedulePing: () => void;
+  onScheduleMaintenance: () => void;
   nextPingAt: string | null;
+  /** Active or next upcoming window for this monitor (null = none). */
+  maintenanceWindow: MaintenanceWindowDTO | null;
   canReorder: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
@@ -114,11 +130,21 @@ export function MonitorCard({
         ? "down"
         : "pending";
 
+  // Maintenance context: is the window active right now, or upcoming?
+  const maintenanceNow =
+    maintenanceWindow != null &&
+    new Date(maintenanceWindow.startsAt).getTime() <= Date.now() &&
+    new Date(maintenanceWindow.endsAt).getTime() > Date.now();
+  const maintenanceUpcoming =
+    maintenanceWindow != null && new Date(maintenanceWindow.startsAt).getTime() > Date.now();
+
   const statusTone =
     status === "up"
       ? "bg-up/10 text-up border-up/25"
       : status === "down"
-        ? "bg-down/10 text-down border-down/25"
+        ? maintenanceNow
+          ? "bg-warn/10 text-warn border-warn/30"
+          : "bg-down/10 text-down border-down/25"
         : "bg-muted text-muted-foreground border-border";
 
   const beingDragged = dnd?.isDragging === true && dragArmed;
@@ -248,15 +274,22 @@ export function MonitorCard({
           dnd?.onDragEnd();
         }}
         className={cn(
-          "ping-fade-up group relative cursor-pointer rounded-lg border bg-card p-4 outline-none transition-colors",
-          "hover:border-primary/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40",
-          status === "down" && "border-down/30 hover:border-down/50",
-          monitor.pinned && "border-primary/35 bg-primary/[0.03] hover:border-primary/50",
-          status === "down" && monitor.pinned && "border-down/40 bg-down/[0.04]",
+          "ping-fade-up group relative cursor-pointer rounded-lg border bg-card p-4 outline-none transition-colors sm:p-5",
+          "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40",
+          status === "down" && !maintenanceNow && "border-down/30 hover:border-down/50",
+          !monitor.pinned && !maintenanceNow &&
+            "hover:border-primary/40 hover:bg-card/70",
+          monitor.pinned && !maintenanceNow &&
+            "border-primary/35 bg-primary/[0.03] hover:border-primary/50 hover:bg-primary/[0.05]",
+          status === "down" && monitor.pinned && !maintenanceNow && "border-down/40 bg-down/[0.04]",
+          maintenanceNow &&
+            "border-warn/35 bg-warn/[0.03] hover:border-warn/50 hover:bg-warn/[0.06]",
           beingDragged && "opacity-40",
           dnd?.isDragging && !dragArmed && "transition-transform",
         )}
-        aria-label={`Monitor ${monitor.name}, status ${statusLabel(status)}${monitor.pinned ? ", pinned" : ""}`}
+        aria-label={`Monitor ${monitor.name}, status ${
+          status === "down" && maintenanceNow ? "under maintenance" : statusLabel(status)
+        }${monitor.pinned ? ", pinned" : ""}${maintenanceNow ? ", maintenance active" : ""}`}
       >
         <div className="flex items-start gap-2 sm:gap-3">
           {/* drag handle — desktop, manual sort only */}
@@ -304,8 +337,26 @@ export function MonitorCard({
                   statusTone,
                 )}
               >
-                {checking ? "checking…" : statusLabel(status)}
+                {checking ? "checking…" : status === "down" && maintenanceNow ? "maintenance" : statusLabel(status)}
               </span>
+              {maintenanceNow && (
+                <span
+                  title={`Maintenance until ${new Date(maintenanceWindow!.endsAt).toLocaleString()} — alerts silenced`}
+                  className="inline-flex items-center gap-1 rounded-full border border-warn/30 bg-warn/10 px-1.5 py-px text-[10px] font-medium text-warn"
+                >
+                  <Wrench className="size-2.5" aria-hidden="true" />
+                  {formatMaintenanceLeft(maintenanceWindow!.endsAt)}
+                </span>
+              )}
+              {maintenanceUpcoming && (
+                <span
+                  title={`Maintenance starts ${new Date(maintenanceWindow!.startsAt).toLocaleString()}`}
+                  className="inline-flex items-center gap-1 rounded-full border border-warn/25 bg-warn/[0.06] px-1.5 py-px text-[10px] text-warn/80"
+                >
+                  <Wrench className="size-2.5" aria-hidden="true" />
+                  maint. {formatCountdown(maintenanceWindow!.startsAt)}
+                </span>
+              )}
               {monitor.account && (
                 <span
                   className="inline-flex items-center gap-1 rounded-full border border-teal/25 bg-teal/10 px-1.5 py-px text-[10px] text-teal"
@@ -448,6 +499,9 @@ export function MonitorCard({
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={onSchedulePing}>
                     <Clock className="size-4" /> Schedule ping…
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onScheduleMaintenance}>
+                    <Wrench className="size-4" /> Schedule maintenance…
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled={busyAction === "pause"}

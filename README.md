@@ -24,19 +24,30 @@ and no uptime number is ever shown for a window PING didn't actually measure.
   (“ping my deploy at 09:00”). The scheduler fires it, records the result in
   the monitor's history, and shows it in a dedicated sheet with countdowns,
   notes, and results. Cancel anytime before it fires.
+- **Maintenance windows** — planned work on a service (e.g. a deploy):
+  checks keep running and stay recorded — the data stays honest — but
+  down/recovery webhook alerts are silenced and the public status page shows
+  an amber “maintenance” state instead of a red outage. If the service goes
+  down *during* the window and is still down after it ends, the down alert
+  fires then — nothing is lost, just deferred. Windows last up to 7 days,
+  can be scheduled up to 90 days ahead, and are listed in a dedicated sheet
+  with active/upcoming/recently-ended states.
 - **Public status page** — opt in from Settings to get a secret, shareable
   link (`/?status=<token>`, 192-bit) that shows monitor names, live statuses,
   7d/30d uptime and a 30-day per-day bar strip — read-only, no login, no
   URLs or accounts exposed. Regenerate or disable the link anytime; hide
-  individual monitors from their ⋮ menu. A custom page title and a 30-day
-  incident history (stitched from real checks, with a clear “ongoing” state)
-  are included.
+  individual monitors from their ⋮ menu. A custom page title, a 30-day
+  incident history (stitched from real checks, with a clear “ongoing” state),
+  and active/upcoming maintenance windows (with notes) are included; down
+  periods fully inside a maintenance window are not listed as incidents.
 - **Webhook notifications** — when a monitor goes down or recovers, PING
   POSTs one JSON event to each configured channel (Slack `text`, Discord
   `content`, plus a structured `{ event, monitor, check }` object). Events
-  fire on up↔down transitions only — no per-check spam. Best-effort delivery
-  (10 s timeout, no retries) with the honest outcome of the last attempt
-  shown in Settings, and a built-in “Send test” button.
+  fire on up↔down transitions only — no per-check spam, and they are
+  suppressed during active maintenance windows. Channels can be routed to a
+  single monitor (or all monitors). Best-effort delivery (10 s timeout, no
+  retries) with the honest outcome of the last attempt shown in Settings,
+  and a built-in “Send test” button.
 - **Real health checks** — the server performs the request with a 15 s timeout,
   records status code, response time, and the exact error on failures. History
   is kept for 30 days (capped at 1 000 checks per monitor).
@@ -51,7 +62,8 @@ and no uptime number is ever shown for a window PING didn't actually measure.
   second, 15-minute admin unlock.
 - **Keep-awake strategy** — an external scheduler hits `/api/cron/tick`, which
   both wakes PING and runs every due check (see below).
-- **Import/export** — your monitor configuration as JSON (includes accounts).
+- **Import/export** — your monitor configuration as JSON (includes accounts,
+  webhook channels with their routing, and upcoming maintenance windows).
 
 ## Run locally
 
@@ -114,7 +126,7 @@ without triggering checks.
 - Next.js (App Router) single-page app, dark Render-style theme, no chart
   libraries — the sparkline and uptime bars are hand-rolled SVG.
 - Prisma + SQLite: `Folder`, `Monitor`, `Check`, `ScheduledPing`,
-  `WebhookChannel`, `Session`, `Settings`.
+  `MaintenanceWindow`, `WebhookChannel`, `Session`, `Settings`.
 - An in-process scheduler (via `instrumentation.ts`) wakes every 30 s and
   checks every enabled monitor whose interval elapsed (concurrency-capped).
 - Auth: scrypt password hash + opaque session tokens in httpOnly cookies.
@@ -130,10 +142,11 @@ without triggering checks.
 | `POST /api/monitors/[id]/check` | run one check now |
 | `POST /api/folders`, `PATCH/DELETE /api/folders/[id]` | folders |
 | `POST /api/admin/password`, `GET /api/admin/info` | settings & runtime info |
-| `GET/POST /api/webhooks`, `PATCH/DELETE /api/webhooks/[id]`, `POST /api/webhooks/[id]/test` | notification channels |
+| `GET/POST /api/webhooks`, `PATCH/DELETE /api/webhooks/[id]`, `POST /api/webhooks/[id]/test` | notification channels (per-monitor routing via `monitorId`) |
 | `GET/POST /api/scheduled-pings`, `DELETE /api/scheduled-pings/[id]` | scheduled pings |
+| `GET/POST /api/maintenance`, `DELETE /api/maintenance/[id]` | maintenance windows |
 | `GET /api/public/status?token=` | public status page (no auth; token-gated) |
 | `GET /api/render-status` | live status from status.render.com (5 min cache) |
-| `GET /api/export`, `POST /api/import` | backup / restore monitors |
+| `GET /api/export`, `POST /api/import` | backup / restore (monitors, webhook channels, future maintenance windows) |
 | `GET /api/health` | public keep-alive ping, no DB access |
 | `GET/POST /api/cron/tick` | run all due checks (optional `CRON_SECRET`) |
