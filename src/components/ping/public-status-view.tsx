@@ -300,6 +300,18 @@ function bannerState(
   };
 }
 
+/** “Sep 8 14:05 → 12:07” — the time window the sparkline covers (≤48h). */
+function sparkSpan(times: number[]): string {
+  if (times.length < 2) return "";
+  const a = new Date(times[0]);
+  const b = new Date(times[times.length - 1]);
+  const sameDay = a.toDateString() === b.toDateString();
+  const fmt = (d: Date, withDate: boolean) =>
+    (withDate ? d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " " : "") +
+    d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return `${fmt(a, true)} → ${fmt(b, !sameDay)}`;
+}
+
 function MonitorRow({ monitor, now }: { monitor: PublicStatusMonitor; now: number }) {
   const maintenance =
     monitor.maintenance === true && monitor.status !== "paused" ? monitor : null;
@@ -361,16 +373,24 @@ function MonitorRow({ monitor, now }: { monitor: PublicStatusMonitor; now: numbe
       <DayBars daily={monitor.daily} />
 
       {monitor.spark.filter((v) => v != null).length >= 3 && (
-        <div className="mt-2.5 flex items-center gap-3">
+        <div className="mt-3 border-t border-border/40 pt-2.5">
+          <div className="flex items-baseline justify-between pb-0.5 text-[10px] text-foreground/75">
+            <span>response · last {monitor.spark.length} checks</span>
+            {monitor.sparkT.length >= 2 && (
+              <span
+                className="tabular-nums"
+                title="Time window covered by these checks (up to the last 48 hours)"
+              >
+                {sparkSpan(monitor.sparkT)}
+              </span>
+            )}
+          </div>
           <ResponseSparkline
             values={monitor.spark}
             height={26}
             gradientId={`ping-spark-${monitor.id}`}
-            className="min-w-0 flex-1"
+            className="w-full"
           />
-          <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/90">
-            response · last {monitor.spark.length} checks
-          </span>
         </div>
       )}
 
@@ -571,7 +591,7 @@ function DayBars({ daily }: { daily: DailyBucket[] }) {
           );
         })}
       </div>
-      <div className="mt-1 flex items-center justify-between text-[9px] font-medium uppercase tracking-wider text-muted-foreground/80">
+      <div className="mt-1 flex items-center justify-between text-[9px] font-medium uppercase tracking-wider text-foreground/60">
         <span>30 days ago</span>
         <span>today</span>
       </div>

@@ -57,10 +57,11 @@ export async function GET(req: NextRequest) {
     // Response-time sparkline series: newest ≤20 checks (48h window) that
     // collectMonitorStats already fetched — chronological order, null for
     // failed checks so the sparkline shows gaps, never fake zeroes.
-    const spark = (bundle.recentByMonitor.get(m.id) ?? [])
-      .slice()
-      .reverse()
-      .map((c) => (c.status === "up" ? c.responseMs : null));
+    // sparkT carries each point's timestamp (the sparkline's time axis).
+    const sparkRows = (bundle.recentByMonitor.get(m.id) ?? []).slice().reverse();
+    const spark = sparkRows.map((c) => (c.status === "up" ? c.responseMs : null));
+    // CheckDTO.checkedAt is an ISO string — parse it to epoch ms.
+    const sparkT = sparkRows.map((c) => new Date(c.checkedAt).getTime());
     return {
       id: m.id,
       name: m.name,
@@ -82,6 +83,7 @@ export async function GET(req: NextRequest) {
       daily: dailies[i] ?? [],
       maintenance: activeMaintenance.has(m.id) || null,
       spark,
+      sparkT,
     };
   });
 

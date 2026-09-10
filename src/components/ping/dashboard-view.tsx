@@ -77,6 +77,7 @@ export function DashboardView({
   // view state
   const [activeFolder, setActiveFolder] = useState<string | "all">("all");
   const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<MonitorDTO | null>(null);
@@ -96,6 +97,22 @@ export function DashboardView({
       /* private browsing etc. */
     }
   }, []);
+
+  // “/” focuses the search box (Gmail/GitHub-style). Ignored while typing
+  // in any field, while a modifier is held, or inside dialogs/sheets.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("input, textarea, select, [contenteditable=true], [role=dialog]")) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   function changeSort(v: string) {
     const mode = (v as SortMode) ?? "manual";
     setSortMode(mode);
@@ -626,13 +643,23 @@ export function DashboardView({
             <div className="relative min-w-0 basis-full sm:basis-44 sm:flex-1">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input
+                ref={searchRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search…"
-                title="Search by name, URL, folder, or account"
+                title="Search by name, URL, folder, or account — press / to focus"
                 className="border-border bg-muted/30 pl-9 focus-visible:border-primary/40 focus-visible:ring-primary/20"
                 aria-label="Search monitors"
+                aria-keyshortcuts="/"
               />
+              {!query && (
+                <kbd
+                  className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-border/70 bg-muted/60 px-1.5 py-px text-[10px] font-medium text-muted-foreground sm:block"
+                  aria-hidden="true"
+                >
+                  /
+                </kbd>
+              )}
               {query && (
                 <button
                   onClick={() => setQuery("")}

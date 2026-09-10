@@ -19,7 +19,8 @@ and no uptime number is ever shown for a window PING didn't actually measure.
   up/down from the menu (works on touch), and switch the list between manual,
   A–Z, Z–A, and status-first sorting. Pinned monitors float to the top in
   every sort mode; dropping a card into the pinned zone pins it
-  automatically. Your sort choice is remembered per device.
+  automatically. Your sort choice is remembered per device, and `/`
+  (Gmail-style) jumps to the search box.
 - **Scheduled pings** — run one real check at an exact future moment
   (“ping my deploy at 09:00”). The scheduler fires it, records the result in
   the monitor's history, and shows it in a dedicated sheet with countdowns,
@@ -71,7 +72,8 @@ and no uptime number is ever shown for a window PING didn't actually measure.
 - **Public status page** — opt in from Settings to get a secret, shareable
   link (`/?status=<token>`, 192-bit) that shows monitor names, live statuses,
   7d/30d uptime, a 30-day per-day bar strip on a labelled track, and a
-  response-time sparkline of the last 20 checks — read-only, no login, no
+  response-time sparkline of the last 20 checks — with the exact time window
+  it covers labelled on it — read-only, no login, no
   URLs or accounts exposed. Regenerate or disable the link anytime; hide
   individual monitors from their ⋮ menu. A custom page title, a 30-day
   incident history (stitched from real checks, with a clear “ongoing” state),

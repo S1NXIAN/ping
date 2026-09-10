@@ -183,6 +183,8 @@ export interface PublicStatusMonitor {
   daily: DailyBucket[]; // days with recorded checks only
   /** Response ms of the newest ≤20 checks (48h), chronological; null = failed check. */
   spark: Array<number | null>;
+  /** Epoch ms for each spark point (same length) — the sparkline's time axis. */
+  sparkT: number[];
 }
 
 /** A down period on the public status page, derived from recorded checks. */
