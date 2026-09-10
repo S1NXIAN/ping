@@ -4,8 +4,9 @@
 # - The instance spins down after ~15 min without traffic. PING pairs with the
 #   keep-alive GitHub workflow in this repo (.github/workflows/keep-alive.yml)
 #   to stay awake. Without it, checks pause while the instance sleeps.
-# - No persistent disk on free: the SQLite file lives on the instance's
-#   ephemeral filesystem and RESETS on every deploy and every spin-down.
+# - No persistent disk on free: the SQLite file lives at /tmp/ping.db (always
+#   writable, no mkdir needed) on the instance's ephemeral filesystem and
+#   RESETS on every deploy and every spin-down.
 #   Back up via Settings → "Export monitors". For durable data, upgrade the
 #   plan and re-add the disk block below (commented for reference).
 # - Free instance hours are pooled per workspace (~750/month).
@@ -20,13 +21,14 @@ services:
     branch: main
     autoDeploy: true
     buildCommand: npm ci --include=dev && npx prisma generate && npm run build
-    # create the SQLite file (fresh on free) on boot, then serve the Next standalone build
-    startCommand: mkdir -p /var/data && npx prisma db push --accept-data-loss && node .next/standalone/server.js
+    # /tmp is world-writable on Render's native runtime; /var/data only exists
+    # when a persistent disk is attached (paid plans) — mkdir fails on free.
+    startCommand: npx prisma db push --accept-data-loss && node .next/standalone/server.js
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
-        # absolute path → same file for build-time `db push` and runtime
-        value: file:/var/data/ping.db
+        # /tmp → same ephemeral file for `db push` and runtime; no mkdir needed
+        value: file:/tmp/ping.db
       - key: NODE_ENV
         value: production
       # Optional: require ?token=<secret> on /api/cron/tick (keep-alive)
