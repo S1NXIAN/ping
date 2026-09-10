@@ -30,12 +30,12 @@ const PULSE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 90" 
 const PULSE = `data:image/svg+xml,${encodeURIComponent(PULSE_SVG)}`;
 
 const COLORS = {
-  bg: "#0b0d12",
-  card: "#14161d",
-  border: "#232735",
-  fg: "#e6e8ee",
-  muted: "#99a1b2",
-  dim: "#6b7382",
+  bg: "#0b1420",
+  card: "#111c2e",
+  border: "#233454",
+  fg: "#e7ebf3",
+  muted: "#95a1ba",
+  dim: "#6d7a94",
   up: "#10b981",
   down: "#f43f5e",
   warn: "#f59e0b",
@@ -175,7 +175,7 @@ export async function GET(req: NextRequest) {
         justifyContent: "space-between",
         padding: 56,
         backgroundColor: COLORS.bg,
-        backgroundImage: `linear-gradient(160deg, rgba(139,92,246,0.12) 0%, rgba(11,13,18,0) 42%)`,
+        backgroundImage: `linear-gradient(160deg, rgba(139,92,246,0.12) 0%, rgba(11,20,32,0) 42%)`,
         color: COLORS.fg,
         fontFamily: "sans-serif",
       }}

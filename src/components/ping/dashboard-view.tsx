@@ -497,7 +497,7 @@ export function DashboardView({
                     <Settings className="size-4" aria-hidden="true" />
                     {adminUnlocked && (
                       <span
-                        className="absolute -right-1.5 -top-1.5 flex size-3.5 items-center justify-center rounded-full bg-teal text-[#0b0d12]"
+                        className="absolute -right-1.5 -top-1.5 flex size-3.5 items-center justify-center rounded-full bg-teal text-[#0b1420]"
                         title="Settings unlocked"
                       >
                         <LockOpen className="size-2.5" aria-hidden="true" />
@@ -537,7 +537,7 @@ export function DashboardView({
             <Button
               size="sm"
               onClick={() => setAddOpen(true)}
-              className="hidden bg-white font-semibold text-black shadow-sm transition-transform hover:bg-zinc-200 active:scale-[0.98] sm:inline-flex"
+              className="hidden bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/25 transition-transform hover:bg-primary/90 active:scale-[0.98] sm:inline-flex"
             >
               <Plus className="size-4" /> New monitor
             </Button>
@@ -866,7 +866,7 @@ export function DashboardView({
               </p>
               <Button
                 onClick={() => setAddOpen(true)}
-                className="mt-5 bg-white font-semibold text-black hover:bg-zinc-200"
+                className="mt-5 bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/25 hover:bg-primary/90"
               >
                 <Plus className="size-4" /> New monitor
               </Button>
@@ -915,7 +915,7 @@ export function DashboardView({
         <button
           onClick={() => setAddOpen(true)}
           aria-label="New monitor"
-          className="fixed bottom-20 right-4 z-40 flex size-14 items-center justify-center rounded-full bg-white text-black shadow-xl shadow-black/40 transition-transform hover:scale-105 active:scale-95 sm:hidden"
+          className="fixed bottom-20 right-4 z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-primary/30 transition-transform hover:scale-105 active:scale-95 sm:hidden"
         >
           <Plus className="size-6" />
         </button>

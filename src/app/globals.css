@@ -48,44 +48,45 @@
 }
 
 /*
- * PING theme — matches Render's dark product design:
- * deep charcoal canvas, elevated dark panels, electric violet accent,
- * teal secondary, emerald success / rose failure, small radii.
+ * PING theme — blueprint drafting table:
+ * deep navy paper canvas under a fixed technical grid (see body::before),
+ * elevated navy panels, electric violet accent, teal secondary,
+ * emerald success / rose failure, small radii.
  */
 :root,
 .dark {
   --radius: 0.5rem;
-  --background: #0b0d12;
-  --foreground: #e6e8ee;
-  --card: #14161d;
-  --card-foreground: #e6e8ee;
-  --popover: #171a23;
-  --popover-foreground: #e6e8ee;
+  --background: #0b1420;
+  --foreground: #e7ebf3;
+  --card: #111c2e;
+  --card-foreground: #e7ebf3;
+  --popover: #142034;
+  --popover-foreground: #e7ebf3;
   --primary: #8b5cf6;
   --primary-foreground: #ffffff;
-  --secondary: #1e2129;
-  --secondary-foreground: #e6e8ee;
-  --muted: #1a1d26;
-  --muted-foreground: #99a1b2;
-  --accent: #232735;
-  --accent-foreground: #f0f2f8;
+  --secondary: #1a2740;
+  --secondary-foreground: #e7ebf3;
+  --muted: #172338;
+  --muted-foreground: #95a1ba;
+  --accent: #1e2c48;
+  --accent-foreground: #eef1f8;
   --destructive: #f43f5e;
   --destructive-foreground: #ffffff;
-  --border: #232735;
-  --input: #2a2f3e;
+  --border: #233454;
+  --input: #2a3a5c;
   --ring: #8b5cf6;
   --chart-1: #8b5cf6;
   --chart-2: #2dd4bf;
   --chart-3: #10b981;
   --chart-4: #f59e0b;
   --chart-5: #f43f5e;
-  --sidebar: #0e1017;
-  --sidebar-foreground: #e6e8ee;
+  --sidebar: #0d1828;
+  --sidebar-foreground: #e7ebf3;
   --sidebar-primary: #8b5cf6;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1a1d28;
-  --sidebar-accent-foreground: #f0f2f8;
-  --sidebar-border: #1e2230;
+  --sidebar-accent: #172338;
+  --sidebar-accent-foreground: #eef1f8;
+  --sidebar-border: #1d2b45;
   --sidebar-ring: #8b5cf6;
   --up: #10b981;
   --down: #f43f5e;
@@ -110,10 +111,31 @@
 
 /* ---------- PING custom utilities ---------- */
 
-/* Slim dark scrollbars */
+/*
+ * Blueprint grid canvas — the drafting-paper background.
+ * Two-tier grid: fine 24px cells + bold 120px majors, soft periwinkle lines
+ * over the navy paper. Fixed to the viewport so it reads as a drafting table
+ * the UI floats above. Sits at z-index:-1 → above the body background color,
+ * under all content. Frustum-safe: pure CSS, zero image weight.
+ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(128, 174, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(128, 174, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(rgba(128, 174, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(128, 174, 255, 0.05) 1px, transparent 1px);
+  background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
+}
+
+/* Slim navy scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2e3444 transparent;
+  scrollbar-color: #2c3c5a transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
@@ -123,11 +145,11 @@
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: #2e3444;
+  background: #2c3c5a;
   border-radius: 4px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: #3a4155;
+  background: #3a4f75;
 }
 
 .no-scrollbar::-webkit-scrollbar {
