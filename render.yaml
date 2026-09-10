@@ -25,8 +25,8 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
-        # /tmp → writable without a disk; same file for `db push` and runtime
-        value: file:/tmp/ping.db
+        # baked into the image at /app/data (ephemeral on free, like /tmp — but /tmp is masked at runtime)
+        value: file:/app/data/ping.db
       - key: NODE_ENV
         value: production
       # Optional: require ?token=<secret> on /api/cron/tick (keep-alive)

@@ -6,15 +6,15 @@ WORKDIR /app
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 COPY . .
-ENV DATABASE_URL="file:/tmp/ping.db"
+ENV DATABASE_URL="file:/app/data/ping.db"
 RUN bunx prisma generate \
   && bun run build \
-  && bunx prisma db push --accept-data-loss
+  && mkdir -p /app/data && bunx prisma db push --accept-data-loss
 
 FROM oven/bun:1.4.0-slim AS runtime
 WORKDIR /app
-ENV NODE_ENV=production DATABASE_URL="file:/tmp/ping.db"
-COPY --from=build /tmp/ping.db /tmp/ping.db
+ENV NODE_ENV=production DATABASE_URL="file:/app/data/ping.db"
+COPY --from=build /app/data /app/data
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
