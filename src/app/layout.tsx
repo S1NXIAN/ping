@@ -8,8 +8,16 @@ export const metadata: Metadata = {
     "A lightweight, honest uptime monitor. PING periodically sends real HTTP requests to your sites, keeps Render Free services awake, and shows you what actually happened — no invented statistics.",
   applicationName: "PING",
   icons: {
-    icon: "/logo.svg",
-    apple: "/logo.svg",
+    icon: [
+      { url: "/logo.svg", type: "image/svg+xml" },
+      { url: "/icon-1024.png", sizes: "1024x1024", type: "image/png" },
+    ],
+    apple: [{ url: "/icon-1024.png", sizes: "1024x1024", type: "image/png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "PING",
   },
   robots: { index: false, follow: false },
 };

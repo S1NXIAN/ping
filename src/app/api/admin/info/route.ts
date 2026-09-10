@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { statSync } from "node:fs";
 import { adminGuard } from "@/lib/ping-auth";
 import { db } from "@/lib/db";
-import { RETENTION_DAYS, MAX_CHECKS_PER_MONITOR, runtimeState } from "@/lib/checker";
+import { MAX_CHECKS_PER_MONITOR, runtimeState } from "@/lib/checker";
 import { TICK_INTERVAL_SEC } from "@/lib/scheduler";
 import type { AdminInfoResponse } from "@/lib/ping-types";
 
@@ -21,11 +21,12 @@ export async function GET(req: NextRequest) {
   const unauthorized = await adminGuard(req);
   if (unauthorized) return unauthorized;
 
-  const [checksStored, monitors, folders, oldest] = await Promise.all([
+  const [checksStored, monitors, folders, oldest, settings] = await Promise.all([
     db.check.count(),
     db.monitor.count(),
     db.folder.count(),
     db.check.findFirst({ orderBy: { checkedAt: "asc" }, select: { checkedAt: true } }),
+    db.settings.findUnique({ where: { id: "main" }, select: { retentionDays: true } }),
   ]);
 
   const body: AdminInfoResponse = {
@@ -44,8 +45,10 @@ export async function GET(req: NextRequest) {
       folders,
       oldestCheckAt: oldest?.checkedAt.toISOString() ?? null,
       dbBytes: dbBytes(),
-      retentionDays: RETENTION_DAYS,
+      retentionDays: settings?.retentionDays ?? null,
       maxChecksPerMonitor: MAX_CHECKS_PER_MONITOR,
+      lastPrunedAt: runtimeState.lastPrunedAt,
+      lastPrunedCount: runtimeState.lastPrunedCount,
     },
   };
   return NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });

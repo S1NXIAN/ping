@@ -7,6 +7,7 @@ import {
   Copy,
   Database,
   Download,
+  Eraser,
   Eye,
   FileUp,
   Globe,
@@ -23,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -124,6 +126,11 @@ export function AdminView({
   const [titleDraft, setTitleDraft] = useState("");
   const [titleDirty, setTitleDirty] = useState(false);
 
+  // --- data retention ---
+  const [retentionDraft, setRetentionDraft] = useState("default");
+  const [retentionDirty, setRetentionDirty] = useState(false);
+  const [retentionBusy, setRetentionBusy] = useState<string | null>(null);
+
   const statusUrl =
     statusPage?.enabled && statusPage.token
       ? `${typeof window !== "undefined" ? window.location.origin : ""}/?status=${statusPage.token}`
@@ -222,6 +229,60 @@ export function AdminView({
     const t = setInterval(loadInfo, 30_000);
     return () => clearInterval(t);
   }, [loadInfo]);
+
+  // Retention select mirrors the server value unless the user is editing it.
+  const retentionCurrent = useMemo(() => {
+    const d = info?.storage.retentionDays;
+    if (d == null) return "default";
+    if (d === 0) return "forever";
+    return String(d);
+  }, [info]);
+
+  useEffect(() => {
+    if (!retentionDirty) setRetentionDraft(retentionCurrent);
+  }, [retentionCurrent, retentionDirty]);
+
+  async function retentionAction(action: "set" | "prune") {
+    setRetentionBusy(action);
+    try {
+      if (action === "set") {
+        const days =
+          retentionDraft === "default"
+            ? null
+            : retentionDraft === "forever"
+              ? 0
+              : Number(retentionDraft);
+        const r = await api<{ applied: string; retentionDays: number | null }>(
+          "/api/admin/retention",
+          { method: "POST", body: JSON.stringify({ action: "set", days }) },
+        );
+        setRetentionDirty(false);
+        setRetentionDraft(
+          r.retentionDays == null ? "default" : r.retentionDays === 0 ? "forever" : String(r.retentionDays),
+        );
+        toast({ description: `Retention saved — ${r.applied}` });
+      } else {
+        const r = await api<{ deleted: number }>('/api/admin/retention', {
+          method: "POST",
+          body: JSON.stringify({ action: "prune" }),
+        });
+        toast({
+          description:
+            r.deleted > 0
+              ? `Pruned ${r.deleted.toLocaleString()} old check${r.deleted === 1 ? "" : "s"}`
+              : "Nothing to prune — every check is inside the retention window",
+        });
+      }
+      loadInfo();
+    } catch (err) {
+      toast({
+        description: err instanceof Error ? err.message : "Action failed",
+        variant: "destructive",
+      });
+    } finally {
+      setRetentionBusy(null);
+    }
+  }
 
   async function changePassword(e: React.FormEvent) {
     e.preventDefault();
@@ -745,12 +806,95 @@ export function AdminView({
                 </div>
               </div>
             </div>
+
+            {/* configurable check-history retention */}
+            <div className="space-y-2.5 rounded-lg border bg-card/60 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="retention" className="text-xs">
+                  Check-history retention
+                </Label>
+                <span className="text-[10px] text-muted-foreground">
+                  {info?.storage.lastPrunedAt
+                    ? `last pruned ${timeAgo(info.storage.lastPrunedAt)}${
+                        info.storage.lastPrunedCount
+                          ? ` · ${info.storage.lastPrunedCount.toLocaleString()} removed`
+                          : " · nothing removed"
+                      }`
+                    : "hourly background job"}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <div className="min-w-44 flex-1">
+                  <Select
+                    value={retentionDraft}
+                    onValueChange={(v) => {
+                      setRetentionDraft(v);
+                      setRetentionDirty(true);
+                    }}
+                  >
+                    <SelectTrigger id="retention" className="h-9 w-full" aria-label="Check-history retention">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">Default · 30 days + 1,000/monitor cap</SelectItem>
+                      <SelectItem value="7">7 days</SelectItem>
+                      <SelectItem value="14">14 days</SelectItem>
+                      <SelectItem value="30">30 days (no cap)</SelectItem>
+                      <SelectItem value="60">60 days</SelectItem>
+                      <SelectItem value="90">90 days</SelectItem>
+                      <SelectItem value="180">180 days</SelectItem>
+                      <SelectItem value="365">365 days</SelectItem>
+                      <SelectItem value="forever">Keep forever</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 shrink-0"
+                  disabled={retentionBusy != null || retentionDraft === retentionCurrent}
+                  onClick={() => retentionAction("set")}
+                >
+                  {retentionBusy === "set" ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    "Save"
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 shrink-0"
+                  disabled={retentionBusy != null}
+                  onClick={() => retentionAction("prune")}
+                >
+                  {retentionBusy === "prune" ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Eraser className="size-3.5" />
+                  )}
+                  Prune now
+                </Button>
+              </div>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Checks older than this window are deleted automatically (hourly) — “Prune now”
+                applies it immediately. Default keeps 30 days and at most 1,000 checks per monitor;
+                a custom number keeps exactly that window; “forever” disables check deletion.
+                Scheduled pings, old maintenance windows and expired sessions are always cleaned.
+              </p>
+            </div>
+
             <p className="text-xs leading-relaxed text-muted-foreground">
               Scheduler{info?.scheduler.running ? " running" : " not started"} — checks due monitors
-              every {info?.scheduler.tickIntervalSec ?? 30}s in-process. History is kept{" "}
-              {info?.storage.retentionDays ?? 30} days (max{" "}
-              {(info?.storage.maxChecksPerMonitor ?? 1000).toLocaleString()} checks per monitor),
-              then pruned automatically. Oldest check: {formatDateTime(info?.storage.oldestCheckAt ?? null)}
+              every {info?.scheduler.tickIntervalSec ?? 30}s in-process.{" "}
+              {(info?.storage.retentionDays ?? null) === 0
+                ? "History is kept forever — no automatic check deletion."
+                : (info?.storage.retentionDays ?? null) == null
+                  ? `History is kept 30 days (max ${(
+                      info?.storage.maxChecksPerMonitor ?? 1000
+                    ).toLocaleString()} checks per monitor), then pruned automatically.`
+                  : `History is kept ${info?.storage.retentionDays} days (no per-monitor cap), then pruned automatically.`}{" "}
+              Oldest check: {formatDateTime(info?.storage.oldestCheckAt ?? null)}
               {info?.storage.dbBytes ? ` · database ${(info.storage.dbBytes / 1024).toFixed(0)} KB` : ""}
               {info ? ` · ${info.nodeEnv} mode` : ""}.
             </p>

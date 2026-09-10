@@ -32,7 +32,33 @@ export const runtimeState = {
   lastTick: null as TickResult | null,
   lastTickAttemptAt: 0,
   schedulerStarted: false,
+  /** When the hourly prune job last ran, and how many checks it deleted. */
+  lastPrunedAt: null as string | null,
+  lastPrunedCount: null as number | null,
 };
+
+export interface RetentionPolicy {
+  /** Days of check history to keep; null = keep forever. */
+  days: number | null;
+  /** Apply the per-monitor cap (only in the default policy). */
+  cap: boolean;
+}
+
+/**
+ * Resolves the configured retention policy from Settings:
+ *   retentionDays = null → default: 30 days + 1,000 checks/monitor cap
+ *   retentionDays = 0    → keep forever (no check deletion at all)
+ *   retentionDays = N    → keep N days, no cap (explicit user choice)
+ */
+export async function getRetentionPolicy(): Promise<RetentionPolicy> {
+  const s = await db.settings.findUnique({
+    where: { id: "main" },
+    select: { retentionDays: true },
+  });
+  if (s?.retentionDays == null) return { days: RETENTION_DAYS, cap: true };
+  if (s.retentionDays === 0) return { days: null, cap: false };
+  return { days: s.retentionDays, cap: false };
+}
 
 function describeError(e: unknown): string {
   const err = e as { name?: string; message?: string; cause?: { code?: string } };
@@ -345,11 +371,41 @@ export async function runDueChecks(): Promise<TickResult> {
   }
 }
 
-/** Prunes old checks (retention) and per-monitor caps; also drops expired sessions, old scheduled-ping records and long-past maintenance windows. */
+/**
+ * Prunes old checks according to the configured retention policy (see
+ * getRetentionPolicy) and drops expired sessions, old scheduled-ping
+ * records and long-past maintenance windows. Operational hygiene rows
+ * (scheduled pings, maintenance windows, sessions) are always cleaned —
+ * only check history respects the retention setting.
+ */
 export async function pruneChecks(): Promise<{ deleted: number }> {
-  const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
-  const old = await db.check.deleteMany({ where: { checkedAt: { lt: cutoff } } });
-  let capped = 0;
+  const policy = await getRetentionPolicy();
+  let deleted = 0;
+
+  if (policy.days != null) {
+    const cutoff = new Date(Date.now() - policy.days * 24 * 60 * 60 * 1000);
+    const old = await db.check.deleteMany({ where: { checkedAt: { lt: cutoff } } });
+    deleted += old.count;
+  }
+
+  if (policy.cap) {
+    const monitors = await db.monitor.findMany({ select: { id: true } });
+    for (const m of monitors) {
+      const count = await db.check.count({ where: { monitorId: m.id } });
+      if (count > MAX_CHECKS_PER_MONITOR) {
+        const keep = await db.check.findMany({
+          where: { monitorId: m.id },
+          orderBy: { checkedAt: "desc" },
+          take: MAX_CHECKS_PER_MONITOR,
+          select: { id: true },
+        });
+        const r = await db.check.deleteMany({
+          where: { monitorId: m.id, id: { notIn: keep.map((k) => k.id) } },
+        });
+        deleted += r.count;
+      }
+    }
+  }
 
   // Finished scheduled pings only matter shortly after they ran — drop old ones.
   await db.scheduledPing.deleteMany({
@@ -361,31 +417,16 @@ export async function pruneChecks(): Promise<{ deleted: number }> {
     where: { endsAt: { lt: new Date(Date.now() - MAINTENANCE_RETENTION_DAYS * 86400_000) } },
   });
 
-  // Incident notes older than the 30-day incident lookback can never match
-  // a derived incident again.
+  // Incident notes older than the incident lookback can never match a derived
+  // incident again — tied to the fixed lookback, not the retention setting.
   await db.incidentNote.deleteMany({
     where: { startedAt: { lt: new Date(Date.now() - (RETENTION_DAYS + 2) * 86400_000) } },
   });
 
-  const monitors = await db.monitor.findMany({ select: { id: true } });
-  for (const m of monitors) {
-    const count = await db.check.count({ where: { monitorId: m.id } });
-    if (count > MAX_CHECKS_PER_MONITOR) {
-      const keep = await db.check.findMany({
-        where: { monitorId: m.id },
-        orderBy: { checkedAt: "desc" },
-        take: MAX_CHECKS_PER_MONITOR,
-        select: { id: true },
-      });
-      const r = await db.check.deleteMany({
-        where: { monitorId: m.id, id: { notIn: keep.map((k) => k.id) } },
-      });
-      capped += r.count;
-    }
-  }
-
   await db.session.deleteMany({ where: { expiresAt: { lt: new Date() } } });
-  return { deleted: old.count + capped };
+  runtimeState.lastPrunedAt = new Date().toISOString();
+  runtimeState.lastPrunedCount = deleted;
+  return { deleted };
 }
 
 /**

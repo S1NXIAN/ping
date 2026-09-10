@@ -321,9 +321,20 @@ export interface AdminInfoResponse {
     folders: number;
     oldestCheckAt: string | null;
     dbBytes: number | null;
-    retentionDays: number;
+    /** Raw setting: null = default policy (30 days + cap), 0 = keep forever. */
+    retentionDays: number | null;
     maxChecksPerMonitor: number;
+    lastPrunedAt: string | null;
+    lastPrunedCount: number | null;
   };
+}
+
+/** GET /api/admin/retention — current data-retention configuration. */
+export interface RetentionResponse {
+  /** Raw setting: null = default (30 days + 1,000/monitor cap), 0 = forever. */
+  retentionDays: number | null;
+  lastPrunedAt: string | null;
+  lastPrunedCount: number | null;
 }
 
 export interface ImportResult {
