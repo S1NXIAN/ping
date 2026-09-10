@@ -15,14 +15,13 @@ services:
   - type: web
     name: ping
     repo: https://github.com/S1NXIAN/ping.git
-    runtime: node
+    runtime: docker
     plan: free
     region: singapore
     branch: dev
     autoDeploy: true
-    buildCommand: bun install && bunx prisma generate && bun run build
-    # free has no disk: /tmp is always writable but ephemeral (resets on deploy/sleep)
-    startCommand: bunx prisma db push --accept-data-loss && bun .next/standalone/server.js
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
