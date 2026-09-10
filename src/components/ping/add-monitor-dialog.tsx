@@ -1,14 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Gauge, Globe, Loader2, Plus, ScanSearch, UserRound } from "lucide-react";
+import { Bell, ChevronRight, Gauge, Loader2, Plus, ScanSearch, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -20,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { api, ApiError, normalizeUrl } from "@/lib/ping-client";
 import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
@@ -51,6 +50,43 @@ const KEYWORD_MODES = [
   { value: "excludes", label: "Body must not contain it" },
 ];
 
+type FieldErrors = { url?: string; slow?: string; keyword?: string };
+
+/** Top-aligned label with a compact "?" tooltip instead of helper paragraphs. */
+function FieldLabel({
+  htmlFor,
+  hint,
+  children,
+}: {
+  htmlFor: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <Label htmlFor={htmlFor} className="text-sm font-medium leading-none">
+        {children}
+      </Label>
+      {hint && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label="More information"
+              className="grid size-4 place-items-center rounded-full text-[10px] font-bold text-muted-foreground/60 transition-colors hover:bg-secondary hover:text-foreground focus-visible:bg-secondary focus-visible:text-foreground focus-visible:outline-none"
+            >
+              ?
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-56">
+            {hint}
+          </TooltipContent>
+        </Tooltip>
+      )}
+    </div>
+  );
+}
+
 export function AddMonitorDialog({
   open,
   onOpenChange,
@@ -81,9 +117,13 @@ export function AddMonitorDialog({
   const [alertDelay, setAlertDelay] = useState("0");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    setError(null);
+    setFieldErrors({});
     if (initial) {
       setName(initial.name);
       setUrl(initial.url);
@@ -95,6 +135,16 @@ export function AddMonitorDialog({
       setKeyword(initial.keyword ?? "");
       setSlowThreshold(initial.slowThresholdMs != null ? String(initial.slowThresholdMs) : "");
       setAlertDelay(String(initial.alertDelay ?? 0));
+      // editing something with advanced values set → start expanded
+      setAdvancedOpen(
+        !!(
+          initial.account ||
+          initial.keyword ||
+          initial.slowThresholdMs != null ||
+          (initial.alertDelay ?? 0) > 0 ||
+          initial.folderId
+        ),
+      );
     } else {
       setName("");
       setUrl("");
@@ -106,8 +156,8 @@ export function AddMonitorDialog({
       setKeyword("");
       setSlowThreshold("");
       setAlertDelay("0");
+      setAdvancedOpen(false);
     }
-    setError(null);
   }, [open, initial, defaultFolderId]);
 
   // Keyword checks need a response body — a HEAD response has none, so GET
@@ -117,35 +167,58 @@ export function AddMonitorDialog({
     if (keywordActive && method === "HEAD") setMethod("GET");
   }, [keywordActive, method]);
 
-  async function submit(e: React.FormEvent) {
+  const clearError = (key: keyof FieldErrors) =>
+    setFieldErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+
+  /** URL check — on blur only nags when something invalid was typed. */
+  function checkUrlBlur() {
+    if (!url.trim()) {
+      clearError("url");
+      return;
+    }
+    if (!normalizeUrl(url)) setFieldErrors((p) => ({ ...p, url: "Not a valid http(s) URL" }));
+    else clearError("url");
+  }
+
+  function checkSlowBlur() {
+    if (slowThreshold.trim() === "") {
+      clearError("slow");
+      return;
+    }
+    const n = Number(slowThreshold.trim());
+    if (!Number.isInteger(n) || n < 50 || n > 30000)
+      setFieldErrors((p) => ({ ...p, slow: "50–30000 ms" }));
+    else clearError("slow");
+  }
+
+  const advCount =
+    (account.trim() ? 1 : 0) +
+    (keywordActive && keyword.trim() ? 1 : 0) +
+    (slowThreshold.trim() !== "" ? 1 : 0) +
+    (alertDelay !== "0" ? 1 : 0) +
+    (folderId !== "none" ? 1 : 0);
+
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
+    const next: FieldErrors = {};
     const normalized = normalizeUrl(url);
-    if (!normalized) {
-      setError("Enter a valid URL, e.g. https://my-app.onrender.com");
-      return;
-    }
-    if (intervalSec === "custom") {
-      setError("Pick a check interval");
-      return;
-    }
+    if (!url.trim()) next.url = "Required";
+    else if (!normalized) next.url = "Not a valid http(s) URL";
 
     const thresholdNum = slowThreshold.trim() === "" ? null : Number(slowThreshold.trim());
-    if (thresholdNum != null) {
-      if (!Number.isInteger(thresholdNum)) {
-        setError("Slow threshold must be a whole number of milliseconds");
-        return;
-      }
-      if (thresholdNum < 50 || thresholdNum > 30000) {
-        setError("Slow threshold must be between 50 and 30000 ms");
-        return;
-      }
-    }
+    if (thresholdNum != null && (!Number.isInteger(thresholdNum) || thresholdNum < 50 || thresholdNum > 30000))
+      next.slow = "50–30000 ms";
 
     const trimmedKeyword = keyword.trim();
-    if (keywordMode !== "off" && trimmedKeyword === "") {
-      setError("Enter a keyword, or set the keyword check to Off");
+    if (keywordMode !== "off" && trimmedKeyword === "") next.keyword = "Enter a keyword, or set it Off";
+
+    setFieldErrors(next);
+    if (Object.values(next).some(Boolean)) {
+      // surface hidden advanced-field errors
+      if (next.slow || next.keyword) setAdvancedOpen(true);
+      document.getElementById("m-url")?.focus();
       return;
     }
 
@@ -164,241 +237,333 @@ export function AddMonitorDialog({
     if (trimmedName) body.name = trimmedName;
 
     setBusy(true);
-    try {
-      if (isEdit && initial) {
-        await api(`/api/monitors/${initial.id}`, {
-          method: "PATCH",
-          body: JSON.stringify(body),
-        });
-        toast({ description: "Monitor updated" });
-      } else {
-        await api("/api/monitors", { method: "POST", body: JSON.stringify(body) });
-        toast({
-          description: "Monitor created — running its first real check now",
-        });
+    (async () => {
+      try {
+        if (isEdit && initial) {
+          await api(`/api/monitors/${initial.id}`, {
+            method: "PATCH",
+            body: JSON.stringify(body),
+          });
+          toast({ description: "Monitor updated" });
+        } else {
+          await api("/api/monitors", { method: "POST", body: JSON.stringify(body) });
+          toast({ description: "Monitor created — running its first real check now" });
+        }
+        onOpenChange(false);
+        onSaved();
+      } catch (err) {
+        setError(
+          err instanceof ApiError || err instanceof Error ? err.message : "Something went wrong",
+        );
+      } finally {
+        setBusy(false);
       }
-      onOpenChange(false);
-      onSaved();
-    } catch (err) {
-      setError(
-        err instanceof ApiError || err instanceof Error ? err.message : "Something went wrong",
-      );
-    } finally {
-      setBusy(false);
-    }
+    })();
   }
+
+  const fieldClass = "h-11 sm:h-9";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-w-md flex-col rounded-xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Globe className="size-4 text-primary" aria-hidden="true" />
+      <DialogContent
+        showCloseButton={false}
+        onOpenAutoFocus={(e) => e.preventDefault()} // let the URL input autoFocus win
+        className={(
+          // mobile: bottom sheet / ≥sm: centered card
+          "left-0 right-0 bottom-0 top-auto translate-x-0 translate-y-0 rounded-none rounded-t-2xl border-b-0 " +
+          "max-h-[92dvh] w-full max-w-none overflow-hidden p-0 gap-0 " +
+          "sm:left-1/2 sm:right-auto sm:top-1/2 sm:bottom-auto sm:-translate-x-1/2 sm:-translate-y-1/2 " +
+          "sm:rounded-xl sm:border-b sm:max-h-[90dvh] sm:max-w-[440px]"
+        ).trim()}
+      >
+        {/* drag handle — mobile only */}
+        <div aria-hidden="true" className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-muted-foreground/25 sm:hidden" />
+
+        <div className="flex items-center justify-between pb-2 pl-4 pr-2 pt-2.5 sm:pb-1 sm:pl-5 sm:pt-4">
+          <DialogTitle className="text-sm font-semibold leading-none">
             {isEdit ? "Edit monitor" : "New monitor"}
           </DialogTitle>
-          <DialogDescription>
-            {isEdit
-              ? "Update the target, interval, or folder. History is kept."
-              : "PING will send a real HTTP request to this URL on a schedule."}
-          </DialogDescription>
-        </DialogHeader>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            aria-label="Close"
+            className="grid size-11 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:size-9"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+        <DialogDescription className="sr-only">
+          {isEdit
+            ? "Update this monitor. History is kept."
+            : "PING will send a real HTTP request to the URL on a schedule."}
+        </DialogDescription>
 
-        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
-          <div className="-mr-2 min-h-0 flex-1 space-y-4 overflow-y-auto pr-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="m-url">URL *</Label>
-            <Input
-              id="m-url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://my-app.onrender.com"
-              inputMode="url"
-              autoComplete="off"
-              autoFocus
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="m-name">Display name</Label>
-            <Input
-              id="m-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Optional — defaults to the host"
-              maxLength={80}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="m-account" className="flex items-center gap-1.5">
-              <UserRound className="size-3.5 text-muted-foreground" aria-hidden="true" />
-              Account used <span className="font-normal text-muted-foreground">(optional)</span>
-            </Label>
-            <Input
-              id="m-account"
-              value={account}
-              onChange={(e) => setAccount(e.target.value)}
-              placeholder="e.g. render — personal@mail.com"
-              maxLength={60}
-              autoComplete="off"
-            />
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              A label for which account runs this service — useful when you juggle several Render/GitHub
-              accounts. Shown as a chip on the card and searchable.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="m-interval">Check interval</Label>
-              <Select value={intervalSec} onValueChange={setIntervalSec}>
-                <SelectTrigger id="m-interval">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {INTERVALS.map((i) => (
-                    <SelectItem key={i.value} value={i.value}>
-                      {i.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="m-method">Method</Label>
-              <Select value={method} onValueChange={(v) => setMethod(v as "GET" | "HEAD")}>
-                <SelectTrigger id="m-method">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="GET">GET (recommended)</SelectItem>
-                  <SelectItem value="HEAD" disabled={keywordActive}>
-                    HEAD{keywordActive ? " — needs a body" : ""}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="m-keyword-mode" className="flex items-center gap-1.5">
-              <ScanSearch className="size-3.5 text-muted-foreground" aria-hidden="true" />
-              Keyword check <span className="font-normal text-muted-foreground">(optional)</span>
-            </Label>
-            <Select
-              value={keywordMode}
-              onValueChange={(v) => setKeywordMode(v as "off" | "contains" | "excludes")}
-            >
-              <SelectTrigger id="m-keyword-mode">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {KEYWORD_MODES.map((k) => (
-                  <SelectItem key={k.value} value={k.value}>
-                    {k.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {keywordActive && (
+        <form onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col">
+          {/* scrollable body — visible fields fit without scrolling by default */}
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-4 pt-1 sm:px-5">
+            <div className="space-y-2">
+              <FieldLabel htmlFor="m-url" hint="Full URL to check — https:// is added for you.">
+                URL *
+              </FieldLabel>
               <Input
-                id="m-keyword"
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                placeholder={
-                  keywordMode === "contains"
-                    ? "e.g. “welcome” — must appear in the page"
-                    : "e.g. “error” — must NOT appear in the page"
-                }
-                maxLength={200}
+                id="m-url"
+                type="url"
+                inputMode="url"
                 autoComplete="off"
+                autoFocus
+                value={url}
+                onChange={(e) => {
+                  setUrl(e.target.value);
+                  clearError("url");
+                }}
+                onBlur={checkUrlBlur}
+                placeholder="https://my-app.onrender.com"
+                aria-invalid={fieldErrors.url ? true : undefined}
+                aria-describedby={fieldErrors.url ? "m-url-err" : undefined}
+                className={fieldClass}
               />
-            )}
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              {keywordActive
-                ? "Case-insensitive text search over the first 256 KB of the response body — catches “HTTP 200 but the page is broken”. Always checked with GET, even if the method above says HEAD."
-                : "Beyond the status code: require (or forbid) a word in the response body, so a 200 from a broken page still counts as down."}
-            </p>
-          </div>
+              {fieldErrors.url && (
+                <p id="m-url-err" role="alert" className="text-xs text-down">
+                  {fieldErrors.url}
+                </p>
+              )}
+            </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="m-slow" className="flex items-center gap-1.5">
-              <Gauge className="size-3.5 text-muted-foreground" aria-hidden="true" />
-              Slow threshold <span className="font-normal text-muted-foreground">(ms, optional)</span>
-            </Label>
-            <Input
-              id="m-slow"
-              value={slowThreshold}
-              onChange={(e) => setSlowThreshold(e.target.value.replace(/[^0-9]/g, ""))}
-              placeholder="e.g. 800 — blank = off"
-              inputMode="numeric"
-              autoComplete="off"
-              maxLength={5}
-            />
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              When an up check takes longer than this, the monitor shows a "slow" state, the public
-              status page marks it degraded, and channels with slow alerts are notified. 50–30000 ms.
-            </p>
-          </div>
+            <div className="space-y-2">
+              <FieldLabel htmlFor="m-name" hint="Shown on the card instead of the host.">
+                Display name
+              </FieldLabel>
+              <Input
+                id="m-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Optional — defaults to host"
+                maxLength={80}
+                className={fieldClass}
+              />
+            </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="m-alert-delay" className="flex items-center gap-1.5">
-              <Bell className="size-3.5 text-muted-foreground" aria-hidden="true" />
-              Down-alert delay
-            </Label>
-            <Select value={alertDelay} onValueChange={setAlertDelay}>
-              <SelectTrigger id="m-alert-delay">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ALERT_DELAYS.map((d) => (
-                  <SelectItem key={d.value} value={d.value}>
-                    {d.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Wait for consecutive failures before a “down” webhook fires — avoids false alarms from
-              one flaky check. Downtime is recorded and shown immediately either way.
-            </p>
-          </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <FieldLabel htmlFor="m-interval" hint="How often PING sends a real HTTP request.">
+                  Check interval
+                </FieldLabel>
+                <Select value={intervalSec} onValueChange={setIntervalSec}>
+                  <SelectTrigger id="m-interval" className={fieldClass}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INTERVALS.map((i) => (
+                      <SelectItem key={i.value} value={i.value}>
+                        {i.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="m-folder">Folder</Label>
-            <Select value={folderId} onValueChange={setFolderId}>
-              <SelectTrigger id="m-folder">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No folder</SelectItem>
-                {folders.map((f) => (
-                  <SelectItem key={f.id} value={f.id}>
-                    {f.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <div className="space-y-2">
+                <FieldLabel htmlFor="m-method" hint="GET reads the body; HEAD is lighter, no body.">
+                  Method
+                </FieldLabel>
+                <Select value={method} onValueChange={(v) => setMethod(v as "GET" | "HEAD")}>
+                  <SelectTrigger id="m-method" className={fieldClass}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="GET">GET (recommended)</SelectItem>
+                    <SelectItem value="HEAD" disabled={keywordActive}>
+                      HEAD{keywordActive ? " — needs a body" : ""}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* advanced — collapsed by default */}
+            <details
+              open={advancedOpen}
+              onToggle={(e) => setAdvancedOpen((e.target as HTMLDetailsElement).open)}
+              className="group rounded-lg border border-border/70 bg-card/40"
+            >
+              <summary className="flex cursor-pointer select-none list-none items-center gap-2 px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+                <ChevronRight
+                  className="size-4 shrink-0 transition-transform duration-200 group-open:rotate-90"
+                  aria-hidden="true"
+                />
+                Advanced
+                {advCount > 0 && (
+                  <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-primary">
+                    {advCount} set
+                  </span>
+                )}
+              </summary>
+
+              <div className="space-y-4 border-t border-border/60 px-3 py-3">
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="m-account" hint="Label for which account runs this service.">
+                    Account used
+                  </FieldLabel>
+                  <Input
+                    id="m-account"
+                    value={account}
+                    onChange={(e) => setAccount(e.target.value)}
+                    placeholder="e.g. render — personal@mail.com"
+                    maxLength={60}
+                    autoComplete="off"
+                    className={fieldClass}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="m-keyword-mode" hint="Require or forbid text in the response body.">
+                    <span className="inline-flex items-center gap-1.5">
+                      <ScanSearch className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                      Keyword check
+                    </span>
+                  </FieldLabel>
+                  <Select
+                    value={keywordMode}
+                    onValueChange={(v) => setKeywordMode(v as "off" | "contains" | "excludes")}
+                  >
+                    <SelectTrigger id="m-keyword-mode" className={fieldClass}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {KEYWORD_MODES.map((k) => (
+                        <SelectItem key={k.value} value={k.value}>
+                          {k.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {keywordActive && (
+                    <div className="space-y-2">
+                      <Input
+                        id="m-keyword"
+                        value={keyword}
+                        onChange={(e) => {
+                          setKeyword(e.target.value);
+                          clearError("keyword");
+                        }}
+                        placeholder={
+                          keywordMode === "contains" ? "e.g. welcome" : "e.g. error"
+                        }
+                        maxLength={200}
+                        autoComplete="off"
+                        aria-invalid={fieldErrors.keyword ? true : undefined}
+                        aria-describedby={fieldErrors.keyword ? "m-keyword-err" : undefined}
+                        className={fieldClass}
+                      />
+                      {fieldErrors.keyword && (
+                        <p id="m-keyword-err" role="alert" className="text-xs text-down">
+                          {fieldErrors.keyword}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="m-slow" hint="Up checks slower than this show as slow.">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Gauge className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                      Slow threshold ms
+                    </span>
+                  </FieldLabel>
+                  <Input
+                    id="m-slow"
+                    value={slowThreshold}
+                    onChange={(e) => {
+                      setSlowThreshold(e.target.value.replace(/[^0-9]/g, ""));
+                      clearError("slow");
+                    }}
+                    onBlur={checkSlowBlur}
+                    placeholder="e.g. 800 — blank = off"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={5}
+                    aria-invalid={fieldErrors.slow ? true : undefined}
+                    aria-describedby={fieldErrors.slow ? "m-slow-err" : undefined}
+                    className={fieldClass}
+                  />
+                  {fieldErrors.slow && (
+                    <p id="m-slow-err" role="alert" className="text-xs text-down">
+                      {fieldErrors.slow}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="m-alert-delay" hint="Failed checks in a row before a down webhook fires.">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Bell className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                      Down-alert delay
+                    </span>
+                  </FieldLabel>
+                  <Select value={alertDelay} onValueChange={setAlertDelay}>
+                    <SelectTrigger id="m-alert-delay" className={fieldClass}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ALERT_DELAYS.map((d) => (
+                        <SelectItem key={d.value} value={d.value}>
+                          {d.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="m-folder" hint="Group monitors in the sidebar.">
+                    Folder
+                  </FieldLabel>
+                  <Select value={folderId} onValueChange={setFolderId}>
+                    <SelectTrigger id="m-folder" className={fieldClass}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No folder</SelectItem>
+                      {folders.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </details>
           </div>
 
           {error && (
-            <p className="rounded-md bg-down/10 px-3 py-2 text-xs text-down">{error}</p>
+            <p
+              role="alert"
+              className="mx-4 mb-2 rounded-md bg-down/10 px-3 py-2 text-xs leading-relaxed text-down sm:mx-5"
+            >
+              {error}
+            </p>
           )}
-          </div>
 
-          <DialogFooter className="gap-2 border-t pt-3 mt-4">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+          {/* sticky footer — always visible, primary full-width on mobile */}
+          <div className="flex flex-col-reverse gap-2 border-t border-border/60 bg-background p-3 sm:flex-row sm:justify-end sm:p-4 sm:pt-3">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+              className="h-11 w-full text-sm sm:h-9 sm:w-auto"
+            >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={busy}
-              className="bg-white text-black font-semibold hover:bg-zinc-200"
+              className="h-11 w-full bg-white text-sm font-semibold text-black hover:bg-zinc-200 sm:h-9 sm:w-auto"
             >
               {busy ? (
                 <>
-                  <Loader2 className="size-4 animate-spin" /> Saving…
+                  <Loader2 className="size-4 animate-spin" /> {isEdit ? "Saving…" : "Adding…"}
                 </>
               ) : isEdit ? (
                 "Save changes"
@@ -408,7 +573,7 @@ export function AddMonitorDialog({
                 </>
               )}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

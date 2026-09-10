@@ -1,34 +1,39 @@
-# Deploy PING itself on Render.
+# Deploy PING on Render — free tier.
 #
-# Honest notes about the free plan:
-# - Free web services have an ephemeral filesystem. This blueprint mounts a
-#   persistent disk (paid feature) so your SQLite database survives restarts
-#   and deploys. On a strictly-free deployment without a disk, the database
-#   resets on every restart — use Settings → "Export monitors" to back up,
-#   or point DATABASE_URL at a durable location instead.
-# - Free instances spin down after 15 minutes without traffic. Pair this with
-#   an external keep-alive scheduler hitting /api/cron/tick (see README).
-# - Free instance hours are pooled per workspace (~750/month) — only one free
-#   service can realistically stay awake 24/7.
+# What "free" means here (honest notes):
+# - The instance spins down after ~15 min without traffic. PING pairs with the
+#   keep-alive GitHub workflow in this repo (.github/workflows/keep-alive.yml)
+#   to stay awake. Without it, checks pause while the instance sleeps.
+# - No persistent disk on free: the SQLite file lives on the instance's
+#   ephemeral filesystem and RESETS on every deploy and every spin-down.
+#   Back up via Settings → "Export monitors". For durable data, upgrade the
+#   plan and re-add the disk block below (commented for reference).
+# - Free instance hours are pooled per workspace (~750/month).
 #
 # Render Blueprint docs: https://render.com/docs/blueprints
 services:
   - type: web
     name: ping
     runtime: node
-    plan: starter # required for the disk below; use `free` to try without persistence
-    buildCommand: npm ci --omit=dev=false && npx prisma generate && npm run build
-    startCommand: npx prisma db push --accept-data-loss && npm run start
+    plan: free
+    region: singapore
+    branch: main
+    autoDeploy: true
+    buildCommand: npm ci --include=dev && npx prisma generate && npm run build
+    # create the SQLite file (fresh on free) on boot, then serve the Next standalone build
+    startCommand: mkdir -p /var/data && npx prisma db push --accept-data-loss && node .next/standalone/server.js
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
+        # absolute path → same file for build-time `db push` and runtime
         value: file:/var/data/ping.db
       - key: NODE_ENV
         value: production
-      # Optional: require ?token=<secret> on /api/cron/tick
+      # Optional: require ?token=<secret> on /api/cron/tick (keep-alive)
       # - key: CRON_SECRET
       #   generateValue: true
-    disk:
-      name: ping-data
-      mountPath: /var/data
-      sizeGB: 1
+    # Paid plan only — re-enable for durable SQLite storage:
+    # disk:
+    #   name: ping-data
+    #   mountPath: /var/data
+    #   sizeGB: 1

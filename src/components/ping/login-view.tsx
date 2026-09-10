@@ -149,11 +149,6 @@ export function LoginView({
               )}
             </Button>
           </div>
-
-          <p className="mt-4 text-center text-[11px] leading-relaxed text-muted-foreground">
-            Single-password login · sessions last 30 days · you can change the
-            password anytime in Settings.
-          </p>
         </form>
       </div>
 
