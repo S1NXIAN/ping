@@ -10,7 +10,6 @@ export const WEBHOOK_TIMEOUT_MS = 10_000;
 export const MAX_WEBHOOK_CHANNELS = 5;
 
 export type WebhookEvent = "down" | "up" | "slow" | "test";
-
 export interface WebhookPayload {
   /** Human-readable one-liner (also used by Slack). */
   text: string;
@@ -74,8 +73,39 @@ export interface DeliveryResult {
   ms: number;
 }
 
-/** Sends one payload to one URL. Never throws. */
+/**
+ * SSRF defense: rejects webhook URLs that point at the loopback, RFC1918
+ * private ranges, link-local (cloud metadata endpoints), IPv6 ULA or bare
+ * hostnames. Channel creation is admin-gated, but the guard also runs at
+ * delivery time so rows saved before this check (or crafted directly in
+ * the DB) can never make PING probe internal infrastructure.
+ */
+export function isPrivateWebhookUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    const h = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    if (h === "localhost" || h.endsWith(".localhost") || h === "metadata.google.internal") {
+      return true;
+    }
+    if (/^(127\.|10\.|192\.168\.|169\.254\.)/.test(h) || h === "0.0.0.0") return true;
+    if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
+    if (h === "::1" || h === "::" || h.startsWith("fc") || h.startsWith("fd")) return true;
+    if (!h.includes(".")) return true; // bare/internal hostname
+    return false;
+  } catch {
+    return true;
+  }
+}
+/** Sends one payload to one URL. Never throws. Private targets are refused. */
 export async function deliverWebhook(url: string, payload: WebhookPayload): Promise<DeliveryResult> {
+  if (isPrivateWebhookUrl(url)) {
+    return {
+      ok: false,
+      statusCode: null,
+      error: "Blocked: webhook URL points at a private/internal address",
+      ms: 0,
+    };
+  }
   const started = performance.now();
   try {
     const res = await fetch(url, {

@@ -18,75 +18,95 @@ export async function GET(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Monitor not found" }, { status: 404 });
   }
 
-  const [folder, checks, daily, p95] = await Promise.all([
-    monitor.folderId
-      ? db.folder.findUnique({ where: { id: monitor.folderId } })
-      : Promise.resolve(null),
-    db.check.findMany({
-      where: { monitorId: id },
-      orderBy: { checkedAt: "desc" },
-      take: 100,
-    }),
-    dailyBuckets(id),
-    p95For(id),
-  ]);
-
-  // Build the same stats shape the overview uses, but scoped to this monitor.
   const now = Date.now();
   const H24 = 86400_000;
-  const since = new Date(now - H24);
+  const since24 = new Date(now - H24);
+  const since7d = new Date(now - 7 * H24);
+  const since30d = new Date(now - 30 * H24);
+  // "Last down" bounded to the incident lookback (32 d): keeps the query
+  // cheap under keep-forever retention; older downs can't surface in the UI.
+  const sinceDowns = new Date(now - 32 * H24);
+
+  // All aggregates in one parallel round — 24h stats come from SQL groupBys,
+  // not from the 100-check slice below (a 60 s interval only covers ~100
+  // minutes, so "24h" computed from it would be a lie).
+  const [folder, checks, daily, p95, c24, t24, c7, c30, t7, lastDown, firstCheck, totalChecks] =
+    await Promise.all([
+      monitor.folderId
+        ? db.folder.findUnique({ where: { id: monitor.folderId } })
+        : null,
+      db.check.findMany({
+        where: { monitorId: id },
+        orderBy: { checkedAt: "desc" },
+        take: 100,
+      }),
+      dailyBuckets(id),
+      p95For(id),
+      db.check.groupBy({
+        by: ["status"],
+        where: { monitorId: id, checkedAt: { gte: since24 } },
+        _count: { _all: true },
+      }),
+      db.check.groupBy({
+        by: ["status"],
+        where: { monitorId: id, checkedAt: { gte: since24 }, status: "up" },
+        _avg: { responseMs: true },
+        _min: { responseMs: true },
+        _max: { responseMs: true },
+      }),
+      db.check.groupBy({
+        by: ["status"],
+        where: { monitorId: id, checkedAt: { gte: since7d } },
+        _count: { _all: true },
+      }),
+      db.check.groupBy({
+        by: ["status"],
+        where: { monitorId: id, checkedAt: { gte: since30d } },
+        _count: { _all: true },
+      }),
+      db.check.groupBy({
+        by: ["status"],
+        where: { monitorId: id, checkedAt: { gte: since7d }, status: "up" },
+        _avg: { responseMs: true },
+      }),
+      db.check.findFirst({
+        where: { monitorId: id, status: "down", checkedAt: { gte: sinceDowns } },
+        orderBy: { checkedAt: "desc" },
+        select: { checkedAt: true },
+      }),
+      db.check.findFirst({
+        where: { monitorId: id },
+        orderBy: { checkedAt: "asc" },
+        select: { checkedAt: true },
+      }),
+      db.check.count({ where: { monitorId: id } }),
+    ]);
+
+  // Build the same stats shape the overview uses, but scoped to this monitor.
   const recent = checks.map(toCheckDTO);
-  const last24 = recent.filter((c) => new Date(c.checkedAt).getTime() >= since.getTime());
-  const up24 = last24.filter((c) => c.status === "up");
-  const responseTimes = up24.map((c) => c.responseMs).filter((v): v is number => v != null);
 
-  const stats = {
-    ...emptyStats(),
-    uptime24h: last24.length ? up24.length / last24.length : null,
-    checks24h: last24.length,
-    avgMs24h: responseTimes.length
-      ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length
-      : null,
-    minMs24h: responseTimes.length ? Math.min(...responseTimes) : null,
-    maxMs24h: responseTimes.length ? Math.max(...responseTimes) : null,
-    totalChecks: await db.check.count({ where: { monitorId: id } }),
-  };
-
-  // 7d / 30d uptime + lastDown + firstCheck from grouped queries
-  const c7 = await db.check.groupBy({
-    by: ["status"],
-    where: { monitorId: id, checkedAt: { gte: new Date(now - 7 * H24) } },
-    _count: { _all: true },
-  });
-  const c30 = await db.check.groupBy({
-    by: ["status"],
-    where: { monitorId: id, checkedAt: { gte: new Date(now - 30 * H24) } },
-    _count: { _all: true },
-  });
-  const t7 = await db.check.groupBy({
-    by: ["status"],
-    where: { monitorId: id, checkedAt: { gte: new Date(now - 7 * H24) }, status: "up" },
-    _avg: { responseMs: true },
-  });
-  const lastDown = await db.check.findFirst({
-    where: { monitorId: id, status: "down" },
-    orderBy: { checkedAt: "desc" },
-  });
-  const firstCheck = await db.check.findFirst({
-    where: { monitorId: id },
-    orderBy: { checkedAt: "asc" },
-  });
-
+  const up24 = c24.find((r) => r.status === "up")?._count._all ?? 0;
+  const total24 = c24.reduce((acc, r) => acc + r._count._all, 0);
+  const timing24 = t24.find((r) => r.status === "up");
   const up7 = c7.find((r) => r.status === "up")?._count._all ?? 0;
   const total7 = c7.reduce((acc, r) => acc + r._count._all, 0);
   const up30 = c30.find((r) => r.status === "up")?._count._all ?? 0;
   const total30 = c30.reduce((acc, r) => acc + r._count._all, 0);
 
-  stats.uptime7d = total7 > 0 ? up7 / total7 : null;
-  stats.uptime30d = total30 > 0 ? up30 / total30 : null;
-  stats.avgMs7d = t7.find((r) => r.status === "up")?._avg.responseMs ?? null;
-  stats.lastDownAt = lastDown?.checkedAt.toISOString() ?? null;
-  stats.firstCheckAt = firstCheck?.checkedAt.toISOString() ?? null;
+  const stats = {
+    ...emptyStats(),
+    uptime24h: total24 > 0 ? up24 / total24 : null,
+    checks24h: total24,
+    avgMs24h: timing24?._avg.responseMs ?? null,
+    minMs24h: timing24?._min.responseMs ?? null,
+    maxMs24h: timing24?._max.responseMs ?? null,
+    uptime7d: total7 > 0 ? up7 / total7 : null,
+    uptime30d: total30 > 0 ? up30 / total30 : null,
+    avgMs7d: t7.find((r) => r.status === "up")?._avg.responseMs ?? null,
+    lastDownAt: lastDown?.checkedAt.toISOString() ?? null,
+    firstCheckAt: firstCheck?.checkedAt.toISOString() ?? null,
+    totalChecks,
+  };
 
   const body: MonitorDetailResponse = {
     monitor: toMonitorDTO(monitor, folder, stats, recent.slice(0, 20)),

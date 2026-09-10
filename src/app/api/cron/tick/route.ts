@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { runDueChecks, runDueScheduledPings, runtimeState } from "@/lib/checker";
 
 /**
@@ -15,8 +16,12 @@ async function handle(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (secret) {
     const token =
-      req.nextUrl.searchParams.get("token") ?? req.headers.get("x-cron-token");
-    if (token !== secret) {
+      req.nextUrl.searchParams.get("token") ?? req.headers.get("x-cron-token") ?? "";
+    // Timing-safe compare — a plain !== would leak the secret's length and
+    // let an attacker measure early-exit byte matches.
+    const a = Buffer.from(token);
+    const b = Buffer.from(secret);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
       return NextResponse.json({ ok: false, error: "Invalid token" }, { status: 403 });
     }
   }

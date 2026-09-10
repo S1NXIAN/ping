@@ -7,20 +7,8 @@ import type { CheckDTO, MaintenanceWindowDTO, MonitorDTO, MonitorStatsDTO, Sched
 
 const H24 = 24 * 60 * 60 * 1000;
 
+/** Shape of a groupBy(monitorId, status) count result. */
 type StatusCounts = Array<{ monitorId: string; status: string; _count: { _all: number } }>;
-type TimingRow = Array<{
-  monitorId: string;
-  _avg: { responseMs: number | null };
-  _min: { responseMs: number | null };
-  _max: { responseMs: number | null };
-}>;
-type AvgRow = Array<{ monitorId: string; _avg: { responseMs: number | null } }>;
-type DownRow = Array<{ monitorId: string; _max: { checkedAt: Date | null } }>;
-type AllTimeRow = Array<{
-  monitorId: string;
-  _min: { checkedAt: Date | null };
-  _count: { _all: number };
-}>;
 
 interface RawCheckRow {
   id: string;
@@ -124,6 +112,10 @@ export async function collectMonitorStats(): Promise<StatsBundle> {
   const since24 = new Date(now - H24);
   const since7d = new Date(now - 7 * H24);
   const since30d = new Date(now - 30 * H24);
+  // "Last down" is only ever displayed/needed within the incident lookback
+  // (30 d + buffer) — older downs can't surface anywhere in the UI, so the
+  // lookup stays bounded even under the keep-forever retention policy.
+  const sinceDowns = new Date(now - 32 * H24);
   const since48hMs = now - 2 * H24; // raw SQL compares against epoch-ms INTEGER
 
   const [c24, c7, c30, t24, t7, downs, allTime, recentRows] = await Promise.all([
@@ -131,39 +123,39 @@ export async function collectMonitorStats(): Promise<StatsBundle> {
       by: ["monitorId", "status"],
       where: { checkedAt: { gte: since24 } },
       _count: { _all: true },
-    }) as Promise<StatusCounts>,
+    }),
     db.check.groupBy({
       by: ["monitorId", "status"],
       where: { checkedAt: { gte: since7d } },
       _count: { _all: true },
-    }) as Promise<StatusCounts>,
+    }),
     db.check.groupBy({
       by: ["monitorId", "status"],
       where: { checkedAt: { gte: since30d } },
       _count: { _all: true },
-    }) as Promise<StatusCounts>,
+    }),
     db.check.groupBy({
       by: ["monitorId"],
       where: { checkedAt: { gte: since24 }, status: "up" },
       _avg: { responseMs: true },
       _min: { responseMs: true },
       _max: { responseMs: true },
-    }) as Promise<TimingRow>,
+    }),
     db.check.groupBy({
       by: ["monitorId"],
       where: { checkedAt: { gte: since7d }, status: "up" },
       _avg: { responseMs: true },
-    }) as Promise<AvgRow>,
+    }),
     db.check.groupBy({
       by: ["monitorId"],
-      where: { status: "down" },
+      where: { status: "down", checkedAt: { gte: sinceDowns } },
       _max: { checkedAt: true },
-    }) as Promise<DownRow>,
+    }),
     db.check.groupBy({
       by: ["monitorId"],
       _min: { checkedAt: true },
       _count: { _all: true },
-    }) as Promise<AllTimeRow>,
+    }),
     db.$queryRaw<RawCheckRow[]>`
       SELECT id, monitorId, status, statusCode, responseMs, error, checkedAt FROM (
         SELECT id, monitorId, status, statusCode, responseMs, error, checkedAt,

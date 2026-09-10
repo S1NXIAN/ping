@@ -62,14 +62,14 @@ export function MaintenanceDialog({
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const now = Date.now();
-  const upcoming = useMemo(
-    () =>
-      windows
-        .filter((w) => w.monitorId === monitor?.id && new Date(w.endsAt).getTime() > now)
-        .sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
-    [windows, monitor?.id, now],
-  );
+  const upcoming = useMemo(() => {
+    // `now` inside the memo: a render-scope Date.now() in the deps array
+    // invalidated the memo on every render, making it a no-op.
+    const now = Date.now();
+    return windows
+      .filter((w) => w.monitorId === monitor?.id && new Date(w.endsAt).getTime() > now)
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  }, [windows, monitor?.id]);
 
   useEffect(() => {
     if (!open) return;

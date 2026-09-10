@@ -684,7 +684,7 @@ export function AdminView({
                   disabled={spBusy != null}
                   onClick={() => {
                     setTitleDirty(false);
-                    void statusPageAction("title", titleDraft.trim() || null);
+                    void statusPageAction("title", titleDraft.trim() || undefined);
                   }}
                 >
                   {spBusy === "title" ? (

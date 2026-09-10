@@ -80,7 +80,8 @@ export async function GET(req: NextRequest, { params }: Params) {
     points = checks.map((c) => ({
       t: c.checkedAt.getTime(),
       ms: c.status === "up" ? c.responseMs : null,
-      s: c.status,
+      // narrow the stored string to the literal union the chart expects
+      s: c.status === "up" ? ("up" as const) : ("down" as const),
     }));
   } else {
     // Bucket-average: window / MAX_POINTS buckets, each with avg(up ms) and

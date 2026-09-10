@@ -71,7 +71,7 @@ model ScheduledPing {
   monitor    Monitor   @relation(fields: [monitorId], references: [id], onDelete: Cascade)
   runAt      DateTime
   note       String?
-  status     String    @default("pending") // pending | done
+  status     String    @default("pending") // pending | running | done (stale "running" rows are re-run by the next tick)
   ranAt      DateTime?
   up         Boolean?
   statusCode Int?
@@ -127,7 +127,13 @@ model Check {
   error       String?
   checkedAt   DateTime @default(now())
 
+  // (monitorId, checkedAt): per-monitor history walks (recent checks,
+  // retention prune, boundary lookups).
   @@index([monitorId, checkedAt])
+  // (monitorId, status, checkedAt): covering index for the down-only scans
+  // used by incident derivation, last-down lookups and day aggregations —
+  // an all-up monitor never touches a row through this path.
+  @@index([monitorId, status, checkedAt])
 }
 
 // Server-side sessions for the single-password auth

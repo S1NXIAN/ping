@@ -238,17 +238,10 @@ export function MonitorCard({
   return (
     <>
       <div
-        role="button"
-        tabIndex={0}
+        role="group"
         onClick={() => {
           if (dnd?.isDragging || dragArmed) return;
           onOpen();
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onOpen();
-          }
         }}
         draggable={!!dnd && canReorder && dragArmed}
         onDragStart={(e) => {
@@ -329,9 +322,18 @@ export function MonitorCard({
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="truncate font-medium leading-tight text-foreground">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (dnd?.isDragging || dragArmed) return;
+                  onOpen();
+                }}
+                title={`Open details for ${monitor.name}`}
+                className="truncate rounded-none font-medium leading-tight text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+              >
                 {monitor.name}
-              </span>
+              </button>
               {monitor.pinned && (
                 <span
                   title="Pinned to top"

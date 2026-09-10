@@ -559,15 +559,16 @@ function MaintenanceList({ maintenance, now }: { maintenance: PublicMaintenance[
   );
 }
 
-/** 30 calendar-day strip ending today. Grey = no recorded checks that day. */
+/** 30 calendar-day strip ending today (UTC days — the same convention the
+ *  server buckets by, so every bar shows its real data in any timezone).
+ *  Grey = no recorded checks that day. */
 function DayBars({ daily }: { daily: DailyBucket[] }) {
   const byDate = new Map(daily.map((d) => [d.date, d]));
   const days: { key: string; bucket?: DailyBucket }[] = [];
-  const cursor = new Date();
-  cursor.setHours(0, 0, 0, 0);
+  const utcDayKey = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  const nowMs = Date.now();
   for (let i = 29; i >= 0; i--) {
-    const d = new Date(cursor.getTime() - i * 86400_000);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const key = utcDayKey(nowMs - i * 86400_000);
     days.push({ key, bucket: byDate.get(key) });
   }
 
@@ -582,8 +583,8 @@ function DayBars({ daily }: { daily: DailyBucket[] }) {
           const up = bucket?.up ?? 0;
           const down = bucket?.down ?? 0;
           const title = bucket
-            ? `${key} — ${up} up / ${down} down${down > 0 ? ` (${formatUptime(up / (up + down))} uptime)` : ""}`
-            : `${key} — no checks recorded`;
+            ? `${key} (UTC) — ${up} up / ${down} down${down > 0 ? ` (${formatUptime(up / (up + down))} uptime)` : ""}`
+            : `${key} (UTC) — no checks recorded`;
           return (
             <div
               key={key}

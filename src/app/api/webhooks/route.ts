@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { adminGuard } from "@/lib/ping-auth";
-import { MAX_WEBHOOK_CHANNELS } from "@/lib/webhooks";
+import { MAX_WEBHOOK_CHANNELS, isPrivateWebhookUrl } from "@/lib/webhooks";
 import type { WebhookChannelDTO } from "@/lib/ping-types";
 
 function toDTO(
@@ -43,7 +43,10 @@ export const urlSchema = z
     } catch {
       return false;
     }
-  }, "Enter a valid http(s) webhook URL");
+  }, "Enter a valid http(s) webhook URL")
+  // SSRF: the URL must not point at loopback/private/link-local space —
+  // PING must never be usable to probe internal infrastructure.
+  .refine((v) => !isPrivateWebhookUrl(v), "Webhook URL must be a public http(s) endpoint — private/internal addresses are blocked");
 
 /** Lists all notification channels (admin unlock required). */
 export async function GET(req: NextRequest) {

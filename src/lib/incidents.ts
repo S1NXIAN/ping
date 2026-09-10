@@ -9,6 +9,10 @@ import type { AdminIncidentDTO } from "./ping-types";
 
 export const INCIDENT_WINDOW_DAYS = 30;
 export const MAX_INCIDENTS = 15;
+/** Hard caps so a pathological (flapping) monitor can never make this unbounded. */
+const MAX_DOWN_ROWS_PER_MONITOR = 5000;
+const MAX_STREAKS_PER_MONITOR = 40;
+const MAX_UP_MARKERS_PER_STREAK = 2000;
 
 export interface DerivedIncident {
   monitorId: string;
@@ -29,6 +33,16 @@ export interface DerivedIncident {
  * incident. Down streaks that fall entirely inside a planned maintenance
  * window are skipped (planned, not an outage); partial overlaps are kept
  * but flagged `duringMaintenance` so pages can present them honestly.
+ *
+ * Implementation note — memory safety: a naive derivation scans EVERY check
+ * of the last 30 days (tens of thousands of rows per monitor under a short
+ * interval). This version only bulk-loads "down" rows (the rare exception),
+ * then resolves each detected streak with two tiny targeted queries: the up
+ * checks recorded inside the streak's span (so a blip that recovered in
+ * between stays two honest incidents rather than one merged) and, for the
+ * final sub-streak, the first check recorded after its last down (the exact
+ * closing time; null = still ongoing). The output is identical to the full
+ * scan, but the work is bounded no matter how much history is kept.
  */
 export async function deriveIncidents(
   monitors: { id: string; name: string; intervalSec: number }[],
@@ -46,14 +60,6 @@ export async function deriveIncidents(
     },
     select: { monitorId: true, startsAt: true, endsAt: true },
   });
-
-  const checks = await db.check.findMany({
-    where: { monitorId: { in: monitors.map((m) => m.id) }, checkedAt: { gte: since } },
-    select: { monitorId: true, status: true, statusCode: true, checkedAt: true },
-    orderBy: [{ monitorId: "asc" }, { checkedAt: "asc" }],
-  });
-  if (checks.length === 0) return [];
-
   const windowsByMonitor = new Map<string, { startsAt: number; endsAt: number }[]>();
   for (const w of historyWindows) {
     const list = windowsByMonitor.get(w.monitorId) ?? [];
@@ -61,64 +67,106 @@ export async function deriveIncidents(
     windowsByMonitor.set(w.monitorId, list);
   }
 
-  const byMonitor = new Map<string, typeof checks>();
-  for (const c of checks) {
-    const list = byMonitor.get(c.monitorId) ?? [];
-    list.push(c);
-    byMonitor.set(c.monitorId, list);
-  }
-
   const incidents: DerivedIncident[] = [];
-  for (const monitor of monitors) {
-    const list = byMonitor.get(monitor.id);
-    if (!list) continue;
-    const gapMs = monitor.intervalSec * 3 * 1000;
-    const monitorWindows = windowsByMonitor.get(monitor.id) ?? [];
-    let open: { start: number; end: number; downChecks: number; lastCode: number | null } | null =
-      null;
-    let prevT: number | null = null;
 
-    const close = (end: number | null) => {
-      if (!open) return;
-      const rel = windowRelation(monitorWindows, open.start, open.end);
-      // Down streaks fully inside a planned window are maintenance, not
-      // outages — skip them. Partial overlaps stay, flagged honestly.
-      if (rel !== "inside") {
-        incidents.push({
-          monitorId: monitor.id,
-          monitorName: monitor.name,
-          startedAt: new Date(open.start).toISOString(),
-          endedAt: end === null ? null : new Date(end).toISOString(),
-          downChecks: open.downChecks,
-          lastStatusCode: open.lastCode,
-          duringMaintenance: rel === "overlaps",
+  await Promise.all(
+    monitors.map(async (monitor) => {
+      const gapMs = monitor.intervalSec * 3 * 1000;
+      const monitorWindows = windowsByMonitor.get(monitor.id) ?? [];
+
+      // 1) Down rows only (newest cap; older ones can't reach the global cut).
+      const downRows = await db.check.findMany({
+        where: { monitorId: monitor.id, status: "down", checkedAt: { gte: since } },
+        select: { statusCode: true, checkedAt: true },
+        orderBy: { checkedAt: "desc" },
+        take: MAX_DOWN_ROWS_PER_MONITOR,
+      });
+      if (downRows.length === 0) return;
+      const downs = downRows
+        .map((c) => ({ t: c.checkedAt.getTime(), code: c.statusCode ?? null }))
+        .reverse(); // chronological
+
+      // 2) Group consecutive downs into streaks; a data gap > 3× interval
+      //    ends a streak (PING was asleep — we can't claim it stayed down).
+      const streaks: typeof downs[] = [];
+      let open: typeof downs = [];
+      let prevT: number | null = null;
+      for (const d of downs) {
+        if (open.length > 0 && prevT != null && d.t - prevT > gapMs) {
+          streaks.push(open);
+          open = [];
+        }
+        open.push(d);
+        prevT = d.t;
+      }
+      if (open.length > 0) streaks.push(open);
+
+      // Only the newest streaks per monitor can survive the global cut.
+      for (const streak of streaks.slice(-MAX_STREAKS_PER_MONITOR)) {
+        const start = streak[0].t;
+        const lastDown = streak[streak.length - 1].t;
+
+        // 3) Up checks recorded strictly inside the streak's span split it —
+        //    a one-check blip that recovered must not merge with later downs.
+        const upRows = await db.check.findMany({
+          where: {
+            monitorId: monitor.id,
+            status: "up",
+            checkedAt: { gt: new Date(start), lt: new Date(lastDown) },
+          },
+          select: { checkedAt: true },
+          orderBy: { checkedAt: "desc" },
+          take: MAX_UP_MARKERS_PER_STREAK,
         });
-      }
-    };
+        const ups = upRows.map((u) => u.checkedAt.getTime()).reverse(); // chronological
 
-    for (const c of list) {
-      const t = c.checkedAt.getTime();
-      // A data gap longer than 3× the interval closes any open incident:
-      // PING was asleep and we honestly don't know the service stayed down.
-      if (prevT != null && t - prevT > gapMs && open) {
-        close(t);
-        open = null;
+        // Walk the streak's downs, closing a sub-streak at each up marker.
+        const subStreaks: { rows: typeof downs; closedByUpAt: number | null }[] = [];
+        let cur: typeof downs = [];
+        let upIdx = 0;
+        for (const d of streak) {
+          while (upIdx < ups.length && ups[upIdx] < d.t) {
+            if (cur.length > 0) subStreaks.push({ rows: cur, closedByUpAt: ups[upIdx] });
+            cur = [];
+            upIdx += 1;
+          }
+          cur.push(d);
+        }
+        if (cur.length > 0) subStreaks.push({ rows: cur, closedByUpAt: null });
+
+        for (const sub of subStreaks) {
+          const subStart = sub.rows[0].t;
+          const subLast = sub.rows[sub.rows.length - 1].t;
+          // Closing check: a splitting up (exact recovery time) or the first
+          // check after the last down (up = recovered; far-future = gap).
+          // No following check at all → the incident is still ongoing.
+          let endedAt: number | null = sub.closedByUpAt;
+          if (endedAt == null) {
+            const boundary = await db.check.findFirst({
+              where: { monitorId: monitor.id, checkedAt: { gt: new Date(subLast) } },
+              select: { checkedAt: true },
+              orderBy: { checkedAt: "asc" },
+            });
+            endedAt = boundary ? boundary.checkedAt.getTime() : null;
+          }
+
+          const rel = windowRelation(monitorWindows, subStart, subLast);
+          // Down streaks fully inside a planned window are maintenance, not
+          // outages — skip them. Partial overlaps stay, flagged honestly.
+          if (rel === "inside") continue;
+          incidents.push({
+            monitorId: monitor.id,
+            monitorName: monitor.name,
+            startedAt: new Date(subStart).toISOString(),
+            endedAt: endedAt == null ? null : new Date(endedAt).toISOString(),
+            downChecks: sub.rows.length,
+            lastStatusCode: sub.rows[sub.rows.length - 1].code,
+            duringMaintenance: rel === "overlaps",
+          });
+        }
       }
-      if (c.status === "down") {
-        if (!open) open = { start: t, end: t, downChecks: 0, lastCode: null };
-        open.downChecks += 1;
-        open.end = t;
-        open.lastCode = c.statusCode ?? open.lastCode;
-      } else if (open) {
-        close(t);
-        open = null;
-      }
-      prevT = t;
-    }
-    if (open) {
-      close(null);
-    }
-  }
+    }),
+  );
 
   incidents.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
   return incidents.slice(0, MAX_INCIDENTS);

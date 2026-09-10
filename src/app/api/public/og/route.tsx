@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { ImageResponse } from "next/og";
 import { timingSafeEqual } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { isDegraded } from "@/lib/ping-stats";
 
@@ -103,22 +104,40 @@ export async function GET(req: NextRequest) {
       },
     });
     const ids = monitors.map((m) => m.id);
-    const rows = ids.length
-      ? await db.check.findMany({
-          where: { monitorId: { in: ids }, checkedAt: { gte: new Date(Date.now() - 30 * DAY_MS) } },
-          select: { checkedAt: true, status: true },
-        })
-      : [];
+
+    // SQL aggregation only — never load raw check rows into memory (this
+    // route is hit by every crawler that unfurls the card).
+    const since30Ms = Date.now() - 30 * DAY_MS;
+    const since24Ms = Date.now() - DAY_MS;
+    const byDay = new Map<string, DayBar>();
+    let total24 = 0;
+    let up24 = 0;
+    if (ids.length > 0) {
+      const [dayRows, c24] = await Promise.all([
+        db.$queryRaw<Array<{ day: string; status: string; cnt: number }>>`
+          SELECT date(checkedAt / 1000, 'unixepoch') AS day, status, COUNT(*) AS cnt
+          FROM "Check" WHERE monitorId IN (${Prisma.join(ids)}) AND checkedAt >= ${since30Ms}
+          GROUP BY day, status`,
+        db.check.groupBy({
+          by: ["status"],
+          where: { monitorId: { in: ids }, checkedAt: { gte: new Date(since24Ms) } },
+          _count: { _all: true },
+        }),
+      ]);
+      for (const r of dayRows) {
+        const cnt = Number(r.cnt); // COUNT(*) arrives as BigInt
+        const bar = byDay.get(r.day) ?? { up: 0, down: 0 };
+        if (r.status === "up") bar.up += cnt;
+        else bar.down += cnt;
+        byDay.set(r.day, bar);
+      }
+      for (const r of c24) {
+        total24 += r._count._all;
+        if (r.status === "up") up24 += r._count._all;
+      }
+    }
 
     // Per-day aggregates for the bar strip (UTC days, newest last).
-    const byDay = new Map<string, DayBar>();
-    for (const r of rows) {
-      const key = r.checkedAt.toISOString().slice(0, 10);
-      const bar = byDay.get(key) ?? { up: 0, down: 0 };
-      if (r.status === "up") bar.up += 1;
-      else bar.down += 1;
-      byDay.set(key, bar);
-    }
     const days: Array<DayBar | undefined> = [];
     for (let i = 29; i >= 0; i--) {
       days.push(byDay.get(new Date(Date.now() - i * DAY_MS).toISOString().slice(0, 10)));
@@ -135,11 +154,6 @@ export async function GET(req: NextRequest) {
       null,
     );
 
-    // 24h uptime from real checks only.
-    const cutoff24 = Date.now() - DAY_MS;
-    const in24 = rows.filter((r) => r.checkedAt.getTime() >= cutoff24);
-    const up24 = in24.filter((r) => r.status === "up").length;
-
     kicker = (settings?.statusTitle ?? "Live status").toUpperCase();
     if (total === 0) {
       headline = "No monitors yet";
@@ -155,9 +169,10 @@ export async function GET(req: NextRequest) {
       headlineColor = COLORS.up;
     }
 
+    // 24h uptime from real checks only (SQL counts, see above).
     const parts: string[] = [`${up} up`];
     if (paused > 0) parts.push(`${paused} paused`);
-    if (in24.length > 0) parts.push(`${((up24 / in24.length) * 100).toFixed(2)}% uptime · 24h`);
+    if (total24 > 0) parts.push(`${((up24 / total24) * 100).toFixed(2)}% uptime · 24h`);
     const ago = agoLabel(lastCheckAt);
     if (ago) parts.push(`checked ${ago}`);
     meta = parts.join("  ·  ");

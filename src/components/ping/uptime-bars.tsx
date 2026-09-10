@@ -78,21 +78,23 @@ export function dailyToSegments(
 ): BarSegment[] {
   const byDate = new Map(daily.map((d) => [d.date, d]));
   const segments: BarSegment[] = [];
-  const today = new Date();
+  // Day keys are UTC calendar days — the same convention the server buckets
+  // by (date(checkedAt, 'unixepoch')). Matching it keeps every bar aligned
+  // with its real data for viewers in any timezone (no shifted "today").
+  const utcDayKey = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  const nowMs = Date.now();
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const key = utcDayKey(nowMs - i * 86400_000);
     const bucket = byDate.get(key);
     if (!bucket) {
-      segments.push({ ratio: null, title: `${key} — no checks recorded` });
+      segments.push({ ratio: null, title: `${key} (UTC) — no checks recorded` });
       continue;
     }
     const total = bucket.up + bucket.down;
     const ratio = total > 0 ? bucket.up / total : null;
     segments.push({
       ratio,
-      title: `${key} — ${bucket.up} up / ${bucket.down} down${ratio != null ? ` (${Math.round(ratio * 100)}%)` : ""}`,
+      title: `${key} (UTC) — ${bucket.up} up / ${bucket.down} down${ratio != null ? ` (${Math.round(ratio * 100)}%)` : ""}`,
     });
   }
   return segments;

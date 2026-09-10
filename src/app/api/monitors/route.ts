@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
-import { runCheck, nextMonitorPosition, KEYWORD_MAX_LENGTH } from "@/lib/checker";
+import { runCheck, nextMonitorPosition, KEYWORD_MAX_LENGTH, MAX_MONITORS } from "@/lib/checker";
 import { emptyStats, toMonitorDTO } from "@/lib/ping-stats";
 
 const createSchema = z.object({
@@ -77,6 +77,15 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Same cap as import: keeps tick duration and DB size honest on free tier.
+  const existing = await db.monitor.count();
+  if (existing >= MAX_MONITORS) {
+    return NextResponse.json(
+      { error: `Monitor limit reached (${MAX_MONITORS}) — delete one before adding more` },
+      { status: 400 },
+    );
+  }
+
   let displayName = name;
   if (!displayName) {
     try {
@@ -105,7 +114,8 @@ export async function POST(req: NextRequest) {
   });
 
   // First real check runs right away in the background — the UI polls
-  // the overview and will show the genuine result when it lands.
+  // the overview and will show the genuine result when it lands. (A null
+  // result just means the scheduler already had this monitor in flight.)
   runCheck(monitor).catch((e) => console.error("[PING] first check failed:", e));
 
   const dto = toMonitorDTO(monitor, null, emptyStats(), []);

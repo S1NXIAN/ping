@@ -153,8 +153,8 @@ export function IncidentsSheet({
                   key={`${inc.monitorId}-${inc.startedAt}-${i}`}
                   inc={inc}
                   now={now}
-                  onSave={(note) => void saveNote(inc, note)}
-                  onClear={() => void clearNote(inc)}
+                  onSave={(note) => saveNote(inc, note)}
+                  onClear={() => clearNote(inc)}
                 />
               ))}
             </div>

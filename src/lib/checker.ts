@@ -1,6 +1,6 @@
 // PING check engine — performs REAL HTTP requests and stores REAL results.
 // Nothing here simulates or estimates anything.
-import type { Monitor } from "@prisma/client";
+import type { Check, Monitor } from "@prisma/client";
 import { db } from "./db";
 import { fireWebhooks, isTransition } from "./webhooks";
 
@@ -12,6 +12,9 @@ export const SCHEDULED_PING_RETENTION_DAYS = 7;
 export const MAINTENANCE_RETENTION_DAYS = 7;
 export const MAX_WINDOWS_PER_MONITOR = 10;
 export const MAX_WINDOWS_TOTAL = 50;
+/** Hard cap on monitors — matches the import limit; keeps tick duration and
+ *  DB size sane on a free-tier instance. */
+export const MAX_MONITORS = 200;
 /** How much of a response body a keyword check is willing to read. */
 export const KEYWORD_BODY_LIMIT_BYTES = 256 * 1024;
 export const KEYWORD_MAX_LENGTH = 200;
@@ -145,8 +148,27 @@ function keywordFailure(
   return found ? null : `Keyword “${keyword}” not found in the response`;
 }
 
-/** Runs one real HTTP check and persists the result. */
-export async function runCheck(monitor: Monitor) {
+/**
+ * Monitor ids with a check currently executing in this process. Overlapping
+ * triggers are normal (scheduler tick × manual "check now" × scheduled ping
+ * × first check after create), and without this guard they would write
+ * duplicate Check rows, double-fire webhooks and clobber the consecutive-
+ * downs streak via read-modify-write races. Returns null when skipped.
+ */
+const inFlight = new Set<string>();
+
+/** Runs one real HTTP check and persists the result. Null = skipped. */
+export async function runCheck(monitor: Monitor): Promise<Check | null> {
+  if (inFlight.has(monitor.id)) return null;
+  inFlight.add(monitor.id);
+  try {
+    return await runCheckInner(monitor);
+  } finally {
+    inFlight.delete(monitor.id);
+  }
+}
+
+async function runCheckInner(monitor: Monitor): Promise<Check> {
   const previousStatus = monitor.lastStatus; // captured BEFORE the check runs
   const started = performance.now();
   let status: "up" | "down" = "down";
@@ -479,29 +501,48 @@ export async function runDueScheduledPings(): Promise<{ ran: number }> {
             await db.scheduledPing.delete({ where: { id: ping.id } });
             return;
           }
-          const check = await runCheck(monitor).catch((err) => {
+          try {
+            const check = await runCheck(monitor);
+            if (!check) {
+              // Another trigger is checking this monitor right now — leave
+              // the row claimed ("running") so the next tick retries it.
+              return;
+            }
+            // runCheck already persisted a Check row; record the outcome on
+            // the ping.
+            await db.scheduledPing.update({
+              where: { id: ping.id },
+              data: {
+                status: "done",
+                ranAt: new Date(),
+                up: check.status === "up",
+                statusCode: check.statusCode ?? null,
+                responseMs: check.responseMs ?? null,
+                error: check.error ?? null,
+              },
+            });
+            ran += 1;
+            console.log(
+              `[PING] scheduled ping → ${monitor.name}: ${check.status}${
+                check.statusCode != null ? ` (HTTP ${check.statusCode})` : ""
+              }`,
+            );
+          } catch (err) {
             console.error(`[PING] scheduled ping for "${monitor.name}" failed:`, err);
-            return null;
-          });
-          // runCheck already persisted a Check row; record the outcome on the
-          // ping. A null check means an internal error, not a down site.
-          await db.scheduledPing.update({
-            where: { id: ping.id },
-            data: {
-              status: "done",
-              ranAt: new Date(),
-              up: check ? check.status === "up" : null,
-              statusCode: check?.statusCode ?? null,
-              responseMs: check?.responseMs ?? null,
-              error: check?.error ?? (check ? null : "Internal error while running the scheduled ping"),
-            },
-          });
-          ran += 1;
-          console.log(
-            `[PING] scheduled ping → ${monitor.name}: ${check?.status ?? "error"}${
-              check?.statusCode != null ? ` (HTTP ${check.statusCode})` : ""
-            }`,
-          );
+            await db.scheduledPing
+              .update({
+                where: { id: ping.id },
+                data: {
+                  status: "done",
+                  ranAt: new Date(),
+                  up: null,
+                  statusCode: null,
+                  responseMs: null,
+                  error: "Internal error while running the scheduled ping",
+                },
+              })
+              .catch(() => undefined);
+          }
         }),
       );
     }

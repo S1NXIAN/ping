@@ -158,11 +158,26 @@ export async function adminGuard(req: NextRequest): Promise<NextResponse | null>
 const attempts = new Map<string, number[]>();
 const WINDOW_MS = 5 * 60_000;
 const MAX_ATTEMPTS = 15;
+/** Hard caps: the Map can never grow without bound, even under floods of
+ *  spoofed XFF values (entries only get pruned when their IP returns). */
+const MAX_TRACKED_IPS = 2048;
 
 export function clientIp(req: NextRequest): string {
+  // NOTE: trusts the proxy-supplied x-forwarded-for (Render sets it to the
+  // real client). A chained/spoofed XFF can rotate throttle buckets — the
+  // MAX_ATTEMPTS per bucket and the global cap bound the damage either way.
   const fwd = req.headers.get("x-forwarded-for");
   if (fwd) return fwd.split(",")[0].trim();
   return "local";
+}
+
+/** Drops IPs whose every attempt is expired — one cheap pass over the Map. */
+function sweepExpired(now: number) {
+  for (const [ip, list] of attempts) {
+    if (list.length === 0 || list.every((t) => now - t >= WINDOW_MS)) {
+      attempts.delete(ip);
+    }
+  }
 }
 
 export function tooManyAttempts(ip: string): boolean {
@@ -175,6 +190,12 @@ export function tooManyAttempts(ip: string): boolean {
 
 export function recordAttempt(ip: string) {
   const now = Date.now();
+  if (attempts.size >= MAX_TRACKED_IPS) {
+    sweepExpired(now);
+    // Still at the cap after sweeping (a genuine flood of live buckets):
+    // reset rather than grow — throttling degrades, memory does not.
+    if (attempts.size >= MAX_TRACKED_IPS) attempts.clear();
+  }
   const list = (attempts.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
   list.push(now);
   attempts.set(ip, list);
