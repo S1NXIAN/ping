@@ -19,14 +19,14 @@ services:
     region: singapore
     branch: main
     autoDeploy: true
-    buildCommand: npm ci --include=dev && npx prisma generate && npm run build
-    # create the SQLite file (fresh on free) on boot, then serve the Next standalone build
-    startCommand: mkdir -p /var/data && npx prisma db push --accept-data-loss && node .next/standalone/server.js
+    buildCommand: bun install && bunx prisma generate && bun run build
+    # free has no disk: /tmp is always writable but ephemeral (resets on deploy/sleep)
+    startCommand: bunx prisma db push --accept-data-loss && bun .next/standalone/server.js
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
-        # absolute path → same file for build-time `db push` and runtime
-        value: file:/var/data/ping.db
+        # /tmp → writable without a disk; same file for `db push` and runtime
+        value: file:/tmp/ping.db
       - key: NODE_ENV
         value: production
       # Optional: require ?token=<secret> on /api/cron/tick (keep-alive)
