@@ -136,6 +136,32 @@ export interface MonitorDetailResponse {
   checks: CheckDTO[]; // newest first, up to 100
 }
 
+/** Chart window for the per-monitor history endpoint. */
+export type HistoryRange = "1h" | "24h" | "7d";
+
+/** One point on the monitor response-time chart — a single check, or an
+ *  averaged bucket when the window is dense (honest: `downsampled` is set). */
+export interface HistoryPoint {
+  /** Check/bucket start time in epoch ms. */
+  t: number;
+  /** Response time of the check (avg of up checks in a bucket); null = failed/none. */
+  ms: number | null;
+  /** "down" when this point (or bucket) contains any failed check. */
+  s: "up" | "down";
+}
+
+export interface MonitorHistoryResponse {
+  range: HistoryRange;
+  from: string; // ISO
+  to: string; // ISO
+  /** Chart points, chronological, buckets with no checks skipped. */
+  points: HistoryPoint[];
+  /** Real recorded checks inside the window (before bucketing). */
+  checks: number;
+  /** True when the points are bucket-averaged rather than raw checks. */
+  downsampled: boolean;
+}
+
 export type RenderIndicator = "none" | "minor" | "major" | "critical" | "unknown";
 
 /** Monitor as it appears on the public status page (no URL, no account). */

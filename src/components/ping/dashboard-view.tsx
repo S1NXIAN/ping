@@ -472,7 +472,7 @@ export function DashboardView({
       {/* ---------- body: sidebar (lg) + main ---------- */}
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 gap-6 px-0 sm:px-4 lg:px-4">
         {/* folder nav — sidebar on desktop */}
-        <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 flex-col gap-0.5 overflow-y-auto py-4 lg:flex">
+        <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-border/50 py-4 pr-3 lg:flex">
           <button
             onClick={() => setActiveFolder("all")}
             className={cn(
@@ -630,7 +630,7 @@ export function DashboardView({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search…"
                 title="Search by name, URL, folder, or account"
-                className="border-border/70 pl-9 focus-visible:border-primary/40 focus-visible:ring-primary/20"
+                className="border-border bg-muted/30 pl-9 focus-visible:border-primary/40 focus-visible:ring-primary/20"
                 aria-label="Search monitors"
               />
               {query && (
@@ -827,12 +827,12 @@ export function DashboardView({
 
       {/* footer */}
       <footer className="sticky bottom-0 z-30 mt-auto border-t bg-background/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[11px] text-muted-foreground">
-          <span className="font-medium tracking-wide text-foreground/80">PING</span>
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[11px] text-foreground/65">
+          <span className="font-medium tracking-wide text-foreground/90">PING</span>
           <span>honest uptime for Render Free</span>
           <span className="ml-auto flex items-center gap-3">
             <span>not affiliated with render.com</span>
-            <span className="tabular-nums text-foreground/70">
+            <span className="tabular-nums text-foreground/75">
               updated {data ? timeAgo(data.serverTime) : "…"}
             </span>
           </span>

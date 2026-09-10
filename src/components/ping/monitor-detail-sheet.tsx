@@ -49,7 +49,7 @@ import {
 } from "@/lib/ping-client";
 import type { MonitorDetailResponse, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
-import { ResponseSparkline } from "./response-sparkline";
+import { HistoryChart } from "./history-chart";
 import { StatusDot, statusLabel } from "./status-dot";
 import { dailyToSegments, UptimeBars } from "./uptime-bars";
 
@@ -94,6 +94,8 @@ export function MonitorDetailSheet({
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  /** Bumped on every (re)load so the history chart silently refetches. */
+  const [historyTick, setHistoryTick] = useState(0);
 
   const id = monitor?.id;
 
@@ -104,6 +106,7 @@ export function MonitorDetailSheet({
       try {
         const d = await api<MonitorDetailResponse>(`/api/monitors/${id}`);
         setDetail(d);
+        setHistoryTick((n) => n + 1);
       } catch (e) {
         toast({
           description: e instanceof Error ? e.message : "Failed to load monitor",
@@ -193,11 +196,6 @@ export function MonitorDetailSheet({
       : m?.lastStatus === "down"
         ? "down"
         : "pending";
-
-  const sparkValues = (detail?.checks ?? [])
-    .slice(0, 100)
-    .reverse()
-    .map((c) => (c.status === "up" ? c.responseMs : null));
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -390,20 +388,15 @@ export function MonitorDetailSheet({
               <Stat label="min (24h)" value={formatMs(stats?.minMs24h)} />
               <Stat label="max (24h)" value={formatMs(stats?.maxMs24h)} />
             </div>
-            <div className="mt-2 rounded-lg border bg-card/60 p-2">
-              <ResponseSparkline values={sparkValues} height={48} />
-              <p className="px-1 pt-1 text-[10px] text-muted-foreground">
-                Last {detail?.checks.length ?? 0} checks (up responses only) · newest on the right
-                {m?.slowThresholdMs != null && (
-                  <>
-                    {" · "}
-                    <span className="text-warn">
-                      slow threshold {m.slowThresholdMs} ms
-                      {m.degraded && " — currently above it"}
-                    </span>
-                  </>
-                )}
-              </p>
+            <div className="mt-2">
+              {id && m && (
+                <HistoryChart
+                  monitorId={id}
+                  monitorName={m.name}
+                  slowThresholdMs={m.slowThresholdMs}
+                  refreshKey={historyTick}
+                />
+              )}
             </div>
           </section>
 

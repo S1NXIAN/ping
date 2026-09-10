@@ -453,10 +453,10 @@ export function MonitorCard({
               <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
             </a>
 
-            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-foreground/60">
               <span>
                 Last updated{" "}
-                <span className="text-foreground/80">{timeAgo(monitor.lastCheckAt)}</span>
+                <span className="text-foreground/85">{timeAgo(monitor.lastCheckAt)}</span>
               </span>
               {monitor.lastResponseMs != null && (
                 <span

@@ -190,7 +190,7 @@ export function AddMonitorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md rounded-xl">
+      <DialogContent className="flex max-w-md flex-col rounded-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Globe className="size-4 text-primary" aria-hidden="true" />
@@ -203,7 +203,8 @@ export function AddMonitorDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+          <div className="-mr-2 min-h-0 flex-1 space-y-4 overflow-y-auto pr-2">
           <div className="space-y-1.5">
             <Label htmlFor="m-url">URL *</Label>
             <Input
@@ -384,8 +385,9 @@ export function AddMonitorDialog({
           {error && (
             <p className="rounded-md bg-down/10 px-3 py-2 text-xs text-down">{error}</p>
           )}
+          </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 border-t pt-3 mt-4">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>

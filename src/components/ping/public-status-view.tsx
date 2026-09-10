@@ -214,8 +214,8 @@ export function PublicStatusView({ token }: { token: string }) {
       </main>
 
       <footer className="sticky bottom-0 z-20 mt-auto border-t bg-background/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-2xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[11px] text-foreground/60">
-          <span className="font-medium text-foreground/85">PING</span>
+        <div className="mx-auto flex max-w-2xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[11px] text-foreground/70">
+          <span className="font-medium text-foreground/90">PING</span>
           <span>honest uptime monitoring</span>
           <span className="ml-auto">not affiliated with render.com</span>
         </div>

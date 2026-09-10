@@ -24,6 +24,13 @@ and no uptime number is ever shown for a window PING didn't actually measure.
   (“ping my deploy at 09:00”). The scheduler fires it, records the result in
   the monitor's history, and shows it in a dedicated sheet with countdowns,
   notes, and results. Cancel anytime before it fires.
+- **Keyword checks** — beyond the status code: require (or forbid) a word in
+  the response body, so a 200 from a broken page still counts as down. Set in
+  the monitor form (“Keyword check”: body must contain / must not contain,
+  case-insensitive, first 256 KB of the body, ≤200 chars). Keyword checks
+  always fetch with GET — a HEAD response has no body — and a failed keyword
+  match is recorded as a real down check (error message, incidents, webhooks
+  and uptime math all follow).
 - **Latency alerting (slow/degraded)** — optional per-monitor threshold
   (50–30000 ms, set in the monitor form). When an up check takes longer than
   the threshold, the monitor card shows an amber “slow” state with the exact
@@ -45,6 +52,14 @@ and no uptime number is ever shown for a window PING didn't actually measure.
   the public status page (e.g. “what happened and what fixed it”). Notes are
   keyed to the incident's exact start, editable, removable, and pruned once
   older than the 30-day incident window.
+- **Response-time chart with a time axis** — the monitor detail sheet's
+  “Response time” section renders a real chart (1h / 24h / 7d ranges) with
+  labelled time and ms axes, dashed gridlines, per-point markers, rose tick
+  marks for failed checks, an amber line for the slow threshold, and a hover
+  tooltip (time · status · latency). Long gaps break the line (paused periods
+  read as gaps, not fake slopes); dense windows are bucket-averaged and say
+  so honestly in the caption. One click downloads the full retained history
+  as CSV (`checkedAt,status,statusCode,responseMs,error`).
 - **Maintenance windows** — planned work on a service (e.g. a deploy):
   checks keep running and stay recorded — the data stays honest — but
   down/recovery webhook alerts are silenced and the public status page shows
