@@ -185,7 +185,7 @@
   animation: ping-fade-up 0.35s ease-out both;
 }
 
-/* Subtle page-level ambient glow, Render-style */
+/* Blueprint grid page background — replaces the old ambient glow */
 .ping-ambient::before {
   content: "";
   position: fixed;
@@ -193,7 +193,10 @@
   pointer-events: none;
   background:
     radial-gradient(560px 300px at 12% -4%, rgba(124, 58, 237, 0.09), transparent 62%),
-    radial-gradient(480px 260px at 88% 0%, rgba(45, 212, 191, 0.06), transparent 60%);
+    radial-gradient(480px 260px at 88% 0%, rgba(45, 212, 191, 0.06), transparent 60%),
+    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  background-size: auto, auto, 32px 32px, 32px 32px;
   z-index: 0;
 }
 
