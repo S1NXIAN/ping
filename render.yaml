@@ -17,7 +17,7 @@ services:
     runtime: node
     plan: free
     region: singapore
-    branch: main
+    branch: dev
     autoDeploy: true
     buildCommand: bun install && bunx prisma generate && bun run build
     # free has no disk: /tmp is always writable but ephemeral (resets on deploy/sleep)
