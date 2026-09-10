@@ -57,6 +57,7 @@ import { MaintenanceSheet } from "./maintenance-sheet";
 import { IncidentsSheet } from "./incidents-sheet";
 import { TextPromptDialog } from "./text-prompt-dialog";
 import { StatCard } from "./stat-card";
+import { CommandPalette } from "./command-palette";
 
 export type SortMode = "manual" | "az" | "za" | "status" | "slowest" | "fastest";
 const SORT_STORAGE_KEY = "ping.sort";
@@ -122,6 +123,20 @@ export function DashboardView({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // ⌘K / Ctrl+K toggles the command palette. Skipped while another dialog or
+  // sheet is open so overlays never stack confusingly.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "k" || !(e.metaKey || e.ctrlKey)) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("[role=dialog]") && !t?.closest("[cmdk-root]")) return;
+      e.preventDefault();
+      setPaletteOpen((o) => !o);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   function changeSort(v: string) {
     const mode = (v as SortMode) ?? "manual";
     setSortMode(mode);
@@ -142,6 +157,9 @@ export function DashboardView({
 
   // incidents — postmortem-note sheet
   const [incidentsOpen, setIncidentsOpen] = useState(false);
+
+  // ⌘K / Ctrl+K command palette
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   // drag-and-drop reorder (manual sort only)
   const [dragId, setDragId] = useState<string | null>(null);
@@ -419,7 +437,7 @@ export function DashboardView({
   }
 
   const headerPill = (label: string, value: number, tone: string) => (
-    <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs tabular-nums", tone)}>
+    <span className={cn("inline-flex h-6 items-center gap-1 rounded-full border px-2.5 text-xs tabular-nums", tone)}>
       {value}
       <span className="text-muted-foreground">{label}</span>
     </span>
@@ -435,6 +453,23 @@ export function DashboardView({
           <span className="hidden text-xs text-muted-foreground sm:inline">uptime for Render Free</span>
 
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPaletteOpen(true)}
+              aria-label="Open command palette"
+              title="Command palette — jump to any monitor or action (Ctrl/⌘+K)"
+              className="h-9 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground md:px-3"
+            >
+              <Search className="size-3.5 shrink-0" aria-hidden="true" />
+              <span className="hidden md:inline">Search…</span>
+              <kbd
+                className="pointer-events-none hidden rounded border border-border/70 bg-muted/60 px-1.5 py-px text-[10px] font-medium text-muted-foreground md:inline"
+                aria-hidden="true"
+              >
+                ⌘K
+              </kbd>
+            </Button>
             {summary && (
               <div className="hidden items-center gap-1.5 md:flex">
                 {headerPill("up", summary.up, "border-up/25 bg-up/10 text-up")}
@@ -672,7 +707,7 @@ export function DashboardView({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search…"
                 title="Search by name, URL, folder, or account — press / to focus"
-                className="border-border bg-muted/30 pl-9 focus-visible:border-primary/40 focus-visible:ring-primary/20"
+                className="h-9 border-border bg-muted/30 pl-9 focus-visible:border-primary/40 focus-visible:ring-primary/20"
                 aria-label="Search monitors"
                 aria-keyshortcuts="/"
               />
@@ -965,6 +1000,26 @@ export function DashboardView({
       />
 
       <IncidentsSheet open={incidentsOpen} onOpenChange={setIncidentsOpen} />
+
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        monitors={monitors}
+        folders={folders}
+        activeFolder={activeFolder}
+        sortMode={sortMode}
+        adminUnlocked={adminUnlocked}
+        onNewMonitor={() => setAddOpen(true)}
+        onRefresh={() => refresh()}
+        onOpenPings={() => setPingsOpen(true)}
+        onOpenMaintenance={() => setMaintenanceOpen(true)}
+        onOpenIncidents={() => setIncidentsOpen(true)}
+        onOpenSettings={onOpenAdmin}
+        onLogout={logout}
+        onSelectMonitor={(id) => setDetailId(id)}
+        onSelectFolder={(id) => setActiveFolder(id)}
+        onChangeSort={changeSort}
+      />
 
       <TextPromptDialog
         open={folderDialog.open}

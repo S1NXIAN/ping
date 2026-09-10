@@ -335,7 +335,7 @@ export function MonitorCard({
               {monitor.pinned && (
                 <span
                   title="Pinned to top"
-                  className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-1.5 py-px text-[10px] font-medium text-primary"
+                  className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary"
                 >
                   <Pin className="size-2.5" aria-hidden="true" />
                   pinned
@@ -343,7 +343,7 @@ export function MonitorCard({
               )}
               <span
                 className={cn(
-                  "rounded-full border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide",
+                  "rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
                   statusTone,
                 )}
               >
@@ -360,7 +360,7 @@ export function MonitorCard({
                   title={`Response time above the ${monitor.slowThresholdMs} ms latency threshold${
                     monitor.lastResponseMs != null ? ` — last check ${formatMs(monitor.lastResponseMs)}` : ""
                   }`}
-                  className="inline-flex items-center gap-1 rounded-full border border-warn/40 bg-warn/15 px-1.5 py-px text-[10px] font-medium text-warn"
+                  className="inline-flex items-center gap-1 rounded-full border border-warn/40 bg-warn/15 px-2 py-0.5 text-[10px] font-medium text-warn"
                 >
                   <Gauge className="size-2.5" aria-hidden="true" />
                   {monitor.lastResponseMs != null
@@ -371,7 +371,7 @@ export function MonitorCard({
               {maintenanceNow && (
                 <span
                   title={`Maintenance until ${new Date(maintenanceWindow!.endsAt).toLocaleString()} — alerts silenced`}
-                  className="inline-flex items-center gap-1 rounded-full border border-warn/30 bg-warn/10 px-1.5 py-px text-[10px] font-medium text-warn"
+                  className="inline-flex items-center gap-1 rounded-full border border-warn/30 bg-warn/10 px-2 py-0.5 text-[10px] font-medium text-warn"
                 >
                   <Wrench className="size-2.5" aria-hidden="true" />
                   {formatMaintenanceLeft(maintenanceWindow!.endsAt)}
@@ -380,7 +380,7 @@ export function MonitorCard({
               {maintenanceUpcoming && (
                 <span
                   title={`Maintenance starts ${new Date(maintenanceWindow!.startsAt).toLocaleString()}`}
-                  className="inline-flex items-center gap-1 rounded-full border border-warn/25 bg-warn/[0.06] px-1.5 py-px text-[10px] text-warn/80"
+                  className="inline-flex items-center gap-1 rounded-full border border-warn/25 bg-warn/[0.06] px-2 py-0.5 text-[10px] text-warn/80"
                 >
                   <Wrench className="size-2.5" aria-hidden="true" />
                   maint. {formatCountdown(maintenanceWindow!.startsAt)}
@@ -388,7 +388,7 @@ export function MonitorCard({
               )}
               {monitor.account && (
                 <span
-                  className="inline-flex items-center gap-1 rounded-full border border-teal/25 bg-teal/10 px-1.5 py-px text-[10px] text-teal"
+                  className="inline-flex items-center gap-1 rounded-full border border-teal/25 bg-teal/10 px-2 py-0.5 text-[10px] text-teal"
                   title={`Account used: ${monitor.account}`}
                 >
                   <UserRound className="size-2.5" aria-hidden="true" />
@@ -402,7 +402,7 @@ export function MonitorCard({
                       ? `Keyword check — the response must NOT contain “${monitor.keyword}” (case-insensitive, first 256 KB)`
                       : `Keyword check — the response must contain “${monitor.keyword}” (case-insensitive, first 256 KB)`
                   }
-                  className="inline-flex max-w-52 items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-1.5 py-px text-[10px] text-primary/90"
+                  className="inline-flex max-w-52 items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] text-primary/90"
                 >
                   <ScanSearch className="size-2.5 shrink-0" aria-hidden="true" />
                   <span className="truncate">
@@ -416,24 +416,24 @@ export function MonitorCard({
                 monitor.consecutiveDowns <= monitor.alertDelay && (
                   <span
                     title={`Down alerts fire after ${monitor.alertDelay + 1} consecutive failed checks — the status above is already honest downtime`}
-                    className="inline-flex items-center gap-1 rounded-full border border-warn/25 bg-warn/[0.08] px-1.5 py-px text-[10px] font-medium text-warn/90"
+                    className="inline-flex items-center gap-1 rounded-full border border-warn/25 bg-warn/[0.08] px-2 py-0.5 text-[10px] font-medium text-warn/90"
                   >
                     <Hourglass className="size-2.5" aria-hidden="true" />
                     confirming {monitor.consecutiveDowns}/{monitor.alertDelay + 1}
                   </span>
                 )}
               {monitor.folderName && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary px-1.5 py-px text-[10px] text-muted-foreground">
+                <span className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
                   <Folder className="size-2.5" aria-hidden="true" />
                   {monitor.folderName}
                 </span>
               )}
-              <span className="rounded-full border border-border bg-secondary px-1.5 py-px text-[10px] text-muted-foreground">
+              <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
                 every {formatInterval(monitor.intervalSec)}
               </span>
               {nextPingAt && (
                 <span
-                  className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-1.5 py-px text-[10px] text-primary/90"
+                  className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] text-primary/90"
                   title={`Scheduled ping ${formatCountdown(nextPingAt)} — ${new Date(nextPingAt).toLocaleString()}`}
                 >
                   <Clock className="size-2.5" aria-hidden="true" />
@@ -453,10 +453,10 @@ export function MonitorCard({
               <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
             </a>
 
-            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-foreground/60">
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-foreground/70">
               <span>
                 Last updated{" "}
-                <span className="text-foreground/85">{timeAgo(monitor.lastCheckAt)}</span>
+                <span className="text-foreground/95">{timeAgo(monitor.lastCheckAt)}</span>
               </span>
               {monitor.lastResponseMs != null && (
                 <span
@@ -512,7 +512,7 @@ export function MonitorCard({
                 aria-label={monitor.pinned ? "Unpin monitor" : "Pin to top"}
                 title={monitor.pinned ? "Unpin" : "Pin to top"}
                 className={cn(
-                  "h-8 w-8",
+                  "h-8 w-8 hover:bg-secondary",
                   monitor.pinned
                     ? "text-primary hover:text-primary"
                     : "text-muted-foreground/60 hover:text-primary",
@@ -531,7 +531,7 @@ export function MonitorCard({
                 disabled={checking}
                 aria-label="Check now"
                 title="Check now"
-                className="h-8 w-8 text-muted-foreground hover:text-teal"
+                className="h-8 w-8 text-muted-foreground hover:bg-secondary hover:text-teal"
               >
                 {checking ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -546,7 +546,7 @@ export function MonitorCard({
                     size="icon"
                     onClick={(e) => e.stopPropagation()}
                     aria-label="Monitor actions"
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    className="h-8 w-8 text-muted-foreground hover:bg-secondary hover:text-foreground"
                   >
                     <MoreVertical className="size-4" />
                   </Button>
