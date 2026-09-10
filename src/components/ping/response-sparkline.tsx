@@ -4,8 +4,8 @@ export function ResponseSparkline({
   height = 44,
   className = "",
   gradientId = "ping-spark-fill",
-  stroke = "#8b5cf6",
-  dot = "#2dd4bf",
+  stroke = "#e6e8ec",
+  dot = "#10b981",
 }: {
   /** chronological ms values (up checks only); null entries create gaps */
   values: Array<number | null>;
@@ -13,9 +13,9 @@ export function ResponseSparkline({
   className?: string;
   /** Unique per instance when several sparklines share a page (SVG ids). */
   gradientId?: string;
-  /** Line color — brand violet by default. */
+  /** Line color — soft white (theme accent) by default. */
   stroke?: string;
-  /** Latest-point marker color — teal by default. */
+  /** Latest-point marker color — emerald live dot by default. */
   dot?: string;
 }) {
   const pts = values.filter((v): v is number => v != null && !Number.isNaN(v));

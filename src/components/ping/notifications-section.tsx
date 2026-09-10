@@ -219,7 +219,7 @@ export function NotificationsSection({
                     >
                       <SelectTrigger
                         className={cn(
-                          "h-6 w-auto max-w-[150px] gap-1 rounded-full border px-2 text-[10px] font-medium",
+                          "h-6 w-auto max-w-[150px] gap-1 rounded-none border px-2 text-[10px] font-medium",
                           ch.monitorId
                             ? "border-primary/30 bg-primary/10 text-primary"
                             : "border-border bg-muted text-muted-foreground",
@@ -417,7 +417,7 @@ function EventBadge({ tone, children }: { tone: "down" | "up" | "warn"; children
   return (
     <span
       className={cn(
-        "rounded-full border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide",
+        "rounded-none border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide",
         tone === "down"
           ? "border-down/30 bg-down/10 text-down"
           : tone === "up"

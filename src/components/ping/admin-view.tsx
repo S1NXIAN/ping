@@ -395,7 +395,7 @@ export function AdminView({
             {unlockExpiresAt && (
               <span
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium tabular-nums",
+                  "inline-flex items-center gap-1.5 rounded-none border px-2.5 py-1 text-xs font-medium tabular-nums",
                   unlockMsLeft < 120
                     ? "border-warn/30 bg-warn/10 text-warn"
                     : "border-teal/30 bg-teal/10 text-teal",

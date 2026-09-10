@@ -209,7 +209,7 @@ export function MonitorDetailSheet({
             <span className="truncate">{m?.name ?? "Monitor"}</span>
             <span
               className={cn(
-                "rounded-full border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide",
+                "rounded-none border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide",
                 status === "up"
                   ? "border-up/25 bg-up/10 text-up"
                   : status === "down"
@@ -240,13 +240,13 @@ export function MonitorDetailSheet({
               </span>
             )}
             {m?.account && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-teal/25 bg-teal/10 px-1.5 py-px text-[10px] text-teal">
+              <span className="inline-flex items-center gap-1 rounded-none border border-teal/25 bg-teal/10 px-1.5 py-px text-[10px] text-teal">
                 <UserRound className="size-2.5" aria-hidden="true" />
                 {m.account}
               </span>
             )}
             {m?.pinned && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-1.5 py-px text-[10px] text-primary">
+              <span className="inline-flex items-center gap-1 rounded-none border border-primary/25 bg-primary/10 px-1.5 py-px text-[10px] text-primary">
                 <Pin className="size-2.5" aria-hidden="true" />
                 pinned
               </span>
@@ -258,7 +258,7 @@ export function MonitorDetailSheet({
                     ? `Down alerts fire after ${m.alertDelay + 1} consecutive failed checks — this downtime is already recorded, only the notification is waiting`
                     : `Down webhooks wait for ${m.alertDelay + 1} consecutive failed checks`
                 }
-                className="inline-flex items-center gap-1 rounded-full border border-warn/25 bg-warn/[0.06] px-1.5 py-px text-[10px] font-medium text-warn/90"
+                className="inline-flex items-center gap-1 rounded-none border border-warn/25 bg-warn/[0.06] px-1.5 py-px text-[10px] font-medium text-warn/90"
               >
                 <Hourglass className="size-2.5" aria-hidden="true" />
                 {m.lastStatus === "down" && m.consecutiveDowns <= m.alertDelay
@@ -368,10 +368,10 @@ export function MonitorDetailSheet({
             <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
               <span>30 days ago</span>
               <span className="flex items-center gap-2">
-                <span className="inline-block size-2 rounded-[2px] bg-up/90" /> up
-                <span className="inline-block size-2 rounded-[2px] bg-warn/90" /> partial
-                <span className="inline-block size-2 rounded-[2px] bg-down/90" /> down
-                <span className="inline-block size-2 rounded-[2px] bg-muted opacity-40" /> no data
+                <span className="inline-block size-2 rounded-none bg-up/90" /> up
+                <span className="inline-block size-2 rounded-none bg-warn/90" /> partial
+                <span className="inline-block size-2 rounded-none bg-down/90" /> down
+                <span className="inline-block size-2 rounded-none bg-muted opacity-40" /> no data
               </span>
               <span>today</span>
             </div>

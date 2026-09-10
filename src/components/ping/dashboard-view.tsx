@@ -437,7 +437,7 @@ export function DashboardView({
   }
 
   const headerPill = (label: string, value: number, tone: string) => (
-    <span className={cn("inline-flex h-6 items-center gap-1 rounded-full border px-2.5 text-xs tabular-nums", tone)}>
+    <span className={cn("inline-flex h-6 items-center gap-1 rounded-none border px-2.5 text-xs tabular-nums", tone)}>
       {value}
       <span className="text-muted-foreground">{label}</span>
     </span>
@@ -497,7 +497,7 @@ export function DashboardView({
                     <Settings className="size-4" aria-hidden="true" />
                     {adminUnlocked && (
                       <span
-                        className="absolute -right-1.5 -top-1.5 flex size-3.5 items-center justify-center rounded-full bg-teal text-[#0b1420]"
+                        className="absolute -right-1.5 -top-1.5 flex size-3.5 items-center justify-center rounded-none bg-teal text-[#0b0c0e]"
                         title="Settings unlocked"
                       >
                         <LockOpen className="size-2.5" aria-hidden="true" />
@@ -552,7 +552,7 @@ export function DashboardView({
           <button
             onClick={() => setActiveFolder("all")}
             className={cn(
-              "flex items-center gap-2.5 rounded-md border-l-2 px-2.5 py-2.5 text-sm transition-colors",
+              "flex items-center gap-2.5 rounded-md border-l px-2.5 py-2.5 text-sm transition-colors",
               activeFolder === "all"
                 ? "border-primary bg-secondary font-medium text-foreground"
                 : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
@@ -560,7 +560,7 @@ export function DashboardView({
           >
             <LayoutGrid className="size-4 shrink-0" aria-hidden="true" />
             <span className="truncate">All monitors</span>
-            <span className="ml-auto rounded-full bg-secondary/80 px-1.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+            <span className="ml-auto rounded-none bg-secondary/80 px-1.5 text-[10px] font-medium tabular-nums text-muted-foreground">
               {monitors.length}
             </span>
           </button>
@@ -573,7 +573,7 @@ export function DashboardView({
                 <button
                   onClick={() => setActiveFolder(f.id)}
                   className={cn(
-                    "flex w-full items-center gap-2.5 rounded-md border-l-2 px-2.5 py-2.5 text-sm transition-colors",
+                    "flex w-full items-center gap-2.5 rounded-md border-l px-2.5 py-2.5 text-sm transition-colors",
                     active
                       ? "border-primary bg-secondary font-medium text-foreground"
                       : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
@@ -581,7 +581,7 @@ export function DashboardView({
                 >
                   <Folder className={cn("size-4 shrink-0", s?.down ? "text-down" : "text-muted-foreground")} aria-hidden="true" />
                   <span className="truncate">{f.name}</span>
-                  <span className="ml-auto rounded-full bg-secondary/80 px-1.5 pr-5.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+                  <span className="ml-auto rounded-none bg-secondary/80 px-1.5 pr-5.5 text-[10px] font-medium tabular-nums text-muted-foreground">
                     {s?.total ?? 0}
                   </span>
                 </button>
@@ -626,7 +626,7 @@ export function DashboardView({
             <button
               onClick={() => setActiveFolder("all")}
               className={cn(
-                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                "shrink-0 rounded-none border px-3 py-1.5 text-xs font-medium transition-colors",
                 activeFolder === "all"
                   ? "border-primary/40 bg-primary/15 text-foreground"
                   : "border-border bg-card text-muted-foreground hover:text-foreground",
@@ -641,7 +641,7 @@ export function DashboardView({
                   key={f.id}
                   onClick={() => setActiveFolder(f.id)}
                   className={cn(
-                    "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                    "flex shrink-0 items-center gap-1.5 rounded-none border px-3 py-1.5 text-xs font-medium transition-colors",
                     activeFolder === f.id
                       ? "border-primary/40 bg-primary/15 text-foreground"
                       : "border-border bg-card text-muted-foreground hover:text-foreground",
@@ -654,7 +654,7 @@ export function DashboardView({
             })}
             <button
               onClick={() => setFolderDialog({ open: true, mode: "create" })}
-              className="flex shrink-0 items-center gap-1 rounded-full border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+              className="flex shrink-0 items-center gap-1 rounded-none border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
               aria-label="New folder"
             >
               <FolderPlus className="size-3" /> New
@@ -785,7 +785,7 @@ export function DashboardView({
               {pendingPingCount > 0 && (
                 <span
                   className={cn(
-                    "ml-0.5 grid min-w-4 place-items-center rounded-full px-1 text-[10px] font-semibold tabular-nums",
+                    "ml-0.5 grid min-w-4 place-items-center rounded-none px-1 text-[10px] font-semibold tabular-nums",
                     "bg-primary/15 text-primary",
                   )}
                 >
@@ -810,7 +810,7 @@ export function DashboardView({
               <span className="hidden sm:inline">Maintenance</span>
               {activeMaintenanceCount > 0 && (
                 <span
-                  className="ml-0.5 grid min-w-4 place-items-center rounded-full bg-warn/20 px-1 text-[10px] font-semibold tabular-nums text-warn"
+                  className="ml-0.5 grid min-w-4 place-items-center rounded-none bg-warn/20 px-1 text-[10px] font-semibold tabular-nums text-warn"
                 >
                   {activeMaintenanceCount}
                 </span>
@@ -915,7 +915,7 @@ export function DashboardView({
         <button
           onClick={() => setAddOpen(true)}
           aria-label="New monitor"
-          className="fixed bottom-20 right-4 z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-primary/30 transition-transform hover:scale-105 active:scale-95 sm:hidden"
+          className="fixed bottom-20 right-4 z-40 flex size-14 items-center justify-center rounded-none bg-primary text-primary-foreground shadow-xl shadow-primary/30 transition-transform hover:scale-105 active:scale-95 sm:hidden"
         >
           <Plus className="size-6" />
         </button>

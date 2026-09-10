@@ -22,25 +22,25 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 // PING logo mark — the repo's logo.svg simplified to a single solid color
 // (satori-safe: no gradient defs), embedded as a data URI.
-const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"><rect x="2" y="2" width="60" height="60" rx="14" fill="#8b5cf6"/><path d="M10 32 h11 l4 -15 l7 27 l5 -19 l4 7 h13" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="52" cy="32" r="3.4" fill="#2dd4bf"/></svg>`;
+const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"><rect x="0" y="0" width="64" height="64" rx="0" fill="#ffffff"/><path d="M8 32 h11 l4 -15 l7 27 l5 -19 l4 7 h13" fill="none" stroke="#0b0c0e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="52" cy="32" r="3.4" fill="#0b0c0e"/></svg>`;
 const LOGO = `data:image/svg+xml,${encodeURIComponent(LOGO_SVG)}`;
 
 // A wide heartbeat line for the generic card's lower area.
-const PULSE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 90" width="900" height="90"><path d="M0 60 h140 l14 -38 l24 66 l18 -48 l12 20 h200 l14 -38 l24 66 l18 -48 l12 20 h424" fill="none" stroke="#2dd4bf" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/></svg>`;
+const PULSE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 90" width="900" height="90"><path d="M0 60 h140 l14 -38 l24 66 l18 -48 l12 20 h200 l14 -38 l24 66 l18 -48 l12 20 h424" fill="none" stroke="#e6e8ec" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/></svg>`;
 const PULSE = `data:image/svg+xml,${encodeURIComponent(PULSE_SVG)}`;
 
 const COLORS = {
-  bg: "#0b1420",
-  card: "#111c2e",
-  border: "#233454",
-  fg: "#e7ebf3",
-  muted: "#95a1ba",
-  dim: "#6d7a94",
+  bg: "#0b0c0e",
+  card: "#121316",
+  border: "#25272d",
+  fg: "#e9ebee",
+  muted: "#9aa0a8",
+  dim: "#6d727b",
   up: "#10b981",
   down: "#f43f5e",
   warn: "#f59e0b",
-  teal: "#2dd4bf",
-  violet: "#8b5cf6",
+  teal: "#e6e8ec", // white accent (kicker / today marker)
+  violet: "#ffffff", // logo tile white (key name kept)
 };
 
 interface DayBar {
@@ -61,7 +61,7 @@ function agoLabel(iso: Date | null): string | null {
 }
 
 function dayColor(bar: DayBar | undefined): string {
-  if (!bar || bar.up + bar.down === 0) return "#2e3548"; // visible "no data" slate
+  if (!bar || bar.up + bar.down === 0) return "#232529"; // visible "no data" slate
   const ratio = bar.down / (bar.up + bar.down);
   if (ratio === 0) return COLORS.up;
   if (ratio <= 0.2) return COLORS.warn;
@@ -175,7 +175,7 @@ export async function GET(req: NextRequest) {
         justifyContent: "space-between",
         padding: 56,
         backgroundColor: COLORS.bg,
-        backgroundImage: `linear-gradient(160deg, rgba(139,92,246,0.12) 0%, rgba(11,20,32,0) 42%)`,
+        backgroundImage: `linear-gradient(160deg, rgba(255,255,255,0.06) 0%, rgba(11,12,14,0) 42%)`,
         color: COLORS.fg,
         fontFamily: "sans-serif",
       }}
@@ -187,7 +187,7 @@ export async function GET(req: NextRequest) {
             display: "flex",
             width: 72,
             height: 72,
-            borderRadius: 18,
+            borderRadius: 0,
             backgroundColor: COLORS.violet,
             alignItems: "center",
             justifyContent: "center",
@@ -206,8 +206,8 @@ export async function GET(req: NextRequest) {
             marginLeft: "auto",
             display: "flex",
             padding: "12px 24px",
-            borderRadius: 999,
-            border: `2px solid ${COLORS.border}`,
+            borderRadius: 0,
+            border: `1px solid ${COLORS.border}`,
             backgroundColor: COLORS.card,
             fontSize: 24,
             color: COLORS.muted,
@@ -246,10 +246,10 @@ export async function GET(req: NextRequest) {
                   display: "flex",
                   flex: 1,
                   height: 58,
-                  borderRadius: 5,
+                  borderRadius: 0,
                   backgroundColor: color,
                   ...(i === bars.length - 1
-                    ? { borderWidth: 2, borderColor: COLORS.teal }
+                    ? { borderWidth: 1, borderColor: COLORS.teal }
                     : {}),
                 }}
               />

@@ -173,7 +173,7 @@ export function SchedulePingDialog({
                 key={p.label}
                 type="button"
                 onClick={() => applyPreset(p.ms, p.label)}
-                className="rounded-full border border-border bg-secondary px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                className="rounded-none border border-border bg-secondary px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
               >
                 {p.label}
               </button>
@@ -181,7 +181,7 @@ export function SchedulePingDialog({
             <button
               type="button"
               onClick={applyTomorrow9}
-              className="rounded-full border border-border bg-secondary px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+              className="rounded-none border border-border bg-secondary px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
             >
               tomorrow 09:00
             </button>

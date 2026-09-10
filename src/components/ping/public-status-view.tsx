@@ -95,7 +95,7 @@ export function PublicStatusView({ token }: { token: string }) {
         <div className="mx-auto flex h-14 max-w-2xl items-center gap-2 px-4">
           <PingLogo className="size-7" />
           <PingWordmark className="text-base" />
-          <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-px text-[10px] font-medium uppercase tracking-wider text-primary">
+          <span className="rounded-none border border-primary/30 bg-primary/10 px-2 py-px text-[10px] font-medium uppercase tracking-wider text-primary">
             status
           </span>
           <span className="ml-auto text-xs text-muted-foreground">
@@ -339,7 +339,7 @@ function MonitorRow({ monitor, now }: { monitor: PublicStatusMonitor; now: numbe
         {degraded && (
           <span
             title="Up, but the latest check was slower than this service's latency threshold"
-            className="inline-flex items-center gap-1 rounded-full border border-warn/35 bg-warn/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-warn"
+            className="inline-flex items-center gap-1 rounded-none border border-warn/35 bg-warn/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-warn"
           >
             <Gauge className="size-2.5" aria-hidden="true" />
             degraded
@@ -348,14 +348,14 @@ function MonitorRow({ monitor, now }: { monitor: PublicStatusMonitor; now: numbe
         {maintenance && (
           <span
             title="Planned maintenance — checks continue and are recorded; “down” here is expected"
-            className="inline-flex items-center gap-1 rounded-full border border-warn/35 bg-warn/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-warn"
+            className="inline-flex items-center gap-1 rounded-none border border-warn/35 bg-warn/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-warn"
           >
             <Wrench className="size-2.5" aria-hidden="true" />
             maintenance
           </span>
         )}
         {monitor.status === "paused" && (
-          <span className="rounded-full border border-border bg-muted px-1.5 py-px text-[10px] uppercase tracking-wide text-muted-foreground">
+          <span className="rounded-none border border-border bg-muted px-1.5 py-px text-[10px] uppercase tracking-wide text-muted-foreground">
             paused
           </span>
         )}
@@ -451,14 +451,14 @@ function IncidentList({ incidents, now }: { incidents: PublicIncident[]; now: nu
                 {ended ? (
                   <span className="text-xs text-muted-foreground">resolved</span>
                 ) : (
-                  <span className="rounded-full border border-down/40 bg-down/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-down">
+                  <span className="rounded-none border border-down/40 bg-down/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-down">
                     ongoing
                   </span>
                 )}
                 {inc.duringMaintenance && (
                   <span
                     title="This down period overlapped a planned maintenance window"
-                    className="rounded-full border border-warn/35 bg-warn/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-warn"
+                    className="rounded-none border border-warn/35 bg-warn/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-warn"
                   >
                     during maintenance
                   </span>
@@ -477,7 +477,7 @@ function IncidentList({ incidents, now }: { incidents: PublicIncident[]; now: nu
                 )}
               </div>
               {inc.note && (
-                <p className="mt-1.5 rounded-md border-l-2 border-primary/30 bg-muted/40 px-2.5 py-1.5 text-xs italic leading-relaxed text-foreground/75">
+                <p className="mt-1.5 rounded-none border-l border-primary/30 bg-muted/40 px-2.5 py-1.5 text-xs italic leading-relaxed text-foreground/75">
                   {inc.note}
                 </p>
               )}
@@ -519,7 +519,7 @@ function MaintenanceList({ maintenance, now }: { maintenance: PublicMaintenance[
                 <span className="text-sm font-medium text-foreground">{w.monitorName}</span>
                 <span
                   className={cn(
-                    "rounded-full border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide",
+                    "rounded-none border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide",
                     isActive
                       ? "border-warn/40 bg-warn/10 text-warn"
                       : "border-border bg-muted text-muted-foreground",
@@ -589,7 +589,7 @@ function DayBars({ daily }: { daily: DailyBucket[] }) {
               key={key}
               title={title}
               className={cn(
-                "h-7 flex-1 rounded-[3px] transition-colors",
+                "h-7 flex-1 rounded-none transition-colors",
                 !bucket && "border border-dashed border-border/60",
                 bucket && down === 0 && "bg-up/60 hover:bg-up/80",
                 bucket && down > 0 && "bg-down/70 hover:bg-down",

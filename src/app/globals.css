@@ -41,57 +41,60 @@
   --color-down: var(--down);
   --color-warn: var(--warn);
   --color-teal: var(--teal);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
 }
 
 /*
- * PING theme — blueprint drafting table:
- * deep navy paper canvas under a fixed technical grid (see body::before),
- * elevated navy panels, electric violet accent, teal secondary,
- * emerald success / rose failure, small radii.
+ * PING theme — charcoal black + white accent, sharp corners, thin borders:
+ * technical drafting aesthetic. Neutral charcoal scale (no hue tint), white
+ * as the sole brand accent (CTAs, focus, links, highlights), semantic status
+ * colors kept (emerald up / rose down / amber warn). The `--teal` var now
+ * resolves to the soft-white accent — name kept for class compatibility
+ * (text-teal / bg-teal / border-teal all become the white accent).
+ * Blueprint grid stays (white lines — see body::before).
  */
 :root,
 .dark {
-  --radius: 0.5rem;
-  --background: #0b1420;
-  --foreground: #e7ebf3;
-  --card: #111c2e;
-  --card-foreground: #e7ebf3;
-  --popover: #142034;
-  --popover-foreground: #e7ebf3;
-  --primary: #8b5cf6;
-  --primary-foreground: #ffffff;
-  --secondary: #1a2740;
-  --secondary-foreground: #e7ebf3;
-  --muted: #172338;
-  --muted-foreground: #95a1ba;
-  --accent: #1e2c48;
-  --accent-foreground: #eef1f8;
+  --radius: 0rem;
+  --background: #0b0c0e;
+  --foreground: #e9ebee;
+  --card: #121316;
+  --card-foreground: #e9ebee;
+  --popover: #15161a;
+  --popover-foreground: #e9ebee;
+  --primary: #ffffff;
+  --primary-foreground: #0b0c0e;
+  --secondary: #1b1d21;
+  --secondary-foreground: #e9ebee;
+  --muted: #181a1e;
+  --muted-foreground: #9aa0a8;
+  --accent: #202227;
+  --accent-foreground: #f1f2f4;
   --destructive: #f43f5e;
   --destructive-foreground: #ffffff;
-  --border: #233454;
-  --input: #2a3a5c;
-  --ring: #8b5cf6;
-  --chart-1: #8b5cf6;
+  --border: #25272d;
+  --input: #2c2e35;
+  --ring: #ffffff;
+  --chart-1: #e6e8ec;
   --chart-2: #2dd4bf;
   --chart-3: #10b981;
   --chart-4: #f59e0b;
   --chart-5: #f43f5e;
-  --sidebar: #0d1828;
-  --sidebar-foreground: #e7ebf3;
-  --sidebar-primary: #8b5cf6;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #172338;
-  --sidebar-accent-foreground: #eef1f8;
-  --sidebar-border: #1d2b45;
-  --sidebar-ring: #8b5cf6;
+  --sidebar: #0d0e11;
+  --sidebar-foreground: #e9ebee;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #0b0c0e;
+  --sidebar-accent: #181a1e;
+  --sidebar-accent-foreground: #f1f2f4;
+  --sidebar-border: #1f2126;
+  --sidebar-ring: #ffffff;
   --up: #10b981;
   --down: #f43f5e;
   --warn: #f59e0b;
-  --teal: #2dd4bf;
+  --teal: #e6e8ec;
 }
 
 @layer base {
@@ -105,18 +108,18 @@
     @apply bg-background text-foreground;
   }
   ::selection {
-    background: #8b5cf644;
+    background: #ffffff29;
   }
 }
 
 /* ---------- PING custom utilities ---------- */
 
 /*
- * Blueprint grid canvas — the drafting-paper background.
- * Two-tier grid: fine 24px cells + bold 120px majors, soft periwinkle lines
- * over the navy paper. Fixed to the viewport so it reads as a drafting table
+ * Blueprint grid canvas — kept per theme request, recolored white-on-charcoal.
+ * Two-tier grid: fine 24px cells + bold 120px majors, soft white lines over
+ * the charcoal paper. Fixed to the viewport so it reads as a drafting table
  * the UI floats above. Sits at z-index:-1 → above the body background color,
- * under all content. Frustum-safe: pure CSS, zero image weight.
+ * under all content. Pure CSS, zero image weight.
  */
 body::before {
   content: "";
@@ -125,17 +128,17 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(128, 174, 255, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(128, 174, 255, 0.12) 1px, transparent 1px),
-    linear-gradient(rgba(128, 174, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(128, 174, 255, 0.05) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.038) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.038) 1px, transparent 1px);
   background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
 }
 
-/* Slim navy scrollbars */
+/* Slim charcoal scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2c3c5a transparent;
+  scrollbar-color: #2a2c31 transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
@@ -145,11 +148,11 @@ body::before {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: #2c3c5a;
-  border-radius: 4px;
+  background: #2a2c31;
+  border-radius: 0px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: #3a4f75;
+  background: #3a3d44;
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -207,15 +210,15 @@ body::before {
   animation: ping-fade-up 0.35s ease-out both;
 }
 
-/* Subtle page-level ambient glow, Render-style */
+/* Subtle page-level ambient glow — faint white light, Render-style */
 .ping-ambient::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(560px 300px at 12% -4%, rgba(124, 58, 237, 0.09), transparent 62%),
-    radial-gradient(480px 260px at 88% 0%, rgba(45, 212, 191, 0.06), transparent 60%);
+    radial-gradient(560px 300px at 12% -4%, rgba(255, 255, 255, 0.055), transparent 62%),
+    radial-gradient(480px 260px at 88% 0%, rgba(255, 255, 255, 0.035), transparent 60%);
   z-index: 0;
 }
 

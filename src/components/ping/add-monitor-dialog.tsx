@@ -73,7 +73,7 @@ function FieldLabel({
             <button
               type="button"
               aria-label="More information"
-              className="grid size-4 place-items-center rounded-full text-[10px] font-bold text-muted-foreground/60 transition-colors hover:bg-secondary hover:text-foreground focus-visible:bg-secondary focus-visible:text-foreground focus-visible:outline-none"
+              className="grid size-4 place-items-center rounded-none text-[10px] font-bold text-muted-foreground/60 transition-colors hover:bg-secondary hover:text-foreground focus-visible:bg-secondary focus-visible:text-foreground focus-visible:outline-none"
             >
               ?
             </button>
@@ -270,7 +270,7 @@ export function AddMonitorDialog({
         onOpenAutoFocus={(e) => e.preventDefault()} // let the URL input autoFocus win
         className={(
           // mobile: bottom sheet / ≥sm: centered card
-          "left-0 right-0 bottom-0 top-auto translate-x-0 translate-y-0 rounded-none rounded-t-2xl border-b-0 " +
+          "left-0 right-0 bottom-0 top-auto translate-x-0 translate-y-0 rounded-none border-b-0 " +
           "max-h-[92dvh] w-full max-w-none overflow-hidden p-0 gap-0 " +
           "sm:left-1/2 sm:right-auto sm:top-1/2 sm:bottom-auto sm:-translate-x-1/2 sm:-translate-y-1/2 " +
           "sm:rounded-xl sm:border-b sm:max-h-[90dvh] sm:max-w-[440px]"
@@ -393,7 +393,7 @@ export function AddMonitorDialog({
                 />
                 Advanced
                 {advCount > 0 && (
-                  <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-primary">
+                  <span className="ml-auto rounded-none bg-primary/15 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-primary">
                     {advCount} set
                   </span>
                 )}

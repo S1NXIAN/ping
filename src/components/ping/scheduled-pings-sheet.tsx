@@ -50,7 +50,7 @@ export function ScheduledPingsSheet({
             <CalendarClock className="size-4 text-primary" aria-hidden="true" />
             Scheduled pings
             {upcoming.length > 0 && (
-              <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-px text-[10px] font-medium tabular-nums text-primary">
+              <span className="rounded-none border border-primary/30 bg-primary/10 px-1.5 py-px text-[10px] font-medium tabular-nums text-primary">
                 {upcoming.length}
               </span>
             )}
@@ -63,7 +63,7 @@ export function ScheduledPingsSheet({
 
         {empty ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 py-16 text-center">
-            <div className="grid size-12 place-items-center rounded-full border border-dashed border-border">
+            <div className="grid size-12 place-items-center rounded-none border border-dashed border-border">
               <CalendarClock className="size-5 text-muted-foreground" aria-hidden="true" />
             </div>
             <div>
@@ -141,7 +141,7 @@ function UpcomingRow({
     <div className="group flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2.5">
       <span
         className={cn(
-          "grid size-8 shrink-0 place-items-center rounded-full border",
+          "grid size-8 shrink-0 place-items-center rounded-none border",
           ping.status === "running"
             ? "border-primary/30 bg-primary/10 text-primary"
             : "border-border bg-secondary text-muted-foreground",
@@ -192,7 +192,7 @@ function DoneRow({ ping, now }: { ping: ScheduledPingDTO; now: number }) {
     <div className="flex items-center gap-2.5 rounded-lg border bg-card/60 px-3 py-2.5">
       <span
         className={cn(
-          "grid size-8 shrink-0 place-items-center rounded-full border text-[11px] font-semibold tabular-nums",
+          "grid size-8 shrink-0 place-items-center rounded-none border text-[11px] font-semibold tabular-nums",
           unknown
             ? "border-border bg-muted text-muted-foreground"
             : up

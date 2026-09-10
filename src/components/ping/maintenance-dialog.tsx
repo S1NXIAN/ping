@@ -186,7 +186,7 @@ export function MaintenanceDialog({
                 key={p.label}
                 type="button"
                 onClick={() => applyStartPreset(p.min)}
-                className="rounded-full border border-border bg-secondary px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-warn/50 hover:text-foreground"
+                className="rounded-none border border-border bg-secondary px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-warn/50 hover:text-foreground"
               >
                 {p.label}
               </button>
@@ -233,7 +233,7 @@ export function MaintenanceDialog({
                 type="button"
                 onClick={() => setDurationMin(m)}
                 className={cn(
-                  "rounded-full border px-2.5 py-1 text-[11px] transition-colors",
+                  "rounded-none border px-2.5 py-1 text-[11px] transition-colors",
                   durationMin === m
                     ? "border-warn/50 bg-warn/10 text-warn"
                     : "border-border bg-secondary text-muted-foreground hover:border-warn/50 hover:text-foreground",

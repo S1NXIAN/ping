@@ -12,8 +12,8 @@ const RANGES: { value: HistoryRange; label: string }[] = [
   { value: "7d", label: "7d" },
 ];
 
-const VIOLET = "#8b5cf6";
-const TEAL = "#2dd4bf";
+const LINE = "#e6e8ec"; // soft-white response line (theme accent)
+const LIVE = "#10b981"; // emerald "latest up" dot
 
 /** "Nice" y-axis maximum: rounds up so gridlines land on clean numbers. */
 function niceMax(v: number): number {
@@ -205,7 +205,7 @@ export function HistoryChart({
               aria-pressed={range === r.value}
               onClick={() => setRange(r.value)}
               className={cn(
-                "rounded-[4px] px-2 py-0.5 text-[11px] font-medium transition-colors",
+                "rounded-none px-2 py-0.5 text-[11px] font-medium transition-colors",
                 range === r.value
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground",
@@ -246,8 +246,8 @@ export function HistoryChart({
           >
             <defs>
               <linearGradient id="ping-history-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor={VIOLET} stopOpacity="0.22" />
-                <stop offset="1" stopColor={VIOLET} stopOpacity="0" />
+                <stop offset="0" stopColor={LINE} stopOpacity="0.22" />
+                <stop offset="1" stopColor={LINE} stopOpacity="0" />
               </linearGradient>
             </defs>
 
@@ -331,7 +331,7 @@ export function HistoryChart({
                   key={i}
                   d={seg.join(" ")}
                   fill="none"
-                  stroke={VIOLET}
+                  stroke={LINE}
                   strokeWidth="1.5"
                   strokeLinejoin="round"
                   strokeLinecap="round"
@@ -343,7 +343,7 @@ export function HistoryChart({
             {/* Per-point markers when the window is sparse enough to read */}
             {upPoints.length <= 80 &&
               upPoints.map((p, i) => (
-                <circle key={`p${i}`} cx={xOf(p.t)} cy={yOf(p.ms)} r="1.6" fill={VIOLET} opacity="0.75" />
+                <circle key={`p${i}`} cx={xOf(p.t)} cy={yOf(p.ms)} r="1.6" fill={LINE} opacity="0.75" />
               ))}
 
             {/* Down checks: rose ticks at the chart floor */}
@@ -368,7 +368,7 @@ export function HistoryChart({
                 cx={xOf(upPoints[upPoints.length - 1].t)}
                 cy={yOf(upPoints[upPoints.length - 1].ms)}
                 r="2.6"
-                fill={TEAL}
+                fill={LIVE}
               />
             )}
 
@@ -390,7 +390,7 @@ export function HistoryChart({
                     cx={xOf(hoverPoint.t)}
                     cy={yOf(hoverPoint.ms)}
                     r="3.4"
-                    fill={hoverPoint.s === "down" ? "#f43f5e" : VIOLET}
+                    fill={hoverPoint.s === "down" ? "#f43f5e" : LINE}
                     stroke="var(--background)"
                     strokeWidth="1.5"
                   />
@@ -421,7 +421,7 @@ export function HistoryChart({
                 <span
                   aria-hidden="true"
                   className={cn(
-                    "inline-block size-1.5 rounded-full",
+                    "inline-block size-1.5 rounded-none",
                     hoverPoint.s === "down" ? "bg-down" : "bg-up",
                   )}
                 />

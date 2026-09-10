@@ -45,12 +45,18 @@ function esc(s: string): string {
     .replaceAll("'", "&#39;");
 }
 
-function renderBadge({ label, text, color }: BadgeSpec, square: boolean): string {
+function renderBadge(spec: BadgeSpec, _square: boolean): string {
+  const { label, text, color } = spec;
   const lw = Math.round(textWidth(label));
   const vw = Math.round(textWidth(text));
   const w = lw + vw;
-  const rx = square ? 0 : 3;
+  const rx = 0; // sharp corners everywhere (charcoal + white-accent theme)
   const title = `${label}: ${text}`;
+  // Light badge blocks (the white accent) need dark text to stay readable.
+  const h = color.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  const light = 0.299 * r + 0.587 * g + 0.114 * b > 150;
+  const valueFill = light ? "#0b0c0e" : "#fff";
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="20" viewBox="0 0 ${w} 20" role="img" aria-label="${esc(title)}">` +
     `<title>${esc(title)}</title>` +
@@ -64,9 +70,9 @@ function renderBadge({ label, text, color }: BadgeSpec, square: boolean): string
     `<rect x="${lw}" width="${vw}" height="20" fill="${color}"/>` +
     `<rect width="${w}" height="20" fill="url(#s)"/>` +
     `</g>` +
-    `<g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11" font-weight="500">` +
-    `<text x="${lw / 2}" y="15">${esc(label)}</text>` +
-    `<text x="${lw + vw / 2}" y="15">${esc(text)}</text>` +
+    `<g text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11" font-weight="500">` +
+    `<text x="${lw / 2}" y="15" fill="#fff">${esc(label)}</text>` +
+    `<text x="${lw + vw / 2}" y="15" fill="${valueFill}">${esc(text)}</text>` +
     `</g>` +
     `</svg>`
   );
@@ -175,7 +181,7 @@ export async function GET(req: NextRequest) {
     const avg = fractions.reduce((a, b) => a + b, 0) / fractions.length;
     const pct = (avg * 100).toFixed(avg < 0.99995 ? 2 : 0);
     return svgResponse(
-      renderBadge({ label, text: `${pct}% · ${uptimeWindow}`, color: "#8b5cf6" }, square),
+      renderBadge({ label, text: `${pct}% · ${uptimeWindow}`, color: "#e6e8ec" }, square),
     );
   }
 

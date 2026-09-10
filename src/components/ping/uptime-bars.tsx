@@ -44,7 +44,7 @@ export function UptimeBars({
             key={i}
             title={s.title}
             className={cn(
-              "min-w-[4px] flex-1 rounded-[2px] transition-colors hover:opacity-80",
+              "min-w-[4px] flex-1 rounded-none transition-colors hover:opacity-80",
               barClassName,
               cls,
               s.ratio == null && "opacity-40",

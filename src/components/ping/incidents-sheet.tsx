@@ -107,7 +107,7 @@ export function IncidentsSheet({
             <AlertTriangle className="size-4 text-down/90" aria-hidden="true" />
             Incidents
             {incidents && incidents.length > 0 && (
-              <span className="rounded-full border border-down/30 bg-down/10 px-1.5 py-px text-[10px] font-medium tabular-nums text-down">
+              <span className="rounded-none border border-down/30 bg-down/10 px-1.5 py-px text-[10px] font-medium tabular-nums text-down">
                 {incidents.length}
               </span>
             )}
@@ -134,7 +134,7 @@ export function IncidentsSheet({
           </div>
         ) : incidents != null && incidents.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 py-16 text-center">
-            <div className="grid size-12 place-items-center rounded-full border border-dashed border-border">
+            <div className="grid size-12 place-items-center rounded-none border border-dashed border-border">
               <ShieldQuestion className="size-5 text-muted-foreground" aria-hidden="true" />
             </div>
             <div>
@@ -205,14 +205,14 @@ function IncidentRow({
         {ended ? (
           <span className="text-[11px] text-muted-foreground">resolved</span>
         ) : (
-          <span className="rounded-full border border-down/40 bg-down/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-down">
+          <span className="rounded-none border border-down/40 bg-down/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-down">
             ongoing
           </span>
         )}
         {inc.duringMaintenance && (
           <span
             title="This down period overlapped a planned maintenance window"
-            className="rounded-full border border-warn/35 bg-warn/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-warn"
+            className="rounded-none border border-warn/35 bg-warn/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-warn"
           >
             during maintenance
           </span>
@@ -269,7 +269,7 @@ function IncidentRow({
         </div>
       ) : inc.note ? (
         <div className="mt-2">
-          <p className="rounded-md border-l-2 border-primary/30 bg-muted/40 px-2.5 py-1.5 text-xs italic leading-relaxed text-foreground/75">
+          <p className="rounded-none border-l border-primary/30 bg-muted/40 px-2.5 py-1.5 text-xs italic leading-relaxed text-foreground/75">
             {inc.note}
           </p>
           <div className="mt-1.5 flex items-center gap-2">

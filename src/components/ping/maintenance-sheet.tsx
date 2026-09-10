@@ -53,7 +53,7 @@ export function MaintenanceSheet({
             <Wrench className="size-4 text-warn" aria-hidden="true" />
             Maintenance
             {active.length > 0 && (
-              <span className="rounded-full border border-warn/40 bg-warn/10 px-1.5 py-px text-[10px] font-medium tabular-nums text-warn">
+              <span className="rounded-none border border-warn/40 bg-warn/10 px-1.5 py-px text-[10px] font-medium tabular-nums text-warn">
                 {active.length} active
               </span>
             )}
@@ -66,7 +66,7 @@ export function MaintenanceSheet({
 
         {empty ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 py-16 text-center">
-            <div className="grid size-12 place-items-center rounded-full border border-dashed border-border">
+            <div className="grid size-12 place-items-center rounded-none border border-dashed border-border">
               <Wrench className="size-5 text-muted-foreground" aria-hidden="true" />
             </div>
             <div>
@@ -173,7 +173,7 @@ function WindowRow({
     >
       <span
         className={cn(
-          "grid size-8 shrink-0 place-items-center rounded-full border",
+          "grid size-8 shrink-0 place-items-center rounded-none border",
           tone === "active"
             ? "border-warn/40 bg-warn/15 text-warn"
             : "border-border bg-secondary text-muted-foreground",
