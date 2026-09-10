@@ -245,12 +245,20 @@ export interface PublicStatusResponse {
   serverTime: string;
 }
 
+/** One selectable monitor for the status-badge picker (admin only). */
+export interface StatusPageMonitorOption {
+  id: string;
+  name: string;
+}
+
 /** Admin-facing status-page state (token only shown to an unlocked admin). */
 export interface StatusPageInfoResponse {
   enabled: boolean;
   token: string | null;
   /** Custom title shown on the public status page (null = default). */
   title: string | null;
+  /** Visible (non-hidden) monitor names — options for per-monitor badges. */
+  monitors: StatusPageMonitorOption[];
 }
 
 /** A webhook endpoint notified when a monitor goes down or recovers. */

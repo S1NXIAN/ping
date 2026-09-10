@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Activity, AlertTriangle, CalendarClock, Gauge, Hammer, RefreshCw, Wrench } from "lucide-react";
+import { Activity, AlertTriangle, CalendarClock, Gauge, Hammer, RefreshCw, Rss, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api, ApiError, formatDateTime, formatDuration, formatMs, formatUptime, timeAgo } from "@/lib/ping-client";
 import type {
@@ -207,15 +207,23 @@ export function PublicStatusView({ token }: { token: string }) {
 
             <p className="pt-1 text-center text-[11px] leading-relaxed text-muted-foreground">
               Uptime is computed only from recorded checks — days without checks show as empty
-              grey bars, never as perfect uptime. This page auto-refreshes every 30 seconds.
+              grey bars, never as perfect uptime. This page auto-refreshes every 30 seconds.{" "}
+              <a
+                href={`/api/public/feed?token=${encodeURIComponent(token)}`}
+                className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-teal hover:underline"
+                title="RSS 2.0 feed — incidents and maintenance, subscribable in any reader"
+              >
+                <Rss className="size-3" aria-hidden="true" /> RSS feed
+              </a>{" "}
+              available.
             </p>
           </>
         )}
       </main>
 
       <footer className="sticky bottom-0 z-20 mt-auto border-t bg-background/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-2xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[11px] text-foreground/70">
-          <span className="font-medium text-foreground/90">PING</span>
+        <div className="mx-auto flex max-w-2xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[11px] text-foreground/60">
+          <span className="font-medium text-foreground/80">PING</span>
           <span>honest uptime monitoring</span>
           <span className="ml-auto">not affiliated with render.com</span>
         </div>

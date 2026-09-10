@@ -79,6 +79,13 @@ and no uptime number is ever shown for a window PING didn't actually measure.
   incident history (stitched from real checks, with a clear “ongoing” state),
   and active/upcoming maintenance windows (with notes) are included; down
   periods fully inside a maintenance window are not listed as incidents.
+- **README status badge** — a shields.io-style SVG that mirrors the status
+  page live: `![status](https://your-host/api/public/badge?token=…)` (green
+  operational / amber degraded / red down / gray no data; `&monitor=Name` for
+  a single monitor, `&uptime=24h|7d|30d` for a real uptime %, `style=flat-square`
+  for sharp corners). Copy-ready Markdown/HTML snippets and an RSS 2.0 feed of
+  incidents + maintenance (`/api/public/feed?token=…`, also linked on the
+  public page) live in Settings → Public status page.
 - **Webhook notifications** — when a monitor goes down, recovers, or answers
   slower than its latency threshold, PING POSTs one JSON event to each
   configured channel (Slack `text`, Discord `content`, plus a structured
@@ -188,6 +195,8 @@ without triggering checks.
 | `GET/POST/DELETE /api/incidents` | incident list + postmortem notes |
 | `GET/POST /api/maintenance`, `DELETE /api/maintenance/[id]` | maintenance windows |
 | `GET /api/public/status?token=` | public status page (no auth; token-gated) |
+| `GET /api/public/badge?token=` | shields-style SVG badge (no auth; token-gated; `monitor`, `label`, `uptime`, `style` params) |
+| `GET /api/public/feed?token=` | RSS 2.0 feed of incidents + maintenance (no auth; token-gated) |
 | `GET /api/render-status` | live status from status.render.com (5 min cache) |
 | `GET /api/export`, `POST /api/import` | backup / restore (monitors, webhook channels, future maintenance windows) |
 | `GET /api/health` | public keep-alive ping, no DB access |

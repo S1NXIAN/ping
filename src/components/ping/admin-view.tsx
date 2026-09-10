@@ -38,6 +38,7 @@ import type { AdminInfoResponse, ImportResult, StatusPageInfoResponse } from "@/
 import { cn } from "@/lib/utils";
 import { NotificationsSection } from "./notifications-section";
 import { RenderStatusCard } from "./render-status-card";
+import { StatusBadgeSection } from "./status-badge-section";
 
 const GH_ACTIONS_YAML = `name: PING keep-alive
 # Free on public repositories. Set the PING_URL repository secret
@@ -537,6 +538,12 @@ export function AdminView({
                     The token is 192-bit random and unguessable.
                   </p>
                 </div>
+
+                {/* badge + RSS embeds (shares the same token) */}
+                <StatusBadgeSection
+                  token={statusPage.token ?? ""}
+                  monitors={statusPage.monitors ?? []}
+                />
 
                 <div className="flex flex-wrap gap-2">
                   <Button

@@ -23,6 +23,7 @@ import {
   Wrench,
   X,
   XCircle,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,7 +58,7 @@ import { IncidentsSheet } from "./incidents-sheet";
 import { TextPromptDialog } from "./text-prompt-dialog";
 import { StatCard } from "./stat-card";
 
-export type SortMode = "manual" | "az" | "za" | "status";
+export type SortMode = "manual" | "az" | "za" | "status" | "slowest" | "fastest";
 const SORT_STORAGE_KEY = "ping.sort";
 
 export function DashboardView({
@@ -92,7 +93,15 @@ export function DashboardView({
   useEffect(() => {
     try {
       const v = localStorage.getItem(SORT_STORAGE_KEY);
-      if (v === "manual" || v === "az" || v === "za" || v === "status") setSortMode(v);
+      if (
+        v === "manual" ||
+        v === "az" ||
+        v === "za" ||
+        v === "status" ||
+        v === "slowest" ||
+        v === "fastest"
+      )
+        setSortMode(v);
     } catch {
       /* private browsing etc. */
     }
@@ -187,6 +196,21 @@ export function DashboardView({
           a.position - b.position,
       );
       // pinned monitors always float to the top, even when browsing alphabetically
+      return [...sorted.filter((m) => m.pinned), ...sorted.filter((m) => !m.pinned)];
+    }
+
+    if (sortMode === "slowest" || sortMode === "fastest") {
+      // by real average response time (24h) — monitors with no up checks
+      // (paused/pending/all-failed) always sink to the bottom, honestly.
+      const dir = sortMode === "slowest" ? -1 : 1;
+      const sorted = [...list].sort((a, b) => {
+        const av = a.stats.avgMs24h;
+        const bv = b.stats.avgMs24h;
+        if (av == null && bv == null) return a.position - b.position;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        return dir * (av - bv) || a.position - b.position;
+      });
       return [...sorted.filter((m) => m.pinned), ...sorted.filter((m) => !m.pinned)];
     }
 
@@ -674,7 +698,7 @@ export function DashboardView({
             <Select value={sortMode} onValueChange={changeSort}>
               <SelectTrigger
                 aria-label="Sort monitors"
-                title="How the monitor list is ordered — manual drag order, alphabetical, or status"
+                title="How the monitor list is ordered — manual drag order, alphabetical, status, or response time"
                 className="h-9 w-[124px] shrink-0 text-xs"
               >
                 <SelectValue />
@@ -698,6 +722,16 @@ export function DashboardView({
                 <SelectItem value="status">
                   <span className="flex items-center gap-2">
                     <Activity className="size-3.5" aria-hidden="true" /> Status
+                  </span>
+                </SelectItem>
+                <SelectItem value="slowest">
+                  <span className="flex items-center gap-2">
+                    <Gauge className="size-3.5" aria-hidden="true" /> Slowest
+                  </span>
+                </SelectItem>
+                <SelectItem value="fastest">
+                  <span className="flex items-center gap-2">
+                    <Zap className="size-3.5" aria-hidden="true" /> Fastest
                   </span>
                 </SelectItem>
               </SelectContent>

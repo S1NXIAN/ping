@@ -9,18 +9,32 @@ function newToken(): string {
   return randomBytes(24).toString("hex"); // 48 hex chars, 192 bits
 }
 
+/** Settings + visible monitor names (options for per-monitor badges). */
+async function responseBody(): Promise<StatusPageInfoResponse> {
+  const [settings, monitors] = await Promise.all([
+    db.settings.findUnique({ where: { id: "main" } }),
+    db.monitor.findMany({
+      where: { statusHidden: false },
+      select: { id: true, name: true },
+      orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }],
+    }),
+  ]);
+  return {
+    enabled: !!settings?.statusToken,
+    token: settings?.statusToken ?? null,
+    title: settings?.statusTitle ?? null,
+    monitors,
+  };
+}
+
 /** Current status-page state (requires an unlocked admin). */
 export async function GET(req: NextRequest) {
   const unauthorized = await adminGuard(req);
   if (unauthorized) return unauthorized;
 
-  const settings = await db.settings.findUnique({ where: { id: "main" } });
-  const body: StatusPageInfoResponse = {
-    enabled: !!settings?.statusToken,
-    token: settings?.statusToken ?? null,
-    title: settings?.statusTitle ?? null,
-  };
-  return NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(await responseBody(), {
+    headers: { "Cache-Control": "no-store" },
+  });
 }
 
 const actionSchema = z.union([
@@ -74,12 +88,7 @@ export async function POST(req: NextRequest) {
       where: { id: "main" },
       data: { statusTitle: parsed.data.title ?? null },
     });
-    const res: StatusPageInfoResponse = {
-      enabled: !!settings.statusToken,
-      token: settings.statusToken,
-      title: parsed.data.title ?? null,
-    };
-    return NextResponse.json(res);
+    return NextResponse.json(await responseBody());
   }
 
   let token: string | null;
@@ -93,10 +102,5 @@ export async function POST(req: NextRequest) {
 
   await db.settings.update({ where: { id: "main" }, data: { statusToken: token } });
 
-  const res: StatusPageInfoResponse = {
-    enabled: !!token,
-    token,
-    title: settings.statusTitle ?? null,
-  };
-  return NextResponse.json(res);
+  return NextResponse.json(await responseBody());
 }
