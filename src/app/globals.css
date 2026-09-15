@@ -226,3 +226,5 @@ body::before {
 nextjs-portal {
   display: none !important;
 }
+
+/* layout pass: regenerate utilities */

@@ -620,9 +620,9 @@ export function DashboardView({
         </aside>
 
         {/* main column */}
-        <main className="min-w-0 flex-1 space-y-4 px-4 pb-24 pt-4 sm:px-0 sm:pb-10">
+        <main className="min-w-0 flex-1 px-4 pb-24 pt-4 sm:px-0 sm:pb-10">
           {/* mobile folder chips */}
-          <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-0.5 lg:hidden">
+          <div className="no-scrollbar -mx-4 mb-3 flex items-center gap-2 overflow-x-auto px-4 pb-0.5 lg:hidden">
             <button
               onClick={() => setActiveFolder("all")}
               className={cn(
@@ -661,8 +661,8 @@ export function DashboardView({
             </button>
           </div>
 
-          {/* stats strip */}
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          {/* stats strip — one generous break below separates overview from the working group */}
+          <div className="mb-7 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             <StatCard
               label="Monitors"
               value={summary ? `${summary.up}/${summary.monitors}` : "—"}
@@ -697,6 +697,8 @@ export function DashboardView({
             />
           </div>
 
+          {/* working group: toolbar + list — one tight unit (10px internal rhythm) */}
+          <div className="space-y-2.5">
           {/* toolbar: search + sort + scheduled pings + maintenance */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative min-w-0 basis-full sm:basis-44 sm:flex-1">
@@ -857,7 +859,7 @@ export function DashboardView({
               ))}
             </div>
           ) : monitors.length === 0 ? (
-            <div className="rounded-xl border border-dashed bg-card/50 p-8 text-center">
+            <div className="rounded-none border border-dashed bg-card/50 p-8 text-center">
               <PingLogo className="mx-auto size-12 opacity-80" />
               <h2 className="mt-4 text-base font-semibold">Add your first monitor</h2>
               <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-muted-foreground">
@@ -872,7 +874,7 @@ export function DashboardView({
               </Button>
             </div>
           ) : visible.length === 0 ? (
-            <div className="rounded-xl border border-dashed bg-card/50 p-8 text-center text-sm text-muted-foreground">
+            <div className="rounded-none border border-dashed bg-card/50 p-8 text-center text-sm text-muted-foreground">
               {query
                 ? `No monitors match “${query}”.`
                 : activeFolder === "all"
@@ -907,6 +909,7 @@ export function DashboardView({
               })}
             </div>
           )}
+          </div>
         </main>
       </div>
 
