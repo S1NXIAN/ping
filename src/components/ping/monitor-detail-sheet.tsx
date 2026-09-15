@@ -417,7 +417,11 @@ export function MonitorDetailSheet({
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Recent checks
             </h3>
-            <ScrollArea className="max-h-96 rounded-lg border">
+            {/* Radix gotcha: the viewport's height:100% collapses to auto
+                when the root's height is content-driven (auto + max-h), so the
+                table would spill past the root's border box and never scroll.
+                Cap the viewport itself — it's the element that scrolls. */}
+            <ScrollArea className="max-h-96 rounded-lg border [&>[data-slot=scroll-area-viewport]]:max-h-96">
               <table className="w-full text-xs">
                 <thead className="sticky top-0 bg-card/95 backdrop-blur">
                   <tr className="border-b text-left text-[10px] uppercase tracking-wide text-muted-foreground">
