@@ -488,7 +488,7 @@ export function DashboardView({
               onClick={() => setPaletteOpen(true)}
               aria-label="Open command palette"
               title="Command palette — jump to any monitor or action (Ctrl/⌘+K)"
-              className="h-9 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground md:px-3"
+              className="h-11 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground sm:h-9 md:px-3"
             >
               <Search className="size-3.5 shrink-0" aria-hidden="true" />
               <span className="hidden md:inline">Search…</span>
@@ -515,13 +515,13 @@ export function DashboardView({
               disabled={refreshing}
               aria-label="Refresh"
               title="Refresh now"
-              className="text-muted-foreground hover:text-teal"
+              className="size-11 text-muted-foreground hover:text-teal sm:size-9"
             >
               <RefreshCw className={cn("size-4", refreshing && "animate-spin")} />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Menu" className="text-muted-foreground hover:text-foreground">
+                <Button variant="ghost" size="icon" aria-label="Menu" className="size-11 text-muted-foreground hover:text-foreground sm:size-9">
                   <span className="relative">
                     <Settings className="size-4" aria-hidden="true" />
                     {adminUnlocked && (
@@ -664,7 +664,7 @@ export function DashboardView({
             <button
               onClick={() => setActiveFolder("all")}
               className={cn(
-                "shrink-0 rounded-none border px-3 py-1.5 text-xs font-medium transition-colors",
+                "inline-flex min-h-11 shrink-0 items-center rounded-none border px-3 py-1.5 text-xs font-medium transition-colors",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                 activeFolder === "all"
                   ? "border-primary/40 bg-primary/15 text-foreground"
@@ -680,7 +680,7 @@ export function DashboardView({
                   key={f.id}
                   onClick={() => setActiveFolder(f.id)}
                   className={cn(
-                    "flex shrink-0 items-center gap-1.5 rounded-none border px-3 py-1.5 text-xs font-medium transition-colors",
+                    "flex min-h-11 shrink-0 items-center gap-1.5 rounded-none border px-3 py-1.5 text-xs font-medium transition-colors",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                     activeFolder === f.id
                       ? "border-primary/40 bg-primary/15 text-foreground"
@@ -694,7 +694,7 @@ export function DashboardView({
             })}
             <button
               onClick={() => setFolderDialog({ open: true, mode: "create" })}
-              className="flex shrink-0 items-center gap-1 rounded-none border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+              className="flex min-h-11 shrink-0 items-center gap-1 rounded-none border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
               aria-label="New folder"
             >
               <FolderPlus className="size-3" /> New
@@ -766,7 +766,7 @@ export function DashboardView({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search…"
                 title="Search by name, URL, folder, or account — press / to focus"
-                className="h-9 border-border bg-muted/30 pl-9 focus-visible:border-primary/40 focus-visible:ring-primary/20"
+                className="h-11 border-border bg-muted/30 pl-9 focus-visible:border-primary/40 focus-visible:ring-primary/20 sm:h-9"
                 aria-label="Search monitors"
                 aria-keyshortcuts="/"
               />
@@ -781,7 +781,7 @@ export function DashboardView({
               {query && (
                 <button
                   onClick={() => setQuery("")}
-                  className="absolute right-2.5 top-1/2 -m-2.5 -translate-y-1/2 p-2.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                  className="absolute right-2.5 top-1/2 -m-3.5 -translate-y-1/2 p-3.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                   aria-label="Clear search"
                 >
                   <X className="size-4" />
@@ -790,10 +790,13 @@ export function DashboardView({
             </div>
 
             <Select value={sortMode} onValueChange={changeSort}>
+              {/* data-[size] variant: SelectTrigger's own h-9/h-8 use
+                  attribute-scoped selectors that out-specify bare h-11 —
+                  mirror the pattern or the 44px touch height never applies */}
               <SelectTrigger
                 aria-label="Sort monitors"
                 title="How the monitor list is ordered — manual drag order, alphabetical, status, or response time"
-                className="h-10 w-[124px] shrink-0 text-xs sm:h-9"
+                className="w-[124px] shrink-0 text-xs data-[size=default]:h-11 sm:data-[size=default]:h-9"
               >
                 <SelectValue />
               </SelectTrigger>
@@ -832,15 +835,16 @@ export function DashboardView({
             </Select>
             </div>
 
-            {/* working tools — tight 40px icon group on touch; never stretched
-                equal thirds (a stretched icon-only button reads as fat and
-                ambiguous). Labels and natural width return from sm up. */}
+            {/* working tools — 44px touch squares on touch (DESIGN.md: density
+                is visual, not physical); never stretched equal thirds (a
+                stretched icon-only button reads as fat and ambiguous). Labels
+                and natural width return from sm up. */}
             <div className="flex items-center gap-1.5 sm:gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setPingsOpen(true)}
-              className="relative h-10 w-10 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3"
+              className="relative h-11 w-11 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3"
               aria-label={`Scheduled pings${pendingPingCount ? ` (${pendingPingCount} upcoming)` : ""}`}
               title="Scheduled pings — one-off checks at a specific time"
             >
@@ -863,7 +867,7 @@ export function DashboardView({
               size="sm"
               onClick={() => setMaintenanceOpen(true)}
               className={cn(
-                "relative h-10 w-10 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3",
+                "relative h-11 w-11 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3",
                 activeMaintenanceCount > 0 &&
                   "border-warn/45 bg-warn/15 text-warn hover:bg-warn/20 hover:text-warn",
               )}
@@ -885,7 +889,7 @@ export function DashboardView({
               variant="outline"
               size="sm"
               onClick={() => setIncidentsOpen(true)}
-              className="relative h-10 w-10 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3"
+              className="relative h-11 w-11 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3"
               aria-label="Incidents and postmortem notes"
               title="Incidents — down periods over the last 30 days, with postmortem notes shown on the public status page"
             >
@@ -912,7 +916,7 @@ export function DashboardView({
               <button
                 onClick={() => refresh()}
                 disabled={refreshing}
-                className="shrink-0 border border-down/40 px-2.5 py-1 text-xs font-medium transition-colors hover:bg-down/15 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                className="inline-flex min-h-11 shrink-0 items-center border border-down/40 px-3 text-xs font-medium transition-colors hover:bg-down/15 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
               >
                 {refreshing ? "Checking…" : "Try again"}
               </button>

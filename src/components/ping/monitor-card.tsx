@@ -63,6 +63,7 @@ import {
 import type { FolderDTO, MaintenanceWindowDTO, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { StatusDot, statusLabel } from "./status-dot";
+import { TextPromptDialog } from "./text-prompt-dialog";
 import { checksToSegments, UptimeBars } from "./uptime-bars";
 
 /** Time left in an active maintenance window: "12m left" / "1h 05m left". */
@@ -122,6 +123,7 @@ export function MonitorCard({
   const { toast } = useToast();
   const [checking, setChecking] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [dragArmed, setDragArmed] = useState(false);
 
@@ -210,11 +212,16 @@ export function MonitorCard({
     await patch({ folderId }, folderId ? "Moved" : "Removed from folder", "move");
   }
 
-  async function rename() {
-    const name = window.prompt("Rename monitor", monitor.name);
-    if (!name || name.trim() === monitor.name) return;
-    await patch({ name: name.trim() }, "Monitor renamed", "rename");
-    onRenamed(name.trim());
+  // Rename via the shared TextPromptDialog — the same instrument as folder
+  // rename, not window.prompt (a native dialog outside the design system, no
+  // inline errors, no busy state). The dialog already trims and blocks empty
+  // values; an unchanged name closes silently (no fake success toast).
+  async function renameMonitor(name: string) {
+    if (name === monitor.name) return;
+    await api(`/api/monitors/${monitor.id}`, { method: "PATCH", body: JSON.stringify({ name }) });
+    toast({ description: "Monitor renamed" });
+    onRenamed(name);
+    onEdited();
   }
 
   async function deleteMonitor() {
@@ -525,7 +532,7 @@ export function MonitorCard({
                 aria-label={monitor.pinned ? "Unpin monitor" : "Pin to top"}
                 title={monitor.pinned ? "Unpin" : "Pin to top"}
                 className={cn(
-                  "ml-auto h-10 w-10 hover:bg-secondary sm:ml-0 sm:h-8 sm:w-8",
+                  "ml-auto h-11 w-11 hover:bg-secondary sm:ml-0 sm:h-8 sm:w-8",
                   monitor.pinned
                     ? "text-primary hover:text-primary"
                     : "text-muted-foreground/60 hover:text-primary",
@@ -544,7 +551,7 @@ export function MonitorCard({
                 disabled={checking}
                 aria-label="Check now"
                 title="Check now"
-                className="h-10 w-10 text-muted-foreground hover:bg-secondary hover:text-teal sm:h-8 sm:w-8"
+                className="h-11 w-11 text-muted-foreground hover:bg-secondary hover:text-teal sm:h-8 sm:w-8"
               >
                 {checking ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -559,13 +566,13 @@ export function MonitorCard({
                     size="icon"
                     onClick={(e) => e.stopPropagation()}
                     aria-label="Monitor actions"
-                    className="h-10 w-10 text-muted-foreground hover:bg-secondary hover:text-foreground sm:h-8 sm:w-8"
+                    className="h-11 w-11 text-muted-foreground hover:bg-secondary hover:text-foreground sm:h-8 sm:w-8"
                   >
                     <MoreVertical className="size-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                  <DropdownMenuItem onClick={() => setTimeout(() => void rename(), 0)}>
+                  <DropdownMenuItem onClick={() => setRenameOpen(true)}>
                     <Pencil className="size-4" /> Rename
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={onOpen}>
@@ -674,6 +681,17 @@ export function MonitorCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <TextPromptDialog
+        open={renameOpen}
+        onOpenChange={setRenameOpen}
+        title="Rename monitor"
+        label="Monitor name"
+        initialValue={monitor.name}
+        maxLength={80}
+        submitLabel="Rename"
+        onSubmit={renameMonitor}
+      />
     </>
   );
 }
