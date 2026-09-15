@@ -282,9 +282,11 @@ export function HistoryChart({
           <svg
             viewBox={`0 0 ${W} ${H}`}
             /* pan-y: vertical swipes keep scrolling the sheet (audit P1);
-               horizontal drags still scrub. pointercancel clears the
-               hover so a scroll takeover never leaves a stale tooltip
-               and the next tap works without a reload. */
+               horizontal drags still scrub. pointerup (touch/pen) and
+               pointercancel clear the hover so a tap-inspect never leaves
+               a stale tooltip after the finger lifts and a scroll takeover
+               never leaves one behind either. Mouse keeps hover semantics —
+               click-to-focus must not dismiss an active reading. */
             className="w-full touch-pan-y select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
             style={{ height: 190 }}
             role="img"
@@ -297,6 +299,9 @@ export function HistoryChart({
               setKbHover(false);
             }}
             onPointerCancel={() => setHover(null)}
+            onPointerUp={(e) => {
+              if (e.pointerType !== "mouse") setHover(null);
+            }}
             onKeyDown={onChartKeyDown}
           >
             <defs>
