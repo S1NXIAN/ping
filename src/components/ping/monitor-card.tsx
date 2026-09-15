@@ -5,7 +5,6 @@ import {
   Activity,
   ArrowDown,
   ArrowUp,
-  ChevronRight,
   Clock,
   ExternalLink,
   Eye,
@@ -442,9 +441,6 @@ export function MonitorCard({
                   {monitor.folderName}
                 </span>
               )}
-              <span className="rounded-none border border-border bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                every {formatInterval(monitor.intervalSec)}
-              </span>
               {nextPingAt && (
                 <span
                   className="inline-flex items-center gap-1 rounded-none border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] text-primary/90"
@@ -472,6 +468,7 @@ export function MonitorCard({
                 Last updated{" "}
                 <span className="text-foreground/95">{timeAgo(monitor.lastCheckAt)}</span>
               </span>
+              <span>every {formatInterval(monitor.intervalSec)}</span>
               {monitor.lastResponseMs != null && (
                 <span
                   className={cn(
@@ -572,17 +569,12 @@ export function MonitorCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                  {/* Four chunks, not ten flat decisions: the monitor's own
+                      controls, then labeled Schedule and Reorder groups, then
+                      the destructive outlier. "Stats & history" is not here —
+                      the card itself opens it, one click away. */}
                   <DropdownMenuItem onClick={() => setRenameOpen(true)}>
                     <Pencil className="size-4" /> Rename
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onOpen}>
-                    Stats &amp; history <ChevronRight className="size-4" />
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onSchedulePing}>
-                    <Clock className="size-4" /> Schedule ping…
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onScheduleMaintenance}>
-                    <Wrench className="size-4" /> Schedule maintenance…
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled={busyAction === "pause"}
@@ -630,6 +622,17 @@ export function MonitorCard({
                       <EyeOff className="size-4" />
                     )}
                     {monitor.statusHidden ? "Show on status page" : "Hide from status page"}
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+                    Schedule
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem onClick={onSchedulePing}>
+                    <Clock className="size-4" /> Schedule ping…
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onScheduleMaintenance}>
+                    <Wrench className="size-4" /> Schedule maintenance…
                   </DropdownMenuItem>
 
                   {canReorder && (

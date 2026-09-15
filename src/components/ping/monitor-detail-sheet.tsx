@@ -281,9 +281,9 @@ export function MonitorDetailSheet({
                 </>
               )}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => load()}>
-              <RefreshCw className="size-3.5" /> Refresh
-            </Button>
+            {/* No manual Refresh: the sheet live-polls every 15 s, reloads on
+                open, and reloads after every check — a Refresh button would
+                only duplicate what already happens. */}
             {m && (
               <Button size="sm" variant="outline" onClick={() => onEdit(m)}>
                 Edit

@@ -5,7 +5,6 @@ import {
   Activity,
   AlertTriangle,
   ArrowDownAZ,
-  ArrowUpAZ,
   CalendarClock,
   FolderPlus,
   Folder,
@@ -23,7 +22,6 @@ import {
   Wrench,
   X,
   XCircle,
-  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,7 +67,7 @@ import { TextPromptDialog } from "./text-prompt-dialog";
 import { StatCard } from "./stat-card";
 import { CommandPalette } from "./command-palette";
 
-export type SortMode = "manual" | "az" | "za" | "status" | "slowest" | "fastest";
+export type SortMode = "manual" | "az" | "status" | "slowest";
 const SORT_STORAGE_KEY = "ping.sort";
 
 export function DashboardView({
@@ -108,14 +106,9 @@ export function DashboardView({
   useEffect(() => {
     try {
       const v = localStorage.getItem(SORT_STORAGE_KEY);
-      if (
-        v === "manual" ||
-        v === "az" ||
-        v === "za" ||
-        v === "status" ||
-        v === "slowest" ||
-        v === "fastest"
-      )
+      // "za"/"fastest" were distilled away — stale stored values fall
+      // through to the manual default
+      if (v === "manual" || v === "az" || v === "status" || v === "slowest")
         setSortMode(v);
     } catch {
       /* private browsing etc. */
@@ -226,29 +219,26 @@ export function DashboardView({
       );
     }
 
-    if (sortMode === "az" || sortMode === "za") {
-      const dir = sortMode === "az" ? 1 : -1;
+    if (sortMode === "az") {
       const sorted = [...list].sort(
         (a, b) =>
-          dir *
-            a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }) ||
+          a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }) ||
           a.position - b.position,
       );
       // pinned monitors always float to the top, even when browsing alphabetically
       return [...sorted.filter((m) => m.pinned), ...sorted.filter((m) => !m.pinned)];
     }
 
-    if (sortMode === "slowest" || sortMode === "fastest") {
-      // by real average response time (24h) — monitors with no up checks
-      // (paused/pending/all-failed) always sink to the bottom, honestly.
-      const dir = sortMode === "slowest" ? -1 : 1;
+    if (sortMode === "slowest") {
+      // by real average response time (24h), slowest first — monitors with no
+      // up checks (paused/pending/all-failed) always sink to the bottom, honestly.
       const sorted = [...list].sort((a, b) => {
         const av = a.stats.avgMs24h;
         const bv = b.stats.avgMs24h;
         if (av == null && bv == null) return a.position - b.position;
         if (av == null) return 1;
         if (bv == null) return -1;
-        return dir * (av - bv) || a.position - b.position;
+        return bv - av || a.position - b.position;
       });
       return [...sorted.filter((m) => m.pinned), ...sorted.filter((m) => !m.pinned)];
     }
@@ -811,11 +801,6 @@ export function DashboardView({
                     <ArrowDownAZ className="size-3.5" aria-hidden="true" /> A–Z
                   </span>
                 </SelectItem>
-                <SelectItem value="za">
-                  <span className="flex items-center gap-2">
-                    <ArrowUpAZ className="size-3.5" aria-hidden="true" /> Z–A
-                  </span>
-                </SelectItem>
                 <SelectItem value="status">
                   <span className="flex items-center gap-2">
                     <Activity className="size-3.5" aria-hidden="true" /> Status
@@ -824,11 +809,6 @@ export function DashboardView({
                 <SelectItem value="slowest">
                   <span className="flex items-center gap-2">
                     <Gauge className="size-3.5" aria-hidden="true" /> Slowest
-                  </span>
-                </SelectItem>
-                <SelectItem value="fastest">
-                  <span className="flex items-center gap-2">
-                    <Zap className="size-3.5" aria-hidden="true" /> Fastest
                   </span>
                 </SelectItem>
               </SelectContent>

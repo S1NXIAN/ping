@@ -4,7 +4,6 @@ import {
   Activity,
   AlertTriangle,
   ArrowDownAZ,
-  ArrowUpAZ,
   CalendarClock,
   Check,
   Folder,
@@ -16,7 +15,6 @@ import {
   Plus,
   RefreshCw,
   Wrench,
-  Zap,
 } from "lucide-react";
 import {
   CommandDialog,
@@ -37,10 +35,8 @@ import type { SortMode } from "./dashboard-view";
 const SORT_OPTIONS: { value: SortMode; label: string; icon: typeof MoveVertical }[] = [
   { value: "manual", label: "Manual order", icon: MoveVertical },
   { value: "az", label: "Sort A–Z", icon: ArrowDownAZ },
-  { value: "za", label: "Sort Z–A", icon: ArrowUpAZ },
   { value: "status", label: "Sort by status", icon: Activity },
   { value: "slowest", label: "Sort by slowest", icon: Gauge },
-  { value: "fastest", label: "Sort by fastest", icon: Zap },
 ];
 
 function monitorStatus(m: MonitorDTO): "up" | "down" | "paused" | "pending" {
