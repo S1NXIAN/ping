@@ -201,9 +201,9 @@ export function MonitorDetailSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full overflow-y-auto p-0 sm:max-w-xl lg:max-w-2xl"
+        className="w-full max-w-md overflow-hidden p-0 sm:max-w-xl lg:max-w-2xl"
       >
-        <SheetHeader className="border-b bg-card/40 p-4 pb-3">
+        <SheetHeader className="shrink-0 border-b bg-card/40 p-4 pb-3">
           <SheetTitle className="flex flex-wrap items-center gap-2 pr-8 text-left">
             <StatusDot status={checking ? "checking" : status} />
             <span className="truncate">{m?.name ?? "Monitor"}</span>
@@ -311,6 +311,10 @@ export function MonitorDetailSheet({
           </div>
         </SheetHeader>
 
+        {/* Bounded instrument, not an endless page: the header stays pinned,
+            only the body scrolls. The sheet itself is width-capped at every
+            viewport (max-w-md below sm) so it never takes over the window. */}
+        <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-5 p-4">
           {loading && !detail && (
             <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
@@ -475,6 +479,7 @@ export function MonitorDetailSheet({
             )}
           </section>
         </div>
+        </ScrollArea>
       </SheetContent>
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
