@@ -445,6 +445,14 @@ export function DashboardView({
 
   return (
     <div className="ping-ambient flex min-h-dvh flex-col">
+      {/* keyboard bypass — first focusable element on the surface */}
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[60] focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:outline-none"
+      >
+        Skip to monitor list
+      </a>
+
       {/* ---------- header ---------- */}
       <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 2xl:max-w-7xl">
@@ -553,6 +561,7 @@ export function DashboardView({
             onClick={() => setActiveFolder("all")}
             className={cn(
               "flex items-center gap-2.5 rounded-md border-l px-2.5 py-2.5 text-sm transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
               activeFolder === "all"
                 ? "border-primary bg-secondary font-medium text-foreground"
                 : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
@@ -574,6 +583,7 @@ export function DashboardView({
                   onClick={() => setActiveFolder(f.id)}
                   className={cn(
                     "flex w-full items-center gap-2.5 rounded-md border-l px-2.5 py-2.5 text-sm transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                     active
                       ? "border-primary bg-secondary font-medium text-foreground"
                       : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
@@ -612,7 +622,7 @@ export function DashboardView({
 
           <button
             onClick={() => setFolderDialog({ open: true, mode: "create" })}
-            className="mt-1 flex items-center gap-2 rounded-md px-2.5 py-2 text-sm text-muted-foreground/80 transition-colors hover:bg-secondary/60 hover:text-foreground"
+            className="mt-1 flex items-center gap-2 rounded-md px-2.5 py-2 text-sm text-muted-foreground/80 transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
           >
             <FolderPlus className="size-4" aria-hidden="true" />
             New folder
@@ -620,13 +630,18 @@ export function DashboardView({
         </aside>
 
         {/* main column */}
-        <main className="min-w-0 flex-1 px-4 pb-24 pt-4 sm:px-0 sm:pb-10">
+        <main
+          id="main"
+          tabIndex={-1}
+          className="min-w-0 flex-1 px-4 pb-24 pt-4 focus:outline-none sm:px-0 sm:pb-10"
+        >
           {/* mobile folder chips */}
           <div className="no-scrollbar -mx-4 mb-3 flex items-center gap-2 overflow-x-auto px-4 pb-0.5 lg:hidden">
             <button
               onClick={() => setActiveFolder("all")}
               className={cn(
                 "shrink-0 rounded-none border px-3 py-1.5 text-xs font-medium transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                 activeFolder === "all"
                   ? "border-primary/40 bg-primary/15 text-foreground"
                   : "border-border bg-card text-muted-foreground hover:text-foreground",
@@ -642,6 +657,7 @@ export function DashboardView({
                   onClick={() => setActiveFolder(f.id)}
                   className={cn(
                     "flex shrink-0 items-center gap-1.5 rounded-none border px-3 py-1.5 text-xs font-medium transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                     activeFolder === f.id
                       ? "border-primary/40 bg-primary/15 text-foreground"
                       : "border-border bg-card text-muted-foreground hover:text-foreground",
@@ -654,7 +670,7 @@ export function DashboardView({
             })}
             <button
               onClick={() => setFolderDialog({ open: true, mode: "create" })}
-              className="flex shrink-0 items-center gap-1 rounded-none border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+              className="flex shrink-0 items-center gap-1 rounded-none border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
               aria-label="New folder"
             >
               <FolderPlus className="size-3" /> New
@@ -727,7 +743,7 @@ export function DashboardView({
               {query && (
                 <button
                   onClick={() => setQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-2.5 top-1/2 -m-2.5 -translate-y-1/2 p-2.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                   aria-label="Clear search"
                 >
                   <X className="size-4" />
@@ -846,12 +862,25 @@ export function DashboardView({
             </p>
           )}
 
-          {/* error */}
+          {/* error — announced, and never a dead end: recovery is inline */}
           {error && (
-            <div className="rounded-lg border border-down/30 bg-down/10 px-4 py-3 text-sm text-down">
-              {error}
-              {(error.includes("Unauthorized")) && (
-                <button onClick={onLogout} className="ml-2 underline">
+            <div
+              role="alert"
+              className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-down/30 bg-down/10 px-4 py-3 text-sm text-down"
+            >
+              <span className="min-w-0 flex-1">{error}</span>
+              <button
+                onClick={() => refresh()}
+                disabled={refreshing}
+                className="shrink-0 border border-down/40 px-2.5 py-1 text-xs font-medium transition-colors hover:bg-down/15 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+              >
+                {refreshing ? "Checking…" : "Try again"}
+              </button>
+              {error.includes("Unauthorized") && (
+                <button
+                  onClick={onLogout}
+                  className="shrink-0 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                >
                   sign in again
                 </button>
               )}
@@ -925,7 +954,7 @@ export function DashboardView({
         <button
           onClick={() => setAddOpen(true)}
           aria-label="New monitor"
-          className="fixed bottom-20 right-4 z-40 flex size-14 items-center justify-center rounded-none bg-primary text-primary-foreground shadow-xl shadow-primary/30 transition-transform hover:scale-105 active:scale-95 sm:hidden"
+          className="fixed bottom-20 right-4 z-40 flex size-14 items-center justify-center rounded-none bg-primary text-primary-foreground shadow-xl shadow-primary/30 transition-transform hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 sm:hidden"
         >
           <Plus className="size-6" />
         </button>

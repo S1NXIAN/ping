@@ -227,4 +227,28 @@ nextjs-portal {
   display: none !important;
 }
 
+/*
+ * Reduced motion — vestibular safety valve (audit P1). Infinite ambient
+ * loops (sonar ripple, logo breathe) stop entirely; every transition and
+ * one-shot animation collapses to an instant state change. Feedback
+ * survives — only movement dies. Covers tw-animate-css overlays and
+ * animate-spin/pulse skeletons too.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .ping-dot-ripple,
+  .ping-breathe {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* layout pass: regenerate utilities */
+
+/* harden pass: regenerate utilities */

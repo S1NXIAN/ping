@@ -63,7 +63,9 @@ export function HistoryChart({
   const [data, setData] = useState<MonitorHistoryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [hover, setHover] = useState<number | null>(null); // point index
-  const wrapRef = useRef<HTMLDivElement>(null);
+  // true while the hover index is driven by arrow keys — gates the live
+  // region so pointer hovering never spams screen readers
+  const [kbHover, setKbHover] = useState(false);
 
   const load = useCallback(
     async (silent: boolean) => {
@@ -171,6 +173,7 @@ export function HistoryChart({
 
   function onPointerMove(e: React.PointerEvent<SVGSVGElement>) {
     if (!points.length) return;
+    setKbHover(false);
     const rect = e.currentTarget.getBoundingClientRect();
     const px = ((e.clientX - rect.left) / rect.width) * W;
     const t = t0 + ((px - padL) / plotW) * tSpan;
@@ -186,6 +189,47 @@ export function HistoryChart({
     }
     setHover(best);
   }
+
+  /** Keyboard scrubbing: the chart is inspectable without a pointer. */
+  function onChartKeyDown(e: React.KeyboardEvent<SVGSVGElement>) {
+    if (!points.length) return;
+    switch (e.key) {
+      case "ArrowLeft":
+      case "ArrowRight": {
+        e.preventDefault();
+        setKbHover(true);
+        const dir = e.key === "ArrowLeft" ? -1 : 1;
+        setHover((h) => Math.min(points.length - 1, Math.max(0, (h ?? 0) + dir)));
+        break;
+      }
+      case "Home":
+        e.preventDefault();
+        setKbHover(true);
+        setHover(0);
+        break;
+      case "End":
+        e.preventDefault();
+        setKbHover(true);
+        setHover(points.length - 1);
+        break;
+      // Escape is intentionally NOT handled here: Radix owns it and closes
+      // the sheet (standard dialog behavior — verified in-browser that
+      // React-level stopPropagation cannot outrank it). Hover state resets
+      // when the sheet content unmounts.
+    }
+  }
+
+  // Data-honest spoken summary (audit P2): the label carries what the chart
+  // actually shows — real check counts, down readings, latest latency — never
+  // invented aggregates.
+  const downCount = points.filter((p) => p.s === "down").length;
+  const latest = upPoints.length ? upPoints[upPoints.length - 1] : null;
+  const chartAria =
+    data && points.length > 0
+      ? `Response time chart for ${monitorName}, last ${range}: ${data.checks.toLocaleString()} real checks, ${downCount} down${
+          latest ? `, latest ${formatMs(latest.ms)}` : ""
+        }${data.downsampled ? ", dense windows averaged into buckets" : ""}. Gaps mean no checks were recorded.`
+      : `Response time chart for ${monitorName}, last ${range}`;
 
   const empty = !loading && points.length === 0;
 
@@ -234,15 +278,26 @@ export function HistoryChart({
           No checks recorded in this window yet.
         </div>
       ) : (
-        <div ref={wrapRef} className="relative">
+        <div className="relative">
           <svg
             viewBox={`0 0 ${W} ${H}`}
-            className="w-full touch-none select-none"
+            /* pan-y: vertical swipes keep scrolling the sheet (audit P1);
+               horizontal drags still scrub. pointercancel clears the
+               hover so a scroll takeover never leaves a stale tooltip
+               and the next tap works without a reload. */
+            className="w-full touch-pan-y select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
             style={{ height: 190 }}
             role="img"
-            aria-label={`Response time chart for ${monitorName}, last ${range}`}
+            tabIndex={0}
+            aria-label={chartAria}
+            onPointerDown={onPointerMove}
             onPointerMove={onPointerMove}
-            onPointerLeave={() => setHover(null)}
+            onPointerLeave={() => {
+              setHover(null);
+              setKbHover(false);
+            }}
+            onPointerCancel={() => setHover(null)}
+            onKeyDown={onChartKeyDown}
           >
             <defs>
               <linearGradient id="ping-history-fill" x1="0" y1="0" x2="0" y2="1">
@@ -398,6 +453,20 @@ export function HistoryChart({
               </g>
             )}
           </svg>
+
+          {/* Keyboard readout — announces only while scrubbing via keys */}
+          {kbHover && hoverPoint && (
+            <span className="sr-only" aria-live="polite">
+              {new Date(hoverPoint.t).toLocaleString(undefined, {
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+              {", "}
+              {hoverPoint.s === "down" ? "down, no response" : `up, ${formatMs(hoverPoint.ms)}`}
+            </span>
+          )}
 
           {/* Hover tooltip */}
           {hoverPoint && (

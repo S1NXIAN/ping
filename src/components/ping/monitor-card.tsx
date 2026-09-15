@@ -305,6 +305,7 @@ export function MonitorCard({
               onPointerDown={() => setDragArmed(true)}
               onPointerUp={() => setDragArmed(false)}
               onPointerCancel={() => setDragArmed(false)}
+              onBlur={() => setDragArmed(false)}
               draggable={false}
               className={cn(
                 "mt-1 hidden size-6 shrink-0 cursor-grab touch-none place-items-center rounded text-muted-foreground/50 transition-colors active:cursor-grabbing sm:grid",
@@ -330,7 +331,7 @@ export function MonitorCard({
                   onOpen();
                 }}
                 title={`Open details for ${monitor.name}`}
-                className="truncate rounded-none font-medium leading-tight text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+                className="max-w-full truncate rounded-none font-medium leading-tight text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-card"
               >
                 {monitor.name}
               </button>
@@ -390,11 +391,11 @@ export function MonitorCard({
               )}
               {monitor.account && (
                 <span
-                  className="inline-flex items-center gap-1 rounded-none border border-teal/25 bg-teal/10 px-2 py-0.5 text-[10px] text-teal"
+                  className="inline-flex max-w-52 items-center gap-1 rounded-none border border-teal/25 bg-teal/10 px-2 py-0.5 text-[10px] text-teal"
                   title={`Account used: ${monitor.account}`}
                 >
-                  <UserRound className="size-2.5" aria-hidden="true" />
-                  {monitor.account}
+                  <UserRound className="size-2.5 shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 truncate">{monitor.account}</span>
                 </span>
               )}
               {monitor.keyword && (
@@ -407,7 +408,7 @@ export function MonitorCard({
                   className="inline-flex max-w-52 items-center gap-1 rounded-none border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] text-primary/90"
                 >
                   <ScanSearch className="size-2.5 shrink-0" aria-hidden="true" />
-                  <span className="truncate">
+                  <span className="min-w-0 truncate">
                     {monitor.keywordMode === "excludes" ? "no" : "has"} “{monitor.keyword}”
                   </span>
                 </span>
@@ -451,7 +452,7 @@ export function MonitorCard({
               onClick={(e) => e.stopPropagation()}
               className="mt-0.5 inline-flex max-w-full items-center gap-1 text-xs text-muted-foreground hover:text-teal"
             >
-              <span className="truncate">{hostOf(monitor.url)}</span>
+              <span className="min-w-0 truncate">{hostOf(monitor.url)}</span>
               <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
             </a>
 
