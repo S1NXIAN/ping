@@ -41,6 +41,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useOverview } from "@/hooks/use-overview";
 import { api, ApiError, formatUptime, timeAgo } from "@/lib/ping-client";
@@ -88,6 +98,10 @@ export function DashboardView({
     mode: "create" | "rename";
     folder?: FolderDTO;
   }>({ open: false, mode: "create" });
+  const [folderDelete, setFolderDelete] = useState<{ open: boolean; folder: FolderDTO | null }>({
+    open: false,
+    folder: null,
+  });
 
   // sort — persisted per device
   const [sortMode, setSortMode] = useState<SortMode>("manual");
@@ -618,7 +632,10 @@ export function DashboardView({
                     >
                       Rename folder
                     </DropdownMenuItem>
-                    <DropdownMenuItem variant="destructive" onClick={() => deleteFolder(f.id)}>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => setFolderDelete({ open: true, folder: f })}
+                    >
                       Delete folder
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -728,7 +745,7 @@ export function DashboardView({
             <StatCard
               label="Failures 24h"
               value={summary ? summary.monitorsWithFailures24h : "—"}
-              sub="monitors affected"
+              sub="monitors with failures"
               icon={XCircle}
               tone={summary && summary.monitorsWithFailures24h > 0 ? "down" : "up"}
             />
@@ -1099,6 +1116,44 @@ export function DashboardView({
         submitLabel={folderDialog.mode === "create" ? "Create" : "Rename"}
         onSubmit={folderDialog.mode === "create" ? createFolder : renameFolder}
       />
+
+      {/* Deleting a folder is destructive (the group itself is gone for good),
+          so it gets the same guard as monitor deletion — with an honest count
+          of what happens to the monitors inside: they survive, ungrouped. */}
+      <AlertDialog
+        open={folderDelete.open}
+        onOpenChange={(o) => setFolderDelete((s) => ({ ...s, open: o }))}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{folderDelete.folder?.name}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const n =
+                  data?.monitors.filter((m) => m.folderId === folderDelete.folder?.id).length ?? 0;
+                if (n === 0)
+                  return "The folder is empty — nothing else is affected. This cannot be undone.";
+                if (n === 1)
+                  return "The folder will be removed. Its 1 monitor stays — it moves back to the top level. This cannot be undone.";
+                return `The folder will be removed. Its ${n} monitors stay — they move back to the top level. This cannot be undone.`;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const id = folderDelete.folder?.id;
+                setFolderDelete({ open: false, folder: null });
+                if (id) void deleteFolder(id);
+              }}
+              className="bg-down text-white hover:bg-down/90"
+            >
+              Delete folder
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

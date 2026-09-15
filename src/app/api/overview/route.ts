@@ -61,7 +61,9 @@ export async function GET(req: NextRequest) {
   const uptimes = dtos.map((m) => m.stats.uptime24h).filter((u): u is number => u != null);
   const checks24h = dtos.reduce((acc, m) => acc + m.stats.checks24h, 0);
   const monitorsWithFailures24h = dtos.filter((m) => {
-    if (!m.stats.uptime24h) return false;
+    // Null means "no checks recorded yet", not "no failures" — and 0 (every
+    // check failed) is exactly the value a truthy check would swallow.
+    if (m.stats.uptime24h == null) return false;
     return m.stats.uptime24h < 1;
   }).length;
 
