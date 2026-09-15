@@ -170,6 +170,13 @@ export function DashboardView({
   const folders = data?.folders ?? [];
   const summary = data?.summary;
 
+  // 24h fleet floor — a mean hides outliers; "worst" is the honest companion
+  // readout (min over the same monitors the API averages, nulls excluded).
+  const uptimes24h = monitors
+    .map((m) => m.stats.uptime24h)
+    .filter((u): u is number => u != null);
+  const worst24h = uptimes24h.length ? Math.min(...uptimes24h) : null;
+
   const detailMonitor = detailId ? (monitors.find((m) => m.id === detailId) ?? null) : null;
   const scheduleMonitor = scheduleTargetId
     ? (monitors.find((m) => m.id === scheduleTargetId) ?? null)
@@ -687,7 +694,12 @@ export function DashboardView({
               value={summary ? `${summary.up}/${summary.monitors}` : "—"}
               sub={
                 summary
-                  ? `${summary.up} up · ${summary.down} down${summary.degraded ? ` · ${summary.degraded} slow` : ""}${summary.paused ? ` · ${summary.paused} paused` : ""}`
+                  ? ([
+                      summary.down > 0 ? `${summary.down} down` : null,
+                      summary.degraded > 0 ? `${summary.degraded} slow` : null,
+                      summary.paused > 0 ? `${summary.paused} paused` : null,
+                      summary.pending > 0 ? `${summary.pending} pending` : null,
+                    ].filter(Boolean).join(" · ") || undefined)
                   : undefined
               }
               icon={Activity}
@@ -696,21 +708,21 @@ export function DashboardView({
             <StatCard
               label="Uptime 24h"
               value={formatUptime(summary?.avgUptime24h ?? null)}
-              sub="average across monitors"
+              sub={worst24h != null ? `worst ${formatUptime(worst24h)}` : undefined}
               icon={Gauge}
               tone={summary?.avgUptime24h != null && summary.avgUptime24h < 1 ? "warn" : "default"}
             />
             <StatCard
               label="Checks 24h"
               value={summary ? summary.checks24h.toLocaleString() : "—"}
-              sub="real HTTP requests"
+              sub="HTTP requests sent"
               icon={ListChecks}
               tone="teal"
             />
             <StatCard
               label="Failures 24h"
               value={summary ? summary.monitorsWithFailures24h : "—"}
-              sub="monitors with ≥1 failed check"
+              sub="monitors affected"
               icon={XCircle}
               tone={summary && summary.monitorsWithFailures24h > 0 ? "down" : "up"}
             />

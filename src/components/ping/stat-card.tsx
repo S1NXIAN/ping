@@ -45,8 +45,13 @@ export function StatCard({
       <div className={cn("mt-2 text-lg font-bold tabular-nums leading-tight tracking-tight sm:text-xl", toneClass)}>
         {value}
       </div>
+      {/* Captions are a desktop affordance — phone quadrants carry label +
+          value only. Definitional subs read as noise at 360px and the
+          numbers stand on their own. */}
       {sub != null && (
-        <div className="mt-1 text-[11px] leading-snug text-muted-foreground/85">{sub}</div>
+        <div className="mt-1 hidden text-[11px] leading-snug text-muted-foreground/85 sm:block">
+          {sub}
+        </div>
       )}
     </div>
   );
