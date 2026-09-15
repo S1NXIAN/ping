@@ -600,7 +600,7 @@ function DayBars({ daily }: { daily: DailyBucket[] }) {
           );
         })}
       </div>
-      <div className="mt-1 flex items-center justify-between text-[9px] font-medium uppercase tracking-wider text-foreground/60">
+      <div className="mt-1 flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-foreground/60">
         <span>30 days ago</span>
         <span>today</span>
       </div>

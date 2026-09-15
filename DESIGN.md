@@ -241,7 +241,7 @@ Sharp corners are the system's signature: every radius token is forced to 0px (c
 ### Navigation
 - **Header:** sticky 56px bar, Soot over the grid, hairline bottom edge; wordmark left ("PING." + tagline in Instrument Gray), ⌘K search button, live up/down count pills, ghost icon actions, white primary "New monitor" right.
 - **Folder sidebar** (lg+): 14rem sticky dock, hairline right border, rows with Accent Charcoal hover, 10px uppercase "MONITORS" section label; collapses to horizontal chips below `lg`.
-- **Footer:** slim, sticky when content is short — "honest uptime for Render Free" left, refresh time right.
+- **Footer:** slim, sticky when content is short — "honest uptime monitoring" left, refresh time right.
 
 ### Status Dot (signature)
 - **Form:** 10px circle — the only curved element in the system (`{status-dot}`).

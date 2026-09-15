@@ -62,7 +62,7 @@ export async function generateMetadata({
     };
   }
 
-  const title = "PING — Uptime for Render Free";
+  const title = "PING — honest uptime monitoring";
   const description =
     "A lightweight, honest uptime monitor. PING periodically sends real HTTP requests to your sites, keeps Render Free services awake, and shows you what actually happened — no invented statistics.";
   const image = "/api/public/og";
@@ -74,7 +74,7 @@ export async function generateMetadata({
       type: "website",
       title,
       description,
-      images: [{ url: image, width: 1200, height: 630, alt: "PING — uptime for Render Free" }],
+      images: [{ url: image, width: 1200, height: 630, alt: "PING — honest uptime monitoring" }],
     },
     twitter: { card: "summary_large_image", title, description, images: [image] },
   };

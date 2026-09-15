@@ -53,7 +53,7 @@ Constraints (must be preserved by future work):
 
 ## Brand Commitments
 
-- Name: **PING** (header "PING." with tagline "uptime for Render Free" — tagline predates the widened scope below; updating it is an open decision for the operator).
+- Name: **PING** (header "PING." with tagline "honest uptime monitoring" — unified across admin header/footer, login, public footer, and share metadata by the 2026-09-15 clarify pass; the earlier "uptime for Render Free" predated the platform-agnostic scope).
 - Voice: plain-spoken, honest, technical; no marketing fluff; disclaimers kept factual ("not affiliated with render.com").
 - The honesty contract itself is a brand commitment: no simulated data, no invented uptime numbers, ever.
 
@@ -78,5 +78,4 @@ No formal WCAG target set by the operator ("keep as is"). Existing effort contin
 
 ## Open Decisions
 
-- Tagline still reads "uptime for Render Free" while confirmed scope is "every free-tier service that cold-boots, not just Render" — operator will decide if/when to widen the copy (candidate for a `clarify` pass).
 - Binding commitments list intentionally open: operator will add constraints as they come to mind.

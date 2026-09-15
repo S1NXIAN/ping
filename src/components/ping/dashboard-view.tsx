@@ -469,7 +469,7 @@ export function DashboardView({
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 2xl:max-w-7xl">
           <PingLogo className="size-7" />
           <PingWordmark className="text-base" />
-          <span className="hidden text-xs text-muted-foreground sm:inline">uptime for Render Free</span>
+          <span className="hidden text-xs text-muted-foreground sm:inline">honest uptime monitoring</span>
 
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
             <Button
@@ -988,7 +988,7 @@ export function DashboardView({
       <footer className="sticky bottom-0 z-30 mt-auto border-t bg-background/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] text-[11px] text-foreground/65 2xl:max-w-7xl">
           <span className="font-medium tracking-wide text-foreground/90">PING</span>
-          <span>honest uptime for Render Free</span>
+          <span>honest uptime monitoring</span>
           <span className="ml-auto flex items-center gap-3">
             <span>not affiliated with render.com</span>
             <span className="tabular-nums text-foreground/75">
