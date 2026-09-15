@@ -699,7 +699,13 @@ export function DashboardView({
                       summary.degraded > 0 ? `${summary.degraded} slow` : null,
                       summary.paused > 0 ? `${summary.paused} paused` : null,
                       summary.pending > 0 ? `${summary.pending} pending` : null,
-                    ].filter(Boolean).join(" · ") || undefined)
+                    ].filter(Boolean).join(" · ") ||
+                      // Healthy fleet: freshness fills the caption slot — the
+                      // most recent check across all monitors (a max, so one
+                      // paused or stalled monitor can't fake staleness).
+                      (summary.lastCheckAt
+                        ? `last check ${timeAgo(summary.lastCheckAt)}`
+                        : undefined))
                   : undefined
               }
               icon={Activity}
