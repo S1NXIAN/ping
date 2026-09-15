@@ -447,7 +447,7 @@ export function DashboardView({
     <div className="ping-ambient flex min-h-dvh flex-col">
       {/* ---------- header ---------- */}
       <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4">
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 2xl:max-w-7xl">
           <PingLogo className="size-7" />
           <PingWordmark className="text-base" />
           <span className="hidden text-xs text-muted-foreground sm:inline">uptime for Render Free</span>
@@ -546,7 +546,7 @@ export function DashboardView({
       </header>
 
       {/* ---------- body: sidebar (lg) + main ---------- */}
-      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 gap-6 px-0 sm:px-4 lg:px-4">
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 gap-6 px-0 sm:px-4 lg:px-4 2xl:max-w-7xl 2xl:gap-8">
         {/* folder nav — sidebar on desktop */}
         <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-border/50 py-4 pr-3 lg:flex">
           <button
@@ -589,7 +589,7 @@ export function DashboardView({
                   <DropdownMenuTrigger asChild>
                     <button
                       aria-label={`Folder actions for ${f.name}`}
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Settings className="size-3.5" />
@@ -699,9 +699,12 @@ export function DashboardView({
 
           {/* working group: toolbar + list — one tight unit (10px internal rhythm) */}
           <div className="space-y-2.5">
-          {/* toolbar: search + sort + scheduled pings + maintenance */}
+          {/* toolbar: search + sort + scheduled pings + maintenance — two designed
+              clusters so resizing never mixes orphans: find+order stays a unit,
+              working tools wrap as a whole row when space runs out */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-0 basis-full sm:basis-44 sm:flex-1">
+            <div className="flex min-w-0 basis-full items-center gap-2 sm:basis-auto sm:flex-1">
+              <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input
                 ref={searchRef}
@@ -736,7 +739,7 @@ export function DashboardView({
               <SelectTrigger
                 aria-label="Sort monitors"
                 title="How the monitor list is ordered — manual drag order, alphabetical, status, or response time"
-                className="h-9 w-[124px] shrink-0 text-xs"
+                className="h-10 w-[124px] shrink-0 text-xs sm:h-9"
               >
                 <SelectValue />
               </SelectTrigger>
@@ -773,12 +776,15 @@ export function DashboardView({
                 </SelectItem>
               </SelectContent>
             </Select>
+            </div>
 
+            {/* working tools — equal-width thirds on touch, fixed width from sm up */}
+            <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setPingsOpen(true)}
-              className="relative h-9 shrink-0 gap-1.5 text-xs"
+              className="relative h-10 flex-1 shrink-0 gap-1.5 text-xs sm:h-9 sm:flex-none"
               aria-label={`Scheduled pings${pendingPingCount ? ` (${pendingPingCount} upcoming)` : ""}`}
               title="Scheduled pings — one-off checks at a specific time"
             >
@@ -801,7 +807,7 @@ export function DashboardView({
               size="sm"
               onClick={() => setMaintenanceOpen(true)}
               className={cn(
-                "relative h-9 shrink-0 gap-1.5 text-xs",
+                "relative h-10 flex-1 shrink-0 gap-1.5 text-xs sm:h-9 sm:flex-none",
                 activeMaintenanceCount > 0 &&
                   "border-warn/45 bg-warn/15 text-warn hover:bg-warn/20 hover:text-warn",
               )}
@@ -823,13 +829,14 @@ export function DashboardView({
               variant="outline"
               size="sm"
               onClick={() => setIncidentsOpen(true)}
-              className="relative h-9 shrink-0 gap-1.5 text-xs"
+              className="relative h-10 flex-1 shrink-0 gap-1.5 text-xs sm:h-9 sm:flex-none"
               aria-label="Incidents and postmortem notes"
               title="Incidents — down periods over the last 30 days, with postmortem notes shown on the public status page"
             >
               <AlertTriangle className="size-4" aria-hidden="true" />
               <span className="hidden sm:inline">Incidents</span>
             </Button>
+            </div>
           </div>
 
           {sortMode === "manual" && monitors.length > 1 && (
@@ -926,7 +933,7 @@ export function DashboardView({
 
       {/* footer */}
       <footer className="sticky bottom-0 z-30 mt-auto border-t bg-background/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[11px] text-foreground/65">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] text-[11px] text-foreground/65 2xl:max-w-7xl">
           <span className="font-medium tracking-wide text-foreground/90">PING</span>
           <span>honest uptime for Render Free</span>
           <span className="ml-auto flex items-center gap-3">

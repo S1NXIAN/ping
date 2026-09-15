@@ -275,7 +275,7 @@ export function MonitorCard({
           dnd?.onDragEnd();
         }}
         className={cn(
-          "ping-fade-up group relative cursor-pointer rounded-lg border bg-card p-4 outline-none transition-colors sm:p-5",
+          "ping-fade-up group relative cursor-pointer rounded-lg border bg-card p-4 outline-none transition-colors sm:p-5 @container",
           "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40",
           status === "down" && !maintenanceNow && "border-down/30 hover:border-down/50",
           degraded && !maintenanceNow &&
@@ -495,8 +495,11 @@ export function MonitorCard({
             )}
           </div>
 
-          <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
-            <div className="w-24 sm:w-32">
+          {/* right block: honest-width check bars + actions. Bars get their own
+              definite-width box (container-query tiers) so the buttons can
+              never flex-shrink them below their nominal size. */}
+          <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-2">
+            <div className="w-24 shrink-0 sm:w-32 @xl:w-44 @4xl:w-56">
               <UptimeBars
                 segments={checksToSegments(monitor.recentChecks)}
                 barClassName="h-6 sm:h-7"
@@ -514,7 +517,7 @@ export function MonitorCard({
                 aria-label={monitor.pinned ? "Unpin monitor" : "Pin to top"}
                 title={monitor.pinned ? "Unpin" : "Pin to top"}
                 className={cn(
-                  "h-8 w-8 hover:bg-secondary",
+                  "h-10 w-10 hover:bg-secondary sm:h-8 sm:w-8",
                   monitor.pinned
                     ? "text-primary hover:text-primary"
                     : "text-muted-foreground/60 hover:text-primary",
@@ -533,7 +536,7 @@ export function MonitorCard({
                 disabled={checking}
                 aria-label="Check now"
                 title="Check now"
-                className="h-8 w-8 text-muted-foreground hover:bg-secondary hover:text-teal"
+                className="h-10 w-10 text-muted-foreground hover:bg-secondary hover:text-teal sm:h-8 sm:w-8"
               >
                 {checking ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -548,7 +551,7 @@ export function MonitorCard({
                     size="icon"
                     onClick={(e) => e.stopPropagation()}
                     aria-label="Monitor actions"
-                    className="h-8 w-8 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    className="h-10 w-10 text-muted-foreground hover:bg-secondary hover:text-foreground sm:h-8 sm:w-8"
                   >
                     <MoreVertical className="size-4" />
                   </Button>
