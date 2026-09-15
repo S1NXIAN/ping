@@ -21,8 +21,20 @@ export function UptimeBars({
   className?: string;
   barClassName?: string;
 }) {
+  // Spoken summary carries the real counts — never a vague "chart" label.
+  const up = segments.filter((s) => s.ratio != null && s.ratio >= 1).length;
+  const down = segments.filter((s) => s.ratio != null && s.ratio <= 0).length;
+  const partial = segments.filter((s) => s.ratio != null && s.ratio > 0 && s.ratio < 1).length;
+  const noData = segments.filter((s) => s.ratio == null).length;
+  const ariaLabel =
+    segments.length === 0
+      ? "Check history: no checks recorded yet"
+      : `Check history: ${up} up, ${down} down` +
+        (partial ? `, ${partial} partial` : "") +
+        (noData ? `, ${noData} with no data` : "");
+
   return (
-    <div className={cn("flex items-stretch gap-[3px]", className)} role="img" aria-label="Check history bars">
+    <div className={cn("flex items-stretch gap-[3px]", className)} role="img" aria-label={ariaLabel}>
       {segments.length === 0 && (
         <div className={cn("flex items-center text-[10px] text-muted-foreground", barClassName)}>
           no data yet

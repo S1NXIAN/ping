@@ -170,6 +170,13 @@ export function DashboardView({
   const folders = data?.folders ?? [];
   const summary = data?.summary;
 
+  // 24h fleet floor — a mean hides outliers; "worst" is the honest companion
+  // readout (min over the same monitors the API averages, nulls excluded).
+  const uptimes24h = monitors
+    .map((m) => m.stats.uptime24h)
+    .filter((u): u is number => u != null);
+  const worst24h = uptimes24h.length ? Math.min(...uptimes24h) : null;
+
   const detailMonitor = detailId ? (monitors.find((m) => m.id === detailId) ?? null) : null;
   const scheduleMonitor = scheduleTargetId
     ? (monitors.find((m) => m.id === scheduleTargetId) ?? null)
@@ -445,9 +452,17 @@ export function DashboardView({
 
   return (
     <div className="ping-ambient flex min-h-dvh flex-col">
+      {/* keyboard bypass — first focusable element on the surface */}
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[60] focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:outline-none"
+      >
+        Skip to monitor list
+      </a>
+
       {/* ---------- header ---------- */}
       <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4">
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 2xl:max-w-7xl">
           <PingLogo className="size-7" />
           <PingWordmark className="text-base" />
           <span className="hidden text-xs text-muted-foreground sm:inline">uptime for Render Free</span>
@@ -546,13 +561,14 @@ export function DashboardView({
       </header>
 
       {/* ---------- body: sidebar (lg) + main ---------- */}
-      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 gap-6 px-0 sm:px-4 lg:px-4">
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 gap-6 px-0 sm:px-4 lg:px-4 2xl:max-w-7xl 2xl:gap-8">
         {/* folder nav — sidebar on desktop */}
         <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-border/50 py-4 pr-3 lg:flex">
           <button
             onClick={() => setActiveFolder("all")}
             className={cn(
               "flex items-center gap-2.5 rounded-md border-l px-2.5 py-2.5 text-sm transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
               activeFolder === "all"
                 ? "border-primary bg-secondary font-medium text-foreground"
                 : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
@@ -574,6 +590,7 @@ export function DashboardView({
                   onClick={() => setActiveFolder(f.id)}
                   className={cn(
                     "flex w-full items-center gap-2.5 rounded-md border-l px-2.5 py-2.5 text-sm transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                     active
                       ? "border-primary bg-secondary font-medium text-foreground"
                       : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
@@ -589,7 +606,7 @@ export function DashboardView({
                   <DropdownMenuTrigger asChild>
                     <button
                       aria-label={`Folder actions for ${f.name}`}
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Settings className="size-3.5" />
@@ -612,7 +629,7 @@ export function DashboardView({
 
           <button
             onClick={() => setFolderDialog({ open: true, mode: "create" })}
-            className="mt-1 flex items-center gap-2 rounded-md px-2.5 py-2 text-sm text-muted-foreground/80 transition-colors hover:bg-secondary/60 hover:text-foreground"
+            className="mt-1 flex items-center gap-2 rounded-md px-2.5 py-2 text-sm text-muted-foreground/80 transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
           >
             <FolderPlus className="size-4" aria-hidden="true" />
             New folder
@@ -620,13 +637,18 @@ export function DashboardView({
         </aside>
 
         {/* main column */}
-        <main className="min-w-0 flex-1 space-y-4 px-4 pb-24 pt-4 sm:px-0 sm:pb-10">
+        <main
+          id="main"
+          tabIndex={-1}
+          className="min-w-0 flex-1 px-4 pb-24 pt-4 focus:outline-none sm:px-0 sm:pb-10"
+        >
           {/* mobile folder chips */}
-          <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-0.5 lg:hidden">
+          <div className="no-scrollbar -mx-4 mb-3 flex items-center gap-2 overflow-x-auto px-4 pb-0.5 lg:hidden">
             <button
               onClick={() => setActiveFolder("all")}
               className={cn(
                 "shrink-0 rounded-none border px-3 py-1.5 text-xs font-medium transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                 activeFolder === "all"
                   ? "border-primary/40 bg-primary/15 text-foreground"
                   : "border-border bg-card text-muted-foreground hover:text-foreground",
@@ -642,6 +664,7 @@ export function DashboardView({
                   onClick={() => setActiveFolder(f.id)}
                   className={cn(
                     "flex shrink-0 items-center gap-1.5 rounded-none border px-3 py-1.5 text-xs font-medium transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                     activeFolder === f.id
                       ? "border-primary/40 bg-primary/15 text-foreground"
                       : "border-border bg-card text-muted-foreground hover:text-foreground",
@@ -654,21 +677,35 @@ export function DashboardView({
             })}
             <button
               onClick={() => setFolderDialog({ open: true, mode: "create" })}
-              className="flex shrink-0 items-center gap-1 rounded-none border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+              className="flex shrink-0 items-center gap-1 rounded-none border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
               aria-label="New folder"
             >
               <FolderPlus className="size-3" /> New
             </button>
           </div>
 
-          {/* stats strip */}
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          {/* stats strip — one instrument on phones: hairline-divided quadrants
+              (structure is drawn with 1px hairlines, not four floating fat
+              cards); ≥sm restores the incumbent four-card row. One generous
+              break below separates overview from the working group. */}
+          <div className="mb-7 grid grid-cols-2 gap-px border bg-border sm:grid-cols-4 sm:gap-2.5 sm:border-0 sm:bg-transparent">
             <StatCard
               label="Monitors"
               value={summary ? `${summary.up}/${summary.monitors}` : "—"}
               sub={
                 summary
-                  ? `${summary.up} up · ${summary.down} down${summary.degraded ? ` · ${summary.degraded} slow` : ""}${summary.paused ? ` · ${summary.paused} paused` : ""}`
+                  ? ([
+                      summary.down > 0 ? `${summary.down} down` : null,
+                      summary.degraded > 0 ? `${summary.degraded} slow` : null,
+                      summary.paused > 0 ? `${summary.paused} paused` : null,
+                      summary.pending > 0 ? `${summary.pending} pending` : null,
+                    ].filter(Boolean).join(" · ") ||
+                      // Healthy fleet: freshness fills the caption slot — the
+                      // most recent check across all monitors (a max, so one
+                      // paused or stalled monitor can't fake staleness).
+                      (summary.lastCheckAt
+                        ? `last check ${timeAgo(summary.lastCheckAt)}`
+                        : undefined))
                   : undefined
               }
               icon={Activity}
@@ -677,29 +714,34 @@ export function DashboardView({
             <StatCard
               label="Uptime 24h"
               value={formatUptime(summary?.avgUptime24h ?? null)}
-              sub="average across monitors"
+              sub={worst24h != null ? `worst ${formatUptime(worst24h)}` : undefined}
               icon={Gauge}
               tone={summary?.avgUptime24h != null && summary.avgUptime24h < 1 ? "warn" : "default"}
             />
             <StatCard
               label="Checks 24h"
               value={summary ? summary.checks24h.toLocaleString() : "—"}
-              sub="real HTTP requests"
+              sub="HTTP requests sent"
               icon={ListChecks}
               tone="teal"
             />
             <StatCard
               label="Failures 24h"
               value={summary ? summary.monitorsWithFailures24h : "—"}
-              sub="monitors with ≥1 failed check"
+              sub="monitors affected"
               icon={XCircle}
               tone={summary && summary.monitorsWithFailures24h > 0 ? "down" : "up"}
             />
           </div>
 
-          {/* toolbar: search + sort + scheduled pings + maintenance */}
+          {/* working group: toolbar + list — one tight unit (10px internal rhythm) */}
+          <div className="space-y-2.5">
+          {/* toolbar: search + sort + scheduled pings + maintenance — two designed
+              clusters so resizing never mixes orphans: find+order stays a unit,
+              working tools wrap as a whole row when space runs out */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-0 basis-full sm:basis-44 sm:flex-1">
+            <div className="flex min-w-0 basis-full items-center gap-2 sm:basis-auto sm:flex-1">
+              <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input
                 ref={searchRef}
@@ -722,7 +764,7 @@ export function DashboardView({
               {query && (
                 <button
                   onClick={() => setQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-2.5 top-1/2 -m-2.5 -translate-y-1/2 p-2.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                   aria-label="Clear search"
                 >
                   <X className="size-4" />
@@ -734,7 +776,7 @@ export function DashboardView({
               <SelectTrigger
                 aria-label="Sort monitors"
                 title="How the monitor list is ordered — manual drag order, alphabetical, status, or response time"
-                className="h-9 w-[124px] shrink-0 text-xs"
+                className="h-10 w-[124px] shrink-0 text-xs sm:h-9"
               >
                 <SelectValue />
               </SelectTrigger>
@@ -771,12 +813,17 @@ export function DashboardView({
                 </SelectItem>
               </SelectContent>
             </Select>
+            </div>
 
+            {/* working tools — tight 40px icon group on touch; never stretched
+                equal thirds (a stretched icon-only button reads as fat and
+                ambiguous). Labels and natural width return from sm up. */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setPingsOpen(true)}
-              className="relative h-9 shrink-0 gap-1.5 text-xs"
+              className="relative h-10 w-10 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3"
               aria-label={`Scheduled pings${pendingPingCount ? ` (${pendingPingCount} upcoming)` : ""}`}
               title="Scheduled pings — one-off checks at a specific time"
             >
@@ -799,7 +846,7 @@ export function DashboardView({
               size="sm"
               onClick={() => setMaintenanceOpen(true)}
               className={cn(
-                "relative h-9 shrink-0 gap-1.5 text-xs",
+                "relative h-10 w-10 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3",
                 activeMaintenanceCount > 0 &&
                   "border-warn/45 bg-warn/15 text-warn hover:bg-warn/20 hover:text-warn",
               )}
@@ -821,13 +868,14 @@ export function DashboardView({
               variant="outline"
               size="sm"
               onClick={() => setIncidentsOpen(true)}
-              className="relative h-9 shrink-0 gap-1.5 text-xs"
+              className="relative h-10 w-10 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3"
               aria-label="Incidents and postmortem notes"
               title="Incidents — down periods over the last 30 days, with postmortem notes shown on the public status page"
             >
               <AlertTriangle className="size-4" aria-hidden="true" />
               <span className="hidden sm:inline">Incidents</span>
             </Button>
+            </div>
           </div>
 
           {sortMode === "manual" && monitors.length > 1 && (
@@ -837,12 +885,25 @@ export function DashboardView({
             </p>
           )}
 
-          {/* error */}
+          {/* error — announced, and never a dead end: recovery is inline */}
           {error && (
-            <div className="rounded-lg border border-down/30 bg-down/10 px-4 py-3 text-sm text-down">
-              {error}
-              {(error.includes("Unauthorized")) && (
-                <button onClick={onLogout} className="ml-2 underline">
+            <div
+              role="alert"
+              className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-down/30 bg-down/10 px-4 py-3 text-sm text-down"
+            >
+              <span className="min-w-0 flex-1">{error}</span>
+              <button
+                onClick={() => refresh()}
+                disabled={refreshing}
+                className="shrink-0 border border-down/40 px-2.5 py-1 text-xs font-medium transition-colors hover:bg-down/15 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+              >
+                {refreshing ? "Checking…" : "Try again"}
+              </button>
+              {error.includes("Unauthorized") && (
+                <button
+                  onClick={onLogout}
+                  className="shrink-0 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                >
                   sign in again
                 </button>
               )}
@@ -857,7 +918,7 @@ export function DashboardView({
               ))}
             </div>
           ) : monitors.length === 0 ? (
-            <div className="rounded-xl border border-dashed bg-card/50 p-8 text-center">
+            <div className="rounded-none border border-dashed bg-card/50 p-8 text-center">
               <PingLogo className="mx-auto size-12 opacity-80" />
               <h2 className="mt-4 text-base font-semibold">Add your first monitor</h2>
               <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-muted-foreground">
@@ -872,7 +933,7 @@ export function DashboardView({
               </Button>
             </div>
           ) : visible.length === 0 ? (
-            <div className="rounded-xl border border-dashed bg-card/50 p-8 text-center text-sm text-muted-foreground">
+            <div className="rounded-none border border-dashed bg-card/50 p-8 text-center text-sm text-muted-foreground">
               {query
                 ? `No monitors match “${query}”.`
                 : activeFolder === "all"
@@ -907,6 +968,7 @@ export function DashboardView({
               })}
             </div>
           )}
+          </div>
         </main>
       </div>
 
@@ -915,7 +977,7 @@ export function DashboardView({
         <button
           onClick={() => setAddOpen(true)}
           aria-label="New monitor"
-          className="fixed bottom-20 right-4 z-40 flex size-14 items-center justify-center rounded-none bg-primary text-primary-foreground shadow-xl shadow-primary/30 transition-transform hover:scale-105 active:scale-95 sm:hidden"
+          className="fixed bottom-20 right-4 z-40 flex size-14 items-center justify-center rounded-none bg-primary text-primary-foreground shadow-xl shadow-primary/30 transition-transform hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 sm:hidden"
         >
           <Plus className="size-6" />
         </button>
@@ -923,7 +985,7 @@ export function DashboardView({
 
       {/* footer */}
       <footer className="sticky bottom-0 z-30 mt-auto border-t bg-background/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[11px] text-foreground/65">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] text-[11px] text-foreground/65 2xl:max-w-7xl">
           <span className="font-medium tracking-wide text-foreground/90">PING</span>
           <span>honest uptime for Render Free</span>
           <span className="ml-auto flex items-center gap-3">

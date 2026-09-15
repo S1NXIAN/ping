@@ -27,10 +27,14 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "rounded-lg border bg-card px-4 py-3.5 transition-all duration-200",
+        // phone: quadrant cell of the single stats instrument — tight on-scale
+        // padding, no own border (the strip's hairlines draw the structure);
+        // ≥sm: incumbent independent card with the gentle hover lift
+        "rounded-none border-0 bg-card px-3 py-2.5 transition-all duration-200",
         // subtle 1px top inner highlight — reads as gentle "lift" on dark
         "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.045)]",
-        "hover:-translate-y-px hover:border-primary/25 hover:bg-card/70",
+        "hover:translate-y-0 hover:border-primary/25 hover:bg-card/70",
+        "sm:rounded-lg sm:border sm:px-4 sm:py-3.5 sm:hover:-translate-y-px",
         className,
       )}
     >
@@ -38,11 +42,16 @@ export function StatCard({
         {Icon && <Icon className="size-3.5 shrink-0" aria-hidden="true" />}
         {label}
       </div>
-      <div className={cn("mt-2 text-xl font-bold tabular-nums leading-tight tracking-tight", toneClass)}>
+      <div className={cn("mt-2 text-lg font-bold tabular-nums leading-tight tracking-tight sm:text-xl", toneClass)}>
         {value}
       </div>
+      {/* Captions are a desktop affordance — phone quadrants carry label +
+          value only. Definitional subs read as noise at 360px and the
+          numbers stand on their own. */}
       {sub != null && (
-        <div className="mt-1 text-[11px] leading-snug text-muted-foreground/85">{sub}</div>
+        <div className="mt-1 hidden text-[11px] leading-snug text-muted-foreground/85 sm:block">
+          {sub}
+        </div>
       )}
     </div>
   );

@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-15T05:13:17Z",
+  "title": "Design System: PING",
+  "extensions": {
+    "colorMeta": {
+      "soot": { "role": "neutral", "displayName": "Soot", "canonical": "#0b0c0e", "tonalRamp": ["oklch(15% 0.004 264)", "oklch(26% 0.004 264)", "oklch(37% 0.004 264)", "oklch(48% 0.004 264)", "oklch(59% 0.004 264)", "oklch(70% 0.004 264)", "oklch(82% 0.004 264)", "oklch(93% 0.004 264)"] },
+      "card-charcoal": { "role": "neutral", "displayName": "Card Charcoal", "canonical": "#121316", "tonalRamp": ["oklch(16% 0.004 264)", "oklch(27% 0.004 264)", "oklch(38% 0.004 264)", "oklch(49% 0.004 264)", "oklch(60% 0.004 264)", "oklch(71% 0.004 264)", "oklch(83% 0.004 264)", "oklch(94% 0.004 264)"] },
+      "popover-charcoal": { "role": "neutral", "displayName": "Popover Charcoal", "canonical": "#15161a", "tonalRamp": ["oklch(17% 0.004 264)", "oklch(28% 0.004 264)", "oklch(39% 0.004 264)", "oklch(50% 0.004 264)", "oklch(61% 0.004 264)", "oklch(72% 0.004 264)", "oklch(83% 0.004 264)", "oklch(94% 0.004 264)"] },
+      "muted-charcoal": { "role": "neutral", "displayName": "Muted Charcoal", "canonical": "#181a1e", "tonalRamp": ["oklch(18% 0.004 264)", "oklch(29% 0.004 264)", "oklch(40% 0.004 264)", "oklch(51% 0.004 264)", "oklch(62% 0.004 264)", "oklch(72% 0.004 264)", "oklch(84% 0.004 264)", "oklch(95% 0.004 264)"] },
+      "surface-charcoal": { "role": "neutral", "displayName": "Surface Charcoal", "canonical": "#1b1d21", "tonalRamp": ["oklch(19% 0.004 264)", "oklch(30% 0.004 264)", "oklch(41% 0.004 264)", "oklch(52% 0.004 264)", "oklch(62% 0.004 264)", "oklch(73% 0.004 264)", "oklch(84% 0.004 264)", "oklch(95% 0.004 264)"] },
+      "accent-charcoal": { "role": "neutral", "displayName": "Accent Charcoal", "canonical": "#202227", "tonalRamp": ["oklch(20% 0.005 264)", "oklch(31% 0.005 264)", "oklch(42% 0.005 264)", "oklch(53% 0.005 264)", "oklch(63% 0.005 264)", "oklch(74% 0.005 264)", "oklch(85% 0.005 264)", "oklch(95% 0.005 264)"] },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "#25272d", "tonalRamp": ["oklch(21% 0.006 265)", "oklch(32% 0.006 265)", "oklch(43% 0.006 265)", "oklch(54% 0.006 265)", "oklch(64% 0.006 265)", "oklch(75% 0.006 265)", "oklch(85% 0.006 265)", "oklch(95% 0.006 265)"] },
+      "input-charcoal": { "role": "neutral", "displayName": "Input Charcoal", "canonical": "#2c2e35", "tonalRamp": ["oklch(23% 0.006 265)", "oklch(34% 0.006 265)", "oklch(45% 0.006 265)", "oklch(56% 0.006 265)", "oklch(66% 0.006 265)", "oklch(77% 0.006 265)", "oklch(87% 0.006 265)", "oklch(96% 0.006 265)"] },
+      "signal-white": { "role": "primary", "displayName": "Signal White", "canonical": "#ffffff", "tonalRamp": ["oklch(15% 0 0)", "oklch(27% 0 0)", "oklch(39% 0 0)", "oklch(51% 0 0)", "oklch(63% 0 0)", "oklch(75% 0 0)", "oklch(87% 0 0)", "oklch(100% 0 0)"] },
+      "chalk": { "role": "primary", "displayName": "Chalk", "canonical": "#e6e8ec", "tonalRamp": ["oklch(15% 0.006 264)", "oklch(27% 0.006 264)", "oklch(39% 0.006 264)", "oklch(51% 0.006 264)", "oklch(63% 0.006 264)", "oklch(75% 0.006 264)", "oklch(87% 0.006 264)", "oklch(93% 0.006 264)"] },
+      "ash-white": { "role": "neutral", "displayName": "Ash White", "canonical": "#e9ebee", "tonalRamp": ["oklch(15% 0.005 264)", "oklch(27% 0.005 264)", "oklch(39% 0.005 264)", "oklch(51% 0.005 264)", "oklch(63% 0.005 264)", "oklch(75% 0.005 264)", "oklch(87% 0.005 264)", "oklch(94% 0.005 264)"] },
+      "instrument-gray": { "role": "neutral", "displayName": "Instrument Gray", "canonical": "#9aa0a8", "tonalRamp": ["oklch(15% 0.01 250)", "oklch(27% 0.01 250)", "oklch(39% 0.01 250)", "oklch(51% 0.01 250)", "oklch(63% 0.01 250)", "oklch(72% 0.01 250)", "oklch(80% 0.01 250)", "oklch(88% 0.01 250)"] },
+      "beacon-emerald": { "role": "secondary", "displayName": "Beacon Emerald", "canonical": "#10b981", "tonalRamp": ["oklch(20% 0.05 162)", "oklch(30% 0.078 162)", "oklch(40% 0.106 162)", "oklch(50% 0.124 162)", "oklch(60% 0.142 162)", "oklch(70% 0.155 162)", "oklch(82% 0.12 162)", "oklch(93% 0.06 162)"] },
+      "alarm-rose": { "role": "secondary", "displayName": "Alarm Rose", "canonical": "#f43f5e", "tonalRamp": ["oklch(18% 0.07 16)", "oklch(28% 0.105 16)", "oklch(38% 0.14 16)", "oklch(48% 0.175 16)", "oklch(57% 0.21 16)", "oklch(65% 0.21 16)", "oklch(77% 0.16 16)", "oklch(90% 0.08 16)"] },
+      "caution-amber": { "role": "secondary", "displayName": "Caution Amber", "canonical": "#f59e0b", "tonalRamp": ["oklch(22% 0.05 70)", "oklch(33% 0.075 70)", "oklch(44% 0.1 70)", "oklch(55% 0.125 70)", "oklch(66% 0.15 70)", "oklch(76% 0.156 70)", "oklch(85% 0.12 70)", "oklch(94% 0.06 70)"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The wordmark only — the system has no larger display type by design." },
+      "headline": { "displayName": "Stat Value", "purpose": "The big readable numbers on stat cards; always tabular." },
+      "title": { "displayName": "Title", "purpose": "Dialog and section headings, monitor names." },
+      "body": { "displayName": "Body", "purpose": "Default UI text, buttons, form labels." },
+      "meta": { "displayName": "Meta", "purpose": "Timestamps, captions, sub-lines." },
+      "label": { "displayName": "Label", "purpose": "10px uppercase 0.1em-tracked metric labels and pill text — the signature treatment." }
+    },
+    "shadows": [
+      { "name": "card-top-highlight", "value": "inset 0 1px 0 0 rgba(255,255,255,0.045)", "purpose": "Every card surface at rest — reads as a gentle lift without casting shadow." },
+      { "name": "cta-key-light", "value": "0 1px 2px rgba(255,255,255,0.25)", "purpose": "The white primary button's glow — light emitting, never darkening what's below." }
+    ],
+    "motion": [
+      { "name": "sonar-ripple", "value": "ping-ripple 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite", "purpose": "Status dot heartbeat: box-shadow ring expands 0→6px and fades; tinted per state at 55% alpha." },
+      { "name": "fade-up", "value": "ping-fade-up 0.35s ease-out both", "purpose": "Cards and views enter: 6px rise + opacity 0→1." },
+      { "name": "breathe", "value": "ping-breathe 2.6s ease-in-out infinite", "purpose": "Logo pulse on splash/login: opacity 1→0.72, scale 1→0.97." },
+      { "name": "state-transition", "value": "all 200ms ease", "purpose": "Default control feedback: hover fills, border brightening." },
+      { "name": "hover-lift", "value": "translateY(-1px) on hover; scale(0.98) on active", "purpose": "Physical, shadow-free elevation response on cards and CTAs." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one white action per view — Soot text, sharp corners, key-light glow, press feedback.",
+      "html": "<button class=\"ds-btn-primary\">New monitor</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 8px 16px; background: var(--signal-white, #ffffff); color: var(--soot, #0b0c0e); border: none; border-radius: 0; font: 500 14px/1 -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; box-shadow: 0 1px 2px rgba(255,255,255,0.25); cursor: pointer; transition: all 200ms ease; } .ds-btn-primary:hover { background: rgba(255,255,255,0.9); } .ds-btn-primary:active { transform: scale(0.98); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,255,255,0.5); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary action — hairline border over a 30% input-charcoal wash, fills accent charcoal on hover.",
+      "html": "<button class=\"ds-btn-outline\">Check now</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 8px 16px; background: rgba(44,46,53,0.3); color: var(--ash-white, #e9ebee); border: 1px solid var(--input-charcoal, #2c2e35); border-radius: 0; font: 500 14px/1 -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; cursor: pointer; transition: all 200ms ease; } .ds-btn-outline:hover { background: var(--accent-charcoal, #202227); border-color: var(--hairline, #25272d); } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,255,255,0.5); }"
+    },
+    {
+      "name": "Ghost Icon Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Quiet icon action (refresh, menu) — transparent until hovered, then an accent-charcoal wash.",
+      "html": "<button class=\"ds-btn-ghost\" aria-label=\"Refresh\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 12a9 9 0 1 1-2.64-6.36\"/><polyline points=\"21 3 21 9 15 9\"/></svg></button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: transparent; color: var(--instrument-gray, #9aa0a8); border: none; border-radius: 0; cursor: pointer; transition: all 200ms ease; } .ds-btn-ghost:hover { background: var(--accent-charcoal, #202227); color: var(--ash-white, #e9ebee); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,255,255,0.5); }"
+    },
+    {
+      "name": "Stat Card",
+      "kind": "card",
+      "refersTo": "stat-card",
+      "description": "The instrument readout: 10px tracked label, 20px bold tabular value, 11px meta, inset top light, 1px hover lift.",
+      "html": "<div class=\"ds-stat-card\"><div class=\"ds-stat-label\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 12h-4l-3 9L9 3l-3 9H2\"/></svg>UPTIME 24H</div><div class=\"ds-stat-value\">100%</div><div class=\"ds-stat-sub\">average across monitors</div></div>",
+      "css": ".ds-stat-card { width: 240px; padding: 14px 16px; background: var(--card-charcoal, #121316); color: var(--ash-white, #e9ebee); border: 1px solid var(--hairline, #25272d); border-radius: 0; box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.045); transition: all 200ms ease; } .ds-stat-card:hover { transform: translateY(-1px); border-color: rgba(255,255,255,0.25); background: rgba(18,19,22,0.7); } .ds-stat-label { display: flex; align-items: center; gap: 6px; font: 500 10px/1.3 -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; color: var(--instrument-gray, #9aa0a8); } .ds-stat-value { margin-top: 8px; font: 700 20px/1.25 -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; color: var(--beacon-emerald, #10b981); } .ds-stat-sub { margin-top: 4px; font: 400 11px/1.4 -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; color: var(--instrument-gray, #9aa0a8); }"
+    },
+    {
+      "name": "Status Pills",
+      "kind": "chip",
+      "refersTo": "pill-up",
+      "description": "The signature chip: 10px text, alpha wash + matching text + 25-40% border. Tone = meaning (up / slow / pinned).",
+      "html": "<span class=\"ds-pill-row\"><span class=\"ds-pill ds-pill-up\">● UP</span><span class=\"ds-pill ds-pill-warn\">▲ 240 ms › 200 ms</span><span class=\"ds-pill ds-pill-white\">★ pinned</span></span>",
+      "css": ".ds-pill-row { display: flex; gap: 6px; align-items: center; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; } .ds-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 0; font-size: 10px; font-weight: 500; line-height: 1.5; letter-spacing: 0.02em; } .ds-pill-up { border: 1px solid rgba(16,185,129,0.3); background: rgba(16,185,129,0.1); color: var(--beacon-emerald, #10b981); } .ds-pill-warn { border: 1px solid rgba(245,158,11,0.4); background: rgba(245,158,11,0.15); color: var(--caution-amber, #f59e0b); } .ds-pill-white { border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: var(--signal-white, #ffffff); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "36px field on a 30% input-charcoal wash with a 3px white focus ring — the system's focus treatment everywhere.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"https://service.example.com\" />",
+      "css": ".ds-input { width: 240px; height: 36px; padding: 8px 12px; background: rgba(44,46,53,0.3); color: var(--ash-white, #e9ebee); border: 1px solid var(--input-charcoal, #2c2e35); border-radius: 0; font: 400 14px/1.5 -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; caret-color: var(--signal-white, #ffffff); transition: all 200ms ease; } .ds-input::placeholder { color: rgba(154,160,168,0.6); } .ds-input:focus-visible { outline: none; border-color: var(--signal-white, #ffffff); box-shadow: 0 0 0 3px rgba(255,255,255,0.5); } .ds-input::selection { background: rgba(255,255,255,0.16); }"
+    },
+    {
+      "name": "Status Dot",
+      "kind": "custom",
+      "refersTo": "status-dot",
+      "description": "The only circle in the system — 10px, sonar ripple every 2.4s. Paused/pending go flat gray with no ripple.",
+      "html": "<span class=\"ds-dot-row\"><span class=\"ds-dot ds-dot-up\"></span><span class=\"ds-dot ds-dot-down\"></span><span class=\"ds-dot ds-dot-paused\"></span></span>",
+      "css": ".ds-dot-row { display: flex; gap: 12px; align-items: center; } .ds-dot { width: 10px; height: 10px; border-radius: 9999px; } .ds-dot-up { background: var(--beacon-emerald, #10b981); animation: ds-ripple 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite; --ds-ripple-color: rgba(16,185,129,0.55); } .ds-dot-down { background: var(--alarm-rose, #f43f5e); animation: ds-ripple 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite; --ds-ripple-color: rgba(244,63,94,0.55); } .ds-dot-paused { background: #71717a; } @keyframes ds-ripple { 0% { box-shadow: 0 0 0 0 var(--ds-ripple-color, rgba(16,185,129,0.55)); } 70% { box-shadow: 0 0 0 6px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Drafting Table",
+    "overview": "PING's interface is a drafting table in a dark studio: a fixed blueprint-grid canvas of fine 24px cells and bold 120px majors sits under everything, and the UI floats above it as flat, sharp-cornered instruments — cards, pills, gauges and charts laid out the way a draughtsman lays out tools. The palette is charcoal paper and one white pencil: a neutral charcoal scale with zero hue tint carries every surface, while pure Signal White is the sole brand accent (primary actions, focus rings, links, highlights). Color that remains is data — emerald, rose and amber exist only because monitors have states.\n\nThe voice is technical calm. Everything is measurable, labeled, and aligned; nothing is decorative, and no number is invented. Type stays small and instrument-like (nothing over 24px — the system has no display type by design), numerals are always tabular so readings don't jitter, and depth comes from light — 1px inner highlights and a faint ambient glow — never from shadows. Corners are sharp everywhere except the single live status dot, the one circle in the entire system, whose 2.4s sonar ripple is the product's heartbeat.",
+    "keyCharacteristics": [
+      "Blueprint grid canvas (24px fine + 120px major, white lines at 3.8%/10% alpha) fixed behind all content",
+      "One white accent on charcoal; status hues are data, not decoration",
+      "Radius 0 everywhere — one exception: the 10px status dot",
+      "Depth is light, not shadow: inset 1px top highlights + radial ambient glow",
+      "Instrument typography: 10px uppercase tracked labels, tabular numerals, dense hierarchy",
+      "Precise and responsive: 1px hover lift, 0.98 press, 200ms feedback on every control",
+      "Hand-rolled SVG instruments (sparkline, uptime bars, response chart) instead of chart libraries"
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Signal White is the only brand color. Emerald, rose and amber are measurement semantics — they may encode a monitor's state, never decorate a layout.", "section": "colors" },
+      { "name": "The Data, Not Decoration Rule", "body": "A colored fill is always an alpha wash over charcoal (10–15% tint + matching text, e.g. bg-emerald/10 + text-emerald). Never solid color blocks; never colored text directly on colored fills.", "section": "colors" },
+      { "name": "The Instrument Type Rule", "body": "Numbers are always tabular (tabular-nums) so live readings don't jitter; labels are 10px uppercase with 0.1em tracking; nothing exceeds 24px. If a layout needs bigger type, it needs less content.", "section": "typography" },
+      { "name": "The Light-Not-Shadow Rule", "body": "No drop shadows on surfaces. Depth = background steps + hairline borders + 1px light. The only allowed \"shadows\" emit light; they never darken anything below them.", "section": "elevation" },
+      { "name": "The Sharp Edge Rule", "body": "Radius 0 everywhere, at every interactive size. The status dot is the only circle in the system; never round anything else.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do keep every surface one of the charcoal steps and separate them with 1px Hairline borders (#25272d).",
+      "Do use Signal White for exactly one primary action per view; everything else gets outline or ghost treatment.",
+      "Do render all numerals with tabular-nums and label all metrics as 10px uppercase + 0.1em tracking.",
+      "Do show alpha washes over charcoal for status fills (10–15% bg + matching text + 25–40% border).",
+      "Do give every interactive element the 3px white focus ring, 1px hover lift, and 0.98 press — feedback is part of the craft."
+    ],
+    "donts": [
+      "Don't round anything except the status dot (no rounded-md/lg/xl, no pill-shaped buttons).",
+      "Don't introduce a second brand hue, a gradient, or a drop shadow — depth is light, color is data.",
+      "Don't stack rounded cards inside rounded cards or blur backgrounds (no glassmorphism) — the generic-SaaS look is the anti-reference.",
+      "Don't go playful: no bouncy/spring animations, no emoji decoration, no casual illustration — motion is limited to the ripple, breathe, fade-up (0.35s) and 200ms state transitions.",
+      "Don't fake data in any visual: gaps stay gaps (hatched bars, broken lines), unmeasured windows show \"—\"."
+    ]
+  }
+}

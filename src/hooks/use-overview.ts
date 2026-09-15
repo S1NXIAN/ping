@@ -14,8 +14,13 @@ export function useOverview(intervalMs = 15000) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Slow-network guard: never let 15s polls pile up behind a stalled
+  // request. The next tick (or visibility return) picks up after it.
+  const inFlight = useRef(false);
 
   const refresh = useCallback(async (silent = false) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     if (!silent) setRefreshing(true);
     try {
       const next = await api<OverviewResponse>("/api/overview");
@@ -24,6 +29,7 @@ export function useOverview(intervalMs = 15000) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load overview");
     } finally {
+      inFlight.current = false;
       setLoading(false);
       setRefreshing(false);
     }
