@@ -150,7 +150,7 @@ A charcoal drafting-paper scale with no hue tint, one white pencil, and three se
 
 ### Secondary (semantic status — data, not decoration)
 - **Beacon Emerald** (#10b981): "Up". Status dots, up-pills, uptime values, healthy bar segments, chart line for success.
-- **Alarm Rose** (#f43f5e): "Down". Failed ticks, downtime bars, destructive actions, outage counts.
+- **Alarm Rose** (#f43f5e): "Down". Failed ticks, downtime bars, destructive actions, outage counts. Solid rose fills take Soot ink (`--down-foreground` / `--destructive-foreground`, 5.33:1 AA) — never white; hover keeps the fill constant (darkening pushes contrast to a 4.5 knife-edge), the CTA press (0.98 scale) is the interaction cue.
 - **Caution Amber** (#f59e0b): "Slow / degraded / maintenance / confirming". Slow-threshold lines on charts, maintenance states, pending ripples.
 
 ### Neutral

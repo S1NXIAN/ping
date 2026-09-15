@@ -25,6 +25,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -39,6 +40,7 @@
   --color-card: var(--card);
   --color-up: var(--up);
   --color-down: var(--down);
+  --color-down-foreground: var(--down-foreground);
   --color-warn: var(--warn);
   --color-teal: var(--teal);
   --radius-sm: 0px;
@@ -74,7 +76,7 @@
   --accent: #202227;
   --accent-foreground: #f1f2f4;
   --destructive: #f43f5e;
-  --destructive-foreground: #ffffff;
+  --destructive-foreground: #0b0c0e;
   --border: #25272d;
   --input: #2c2e35;
   --ring: #ffffff;
@@ -93,6 +95,9 @@
   --sidebar-ring: #ffffff;
   --up: #10b981;
   --down: #f43f5e;
+  /* Ink for solid Alarm Rose fills (delete CTA, destructive toast):
+     Soot on rose = 5.33:1 AA. White measured 3.67:1 — never on rose. */
+  --down-foreground: #0b0c0e;
   --warn: #f59e0b;
   --teal: #e6e8ec;
 }
