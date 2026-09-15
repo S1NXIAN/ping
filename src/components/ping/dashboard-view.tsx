@@ -677,8 +677,11 @@ export function DashboardView({
             </button>
           </div>
 
-          {/* stats strip — one generous break below separates overview from the working group */}
-          <div className="mb-7 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          {/* stats strip — one instrument on phones: hairline-divided quadrants
+              (structure is drawn with 1px hairlines, not four floating fat
+              cards); ≥sm restores the incumbent four-card row. One generous
+              break below separates overview from the working group. */}
+          <div className="mb-7 grid grid-cols-2 gap-px border bg-border sm:grid-cols-4 sm:gap-2.5 sm:border-0 sm:bg-transparent">
             <StatCard
               label="Monitors"
               value={summary ? `${summary.up}/${summary.monitors}` : "—"}
@@ -794,13 +797,15 @@ export function DashboardView({
             </Select>
             </div>
 
-            {/* working tools — equal-width thirds on touch, fixed width from sm up */}
-            <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+            {/* working tools — tight 40px icon group on touch; never stretched
+                equal thirds (a stretched icon-only button reads as fat and
+                ambiguous). Labels and natural width return from sm up. */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setPingsOpen(true)}
-              className="relative h-10 flex-1 shrink-0 gap-1.5 text-xs sm:h-9 sm:flex-none"
+              className="relative h-10 w-10 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3"
               aria-label={`Scheduled pings${pendingPingCount ? ` (${pendingPingCount} upcoming)` : ""}`}
               title="Scheduled pings — one-off checks at a specific time"
             >
@@ -823,7 +828,7 @@ export function DashboardView({
               size="sm"
               onClick={() => setMaintenanceOpen(true)}
               className={cn(
-                "relative h-10 flex-1 shrink-0 gap-1.5 text-xs sm:h-9 sm:flex-none",
+                "relative h-10 w-10 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3",
                 activeMaintenanceCount > 0 &&
                   "border-warn/45 bg-warn/15 text-warn hover:bg-warn/20 hover:text-warn",
               )}
@@ -845,7 +850,7 @@ export function DashboardView({
               variant="outline"
               size="sm"
               onClick={() => setIncidentsOpen(true)}
-              className="relative h-10 flex-1 shrink-0 gap-1.5 text-xs sm:h-9 sm:flex-none"
+              className="relative h-10 w-10 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3"
               aria-label="Incidents and postmortem notes"
               title="Incidents — down periods over the last 30 days, with postmortem notes shown on the public status page"
             >

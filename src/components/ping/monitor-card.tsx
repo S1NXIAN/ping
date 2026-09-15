@@ -275,7 +275,7 @@ export function MonitorCard({
           dnd?.onDragEnd();
         }}
         className={cn(
-          "ping-fade-up group relative cursor-pointer rounded-lg border bg-card p-4 outline-none transition-colors sm:p-5 @container",
+          "ping-fade-up group relative cursor-pointer rounded-lg border bg-card p-3 outline-none transition-colors sm:p-5 @container",
           "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40",
           status === "down" && !maintenanceNow && "border-down/30 hover:border-down/50",
           degraded && !maintenanceNow &&
@@ -294,7 +294,10 @@ export function MonitorCard({
           status === "down" && maintenanceNow ? "under maintenance" : degraded ? "slow" : statusLabel(status)
         }${monitor.pinned ? ", pinned" : ""}${maintenanceNow ? ", maintenance active" : ""}`}
       >
-        <div className="flex items-start gap-2 sm:gap-3">
+        {/* phone: stacked — full-width identity/meta rows, bars + actions share
+            a bottom strip (a side column would pin the name to a ~150px sliver);
+            ≥sm: incumbent two-column card, rendering unchanged */}
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:gap-3">
           {/* drag handle — desktop, manual sort only */}
           {canReorder && (
             <button
@@ -317,11 +320,12 @@ export function MonitorCard({
             </button>
           )}
 
-          <div className="mt-1.5">
-            <StatusDot status={checking ? "checking" : status} pulse={status === "up" || status === "down" || checking} />
-          </div>
+          <div className="flex min-w-0 flex-1 items-start gap-2">
+            <div className="mt-1.5">
+              <StatusDot status={checking ? "checking" : status} pulse={status === "up" || status === "down" || checking} />
+            </div>
 
-          <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <button
                 type="button"
@@ -456,7 +460,7 @@ export function MonitorCard({
               <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
             </a>
 
-            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-foreground/70">
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-foreground/70">
               <span>
                 Last updated{" "}
                 <span className="text-foreground/95">{timeAgo(monitor.lastCheckAt)}</span>
@@ -494,13 +498,16 @@ export function MonitorCard({
                 {monitor.lastError}
               </p>
             )}
+            </div>
           </div>
 
-          {/* right block: honest-width check bars + actions. Bars get their own
-              definite-width box (container-query tiers) so the buttons can
-              never flex-shrink them below their nominal size. */}
-          <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-2">
-            <div className="w-24 shrink-0 sm:w-32 @xl:w-44 @4xl:w-56">
+          {/* right block: honest-width check bars + actions. Phone: one bottom
+              strip — bars flex to the leftover width with the buttons pinned
+              right; sm+: side-by-side column with the incumbent width tiers.
+              Bars always keep a definite honest width — the buttons can never
+              flex-shrink them below it. */}
+          <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
+            <div className="min-w-0 flex-1 sm:w-32 sm:flex-none @xl:w-44 @4xl:w-56">
               <UptimeBars
                 segments={checksToSegments(monitor.recentChecks)}
                 barClassName="h-6 sm:h-7"
@@ -518,7 +525,7 @@ export function MonitorCard({
                 aria-label={monitor.pinned ? "Unpin monitor" : "Pin to top"}
                 title={monitor.pinned ? "Unpin" : "Pin to top"}
                 className={cn(
-                  "h-10 w-10 hover:bg-secondary sm:h-8 sm:w-8",
+                  "ml-auto h-10 w-10 hover:bg-secondary sm:ml-0 sm:h-8 sm:w-8",
                   monitor.pinned
                     ? "text-primary hover:text-primary"
                     : "text-muted-foreground/60 hover:text-primary",
