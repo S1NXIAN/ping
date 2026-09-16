@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -51,8 +51,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useOverview } from "@/hooks/use-overview";
-import { api, ApiError, formatUptime, timeAgo } from "@/lib/ping-client";
-import type { FolderDTO, MaintenanceWindowDTO, MonitorDTO } from "@/lib/ping-types";
+import { api, ApiError, formatUptime, timeAgo, uptimeTone } from "@/lib/ping-client";
+import type {
+  AdminIncidentDTO,
+  FolderDTO,
+  MaintenanceWindowDTO,
+  MonitorDTO,
+} from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
 import { MonitorCard, type CardDnd } from "./monitor-card";
@@ -162,8 +167,22 @@ export function DashboardView({
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [maintenanceTargetId, setMaintenanceTargetId] = useState<string | null>(null);
 
-  // incidents — postmortem-note sheet
+  // incidents — postmortem-note sheet, plus the 30d count that drives the
+  // toolbar's rose state (same endpoint the sheet renders; refreshed on
+  // mount and on sheet close so the badge never outlives its data)
   const [incidentsOpen, setIncidentsOpen] = useState(false);
+  const [incidentCount, setIncidentCount] = useState(0);
+  const loadIncidentCount = useCallback(async () => {
+    try {
+      const r = await api<{ incidents: AdminIncidentDTO[] }>("/api/incidents");
+      setIncidentCount(r.incidents.length);
+    } catch {
+      // The sheet surfaces its own errors; the badge keeps the last count.
+    }
+  }, []);
+  useEffect(() => {
+    void loadIncidentCount();
+  }, [loadIncidentCount]);
 
   // ⌘K / Ctrl+K command palette
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -491,8 +510,23 @@ export function DashboardView({
             </Button>
             {summary && (
               <div className="hidden items-center gap-1.5 md:flex">
-                {headerPill("up", summary.up, "border-up/25 bg-up/10 text-up")}
-                {headerPill("down", summary.down, "border-down/25 bg-down/10 text-down")}
+                {/* Header pills tint only when the count is real (the paused
+                    pill's idle pattern): a rose "0 down" was a false alarm —
+                    color encodes state, and zero is not a state. */}
+                {headerPill(
+                  "up",
+                  summary.up,
+                  summary.up > 0
+                    ? "border-up/25 bg-up/10 text-up"
+                    : "border-border bg-muted text-muted-foreground",
+                )}
+                {headerPill(
+                  "down",
+                  summary.down,
+                  summary.down > 0
+                    ? "border-down/25 bg-down/10 text-down"
+                    : "border-border bg-muted text-muted-foreground",
+                )}
                 {summary.degraded > 0 &&
                   headerPill("slow", summary.degraded, "border-warn/30 bg-warn/10 text-warn")}
                 {summary.paused > 0 && headerPill("paused", summary.paused, "border-border bg-muted text-muted-foreground")}
@@ -723,7 +757,10 @@ export function DashboardView({
               value={formatUptime(summary?.avgUptime24h ?? null)}
               sub={worst24h != null ? `worst ${formatUptime(worst24h)}` : undefined}
               icon={Gauge}
-              tone={summary?.avgUptime24h != null && summary.avgUptime24h < 1 ? "warn" : "default"}
+              // Shared band ink (uptimeTone): displays-as-100% -> emerald,
+              // 90–99.99% amber, <90% rose. Before, a perfect fleet shared
+              // the neutral ink of "no data" — the up state was invisible.
+              tone={uptimeTone(summary?.avgUptime24h) ?? "default"}
             />
             <StatCard
               label="Checks 24h"
@@ -869,12 +906,25 @@ export function DashboardView({
               variant="outline"
               size="sm"
               onClick={() => setIncidentsOpen(true)}
-              className="relative h-11 w-11 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3"
-              aria-label="Incidents and postmortem notes"
+              className={cn(
+                "relative h-11 w-11 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3",
+                // Rose state voice (mirrors Maintenance's amber): the /10 wash
+                // is the AA-safe rose recipe (4.63:1; /15 measures 4.35:1).
+                incidentCount > 0 &&
+                  "border-down/40 bg-down/10 text-down hover:bg-down/10 hover:text-down",
+              )}
+              aria-label={`Incidents and postmortem notes${incidentCount > 0 ? ` (${incidentCount} in the last 30 days)` : ""}`}
               title="Incidents — down periods over the last 30 days, with postmortem notes shown on the public status page"
             >
               <AlertTriangle className="size-4" aria-hidden="true" />
               <span className="hidden sm:inline">Incidents</span>
+              {incidentCount > 0 && (
+                <span
+                  className="ml-0.5 grid min-w-4 place-items-center rounded-none border border-down/40 bg-background/50 px-1 text-[10px] font-semibold tabular-nums text-down"
+                >
+                  {incidentCount}
+                </span>
+              )}
             </Button>
             </div>
           </div>
@@ -1062,7 +1112,13 @@ export function DashboardView({
         serverTime={data?.serverTime ?? null}
       />
 
-      <IncidentsSheet open={incidentsOpen} onOpenChange={setIncidentsOpen} />
+      <IncidentsSheet
+        open={incidentsOpen}
+        onOpenChange={(o) => {
+          setIncidentsOpen(o);
+          if (!o) void loadIncidentCount();
+        }}
+      />
 
       <CommandPalette
         open={paletteOpen}

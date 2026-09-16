@@ -10,7 +10,7 @@ export interface BarSegment {
 /**
  * UptimeRobot-style bar strip. Renders one thin bar per segment —
  * emerald when fully up, rose when fully down, amber when partially up,
- * hatched gray when there is no data (never faked as up).
+ * dashed-outline gray when there is no data (never faked as up).
  */
 export function UptimeBars({
   segments,
@@ -43,7 +43,10 @@ export function UptimeBars({
       {segments.map((s, i) => {
         let cls: string;
         if (s.ratio == null) {
-          cls = "bg-muted";
+          // No data = dashed outline (the same language the public status
+          // DayBars use): honest emptiness that still clears 3:1 non-text
+          // contrast — bg-muted + opacity-40 measured 1.02:1, i.e. invisible.
+          cls = "border border-dashed border-muted-foreground/60 bg-transparent";
         } else if (s.ratio >= 1) {
           cls = "bg-up/90";
         } else if (s.ratio <= 0) {
@@ -59,7 +62,6 @@ export function UptimeBars({
               "min-w-[4px] flex-1 rounded-none transition-colors hover:opacity-80",
               barClassName,
               cls,
-              s.ratio == null && "opacity-40",
             )}
           />
         );

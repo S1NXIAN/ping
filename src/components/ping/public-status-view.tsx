@@ -3,7 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { Activity, AlertTriangle, CalendarClock, Gauge, Hammer, RefreshCw, Rss, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { api, ApiError, formatDateTime, formatDuration, formatMs, formatUptime, timeAgo } from "@/lib/ping-client";
+import {
+  api,
+  ApiError,
+  formatDateTime,
+  formatDuration,
+  formatMs,
+  formatUptime,
+  timeAgo,
+  uptimeTone,
+} from "@/lib/ping-client";
 import type {
   DailyBucket,
   PublicIncident,
@@ -17,6 +26,14 @@ import { ResponseSparkline } from "./response-sparkline";
 import { StatusDot } from "./status-dot";
 
 const REFRESH_MS = 30_000;
+
+/** Band -> ink class; null (no data) keeps the quiet meta ink. */
+function uptimeToneClass(tone: ReturnType<typeof uptimeTone>): string {
+  if (tone === "up") return "text-up";
+  if (tone === "warn") return "text-warn";
+  if (tone === "down") return "text-down";
+  return "text-foreground/85";
+}
 
 /**
  * Public, read-only status page served at `/?status=<token>` — no login.
@@ -362,7 +379,10 @@ function MonitorRow({ monitor, now }: { monitor: PublicStatusMonitor; now: numbe
         <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
           {monitor.uptime7d != null ? (
             <span className="tabular-nums">
-              7d <span className="font-medium text-foreground/85">{formatUptime(monitor.uptime7d)}</span>
+              7d{" "}
+              <span className={cn("font-medium", uptimeToneClass(uptimeTone(monitor.uptime7d)))}>
+                {formatUptime(monitor.uptime7d)}
+              </span>
             </span>
           ) : (
             <span>7d —</span>
@@ -418,7 +438,10 @@ function MonitorRow({ monitor, now }: { monitor: PublicStatusMonitor; now: numbe
         )}
         {monitor.uptime30d != null ? (
           <span>
-            30d <span className="tabular-nums text-foreground/85">{formatUptime(monitor.uptime30d)}</span>
+            30d{" "}
+            <span className={cn("tabular-nums", uptimeToneClass(uptimeTone(monitor.uptime30d)))}>
+              {formatUptime(monitor.uptime30d)}
+            </span>
           </span>
         ) : (
           <span>30d —</span>
@@ -591,7 +614,10 @@ function DayBars({ daily }: { daily: DailyBucket[] }) {
               title={title}
               className={cn(
                 "h-7 flex-1 rounded-none transition-colors",
-                !bucket && "border border-dashed border-border/60",
+                // No data = dashed outline at 3.3:1 (muted-foreground/60) —
+                // border-border/60 measured 1.02:1 against the strip: an
+                // unmeasured day was indistinguishable from a missing bar.
+                !bucket && "border border-dashed border-muted-foreground/60",
                 bucket && down === 0 && "bg-up/60 hover:bg-up/80",
                 bucket && down > 0 && "bg-down/70 hover:bg-down",
                 i === days.length - 1 && "ring-1 ring-inset ring-primary/30",

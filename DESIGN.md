@@ -134,6 +134,7 @@ The voice is technical calm. Everything is measurable, labeled, and aligned; not
 **Key Characteristics:**
 - Blueprint grid canvas (24px fine + 120px major, white lines at 3.8%/10% alpha) fixed behind all content
 - One white accent on charcoal; status hues are data, not decoration
+- Uptime numbers tint by band (emerald 100% / amber 90–99.9% / rose <90%); "no data" is a dashed outline, never invisible
 - Radius 0 everywhere — one exception: the 10px status dot
 - Depth is light, not shadow: inset 1px top highlights + radial ambient glow
 - Instrument typography: 10px uppercase tracked labels, tabular numerals, dense hierarchy
@@ -169,6 +170,10 @@ A charcoal drafting-paper scale with no hue tint, one white pencil, and three se
 **The One Accent Rule.** Signal White is the only brand color. Emerald, rose and amber are measurement semantics — they may encode a monitor's state, never decorate a layout.
 
 **The Data, Not Decoration Rule.** A colored fill is always an alpha wash over charcoal (10–15% tint + matching text, e.g. `bg-emerald/10` + `text-emerald`). Never solid color blocks; never colored text directly on colored fills.
+
+**The Uptime Band Rule.** Every uptime percentage shares one band language, from one helper (`uptimeTone`): displays-as-100% (≥ 99.995%) in Beacon Emerald (up), 90–99.99% in Caution Amber (warn), below 90% in Alarm Rose (down). No data stays neutral — unknown must never read as healthy. Dashboard stat, detail sheet and public status all speak it.
+
+**The Honest-Empty Rule.** "No data" is drawn as a dashed outline in muted gray (`border-dashed border-muted-foreground/60`, ≥3:1 non-text contrast) — never a near-invisible fill, and never faked as up. The legend key mirrors the bar treatment exactly.
 
 ## Typography
 
@@ -220,11 +225,12 @@ Sharp corners are the system's signature: every radius token is forced to 0px (c
 - **Primary:** Signal White fill, Soot text (`{button-primary}`); hover drops to 90% white; active presses to 0.98 scale; subtle key-light glow beneath.
 - **Outline:** Input Charcoal at 30% over paper, hairline border, Ash White text; hover fills Accent Charcoal.
 - **Ghost:** transparent until hovered, then Accent Charcoal wash; used for icon actions (refresh, menu, ⋮).
+- **Toolbar state encoding:** outline tools tint when their state is live — Caution Amber wash + count while maintenance windows are active, Alarm Rose wash + count when 30-day incidents exist, Signal White count chip for scheduled pings. Silent when idle: color only ever carries state.
 - **Focus:** 3px Signal White ring at 50% (`ring-[3px] ring-ring/50`) — visible on every interactive element.
 
 ### Pills
 - **Style:** the recurring status chip — 10px/500 text, 2px×8px padding, sharp corners, Hairline-strength colored border at ~25–40% alpha over a 6–15% alpha wash of the same hue (e.g. up-pill: `border-emerald/30 bg-emerald/10 text-emerald`).
-- **State:** tone encodes meaning — white (pinned/account), Beacon Emerald (up), Caution Amber (slow/maintenance/confirming "2/3"), chalk (keyword/intervals). Never larger than 11px text.
+- **State:** tone encodes meaning — white (pinned/account), Beacon Emerald (up), Caution Amber (slow/maintenance/confirming "2/3"), chalk (keyword/intervals). Never larger than 11px text. Header count pills tint only when count > 0 — a zero is neutral, never a colored false alarm.
 
 ### Cards / Containers
 - **Corner Style:** 0px, always.
@@ -249,7 +255,7 @@ Sharp corners are the system's signature: every radius token is forced to 0px (c
 - **Behavior:** live states emit a sonar ripple — `box-shadow` ring expanding 0→6px in 2.4s `cubic-bezier(0.4, 0, 0.6, 1)`, infinite, tinted per state at 55% alpha.
 
 ### SVG Instruments (signature)
-Hand-rolled, no chart library: **sparkline** (Chalk 1.5px stroke + soft white area fill, emerald latest-point dot, gaps where data is missing); **uptime bars** (20 sharp segments — emerald full, rose empty, amber partial, hatched/gray for "no data", never faked); **response-time chart** (real time axis, dashed hairline gridlines, rose ticks for failed checks, amber dashed slow-threshold line, hover tooltip). Captions state exactly what was measured.
+Hand-rolled, no chart library: **sparkline** (Chalk 1.5px stroke + soft white area fill, emerald latest-point dot, gaps where data is missing); **uptime bars** (20 sharp segments — emerald full, rose empty, amber partial, dashed-outline gray for "no data", never faked); **response-time chart** (real time axis, dashed hairline gridlines, rose ticks for failed checks, amber dashed slow-threshold line, hover tooltip). Captions state exactly what was measured.
 
 ## Do's and Don'ts
 

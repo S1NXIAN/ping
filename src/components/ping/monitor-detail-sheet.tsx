@@ -46,12 +46,21 @@ import {
   formatUptime,
   hostOf,
   timeAgo,
+  uptimeTone,
 } from "@/lib/ping-client";
 import type { MonitorDetailResponse, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { HistoryChart } from "./history-chart";
 import { StatusDot, statusLabel } from "./status-dot";
 import { dailyToSegments, UptimeBars } from "./uptime-bars";
+
+/** Band -> ink class; null (no data) stays muted — unknown never reads healthy. */
+function uptimeToneClass(tone: ReturnType<typeof uptimeTone>): string {
+  if (tone === "up") return "text-up";
+  if (tone === "warn") return "text-warn";
+  if (tone === "down") return "text-down";
+  return "text-muted-foreground";
+}
 
 function Stat({
   label,
@@ -328,28 +337,23 @@ export function MonitorDetailSheet({
               <BarChart3 className="size-3.5" aria-hidden="true" /> Availability (recorded checks)
             </h3>
             <div className="grid grid-cols-3 gap-2">
+              {/* Band ink is shared (uptimeTone): 24h keeps its existing
+                  semantics; 7d/30d spoke the same language from now on —
+                  one percentage, one color, everywhere. */}
               <Stat
                 label="24h uptime"
                 value={formatUptime(stats?.uptime24h)}
-                tone={
-                  stats?.uptime24h == null
-                    ? "text-muted-foreground"
-                    : stats.uptime24h >= 1
-                      ? "text-up"
-                      : stats.uptime24h >= 0.9
-                        ? "text-warn"
-                        : "text-down"
-                }
+                tone={uptimeToneClass(uptimeTone(stats?.uptime24h))}
               />
               <Stat
                 label="7d uptime"
                 value={formatUptime(stats?.uptime7d)}
-                tone="text-foreground"
+                tone={uptimeToneClass(uptimeTone(stats?.uptime7d))}
               />
               <Stat
                 label="30d uptime"
                 value={formatUptime(stats?.uptime30d)}
-                tone="text-foreground"
+                tone={uptimeToneClass(uptimeTone(stats?.uptime30d))}
               />
             </div>
             <p className="mt-1.5 text-[11px] text-muted-foreground">
@@ -372,10 +376,14 @@ export function MonitorDetailSheet({
             <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
               <span>30 days ago</span>
               <span className="flex items-center gap-2">
-                <span className="inline-block size-2 rounded-none bg-up/90" /> up
-                <span className="inline-block size-2 rounded-none bg-warn/90" /> partial
-                <span className="inline-block size-2 rounded-none bg-down/90" /> down
-                <span className="inline-block size-2 rounded-none bg-muted opacity-40" /> no data
+                {/* Legend keys mirror the bars exactly — the no-data key is the
+                    same dashed outline the bars draw, at 3.3:1 (the old
+                    bg-muted+opacity swatch measured 1.02:1: invisible). */}
+                <span className="inline-block size-2.5 rounded-none bg-up/90" /> up
+                <span className="inline-block size-2.5 rounded-none bg-warn/90" /> partial
+                <span className="inline-block size-2.5 rounded-none bg-down/90" /> down
+                <span className="inline-block size-2.5 rounded-none border border-dashed border-muted-foreground/60" />{" "}
+                no data
               </span>
               <span>today</span>
             </div>
