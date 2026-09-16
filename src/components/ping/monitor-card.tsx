@@ -722,11 +722,17 @@ export function MonitorCard({
                   )}
 
                   <DropdownMenuSeparator />
+                  {/* The destructive outlier gets its own labeled chunk, the
+                      same chunking language as Schedule and Reorder — danger
+                      is a decision, not an afterthought. */}
+                  <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+                    Danger
+                  </DropdownMenuLabel>
                   <DropdownMenuItem
                     variant="destructive"
                     onClick={() => setConfirmDelete(true)}
                   >
-                    <Trash2 className="size-4" /> Delete
+                    <Trash2 className="size-4" /> Delete…
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

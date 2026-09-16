@@ -12,10 +12,16 @@ import {
   LockKeyhole,
   LogOut,
   MoveVertical,
+  Pause,
+  Pin,
+  PinOff,
+  Play,
   Plus,
   RefreshCw,
+  Trash2,
   Wrench,
 } from "lucide-react";
+import { useState } from "react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -66,6 +72,8 @@ export function CommandPalette({
   onSelectMonitor,
   onSelectFolder,
   onChangeSort,
+  onMonitorPatch,
+  onDeleteRequest,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -84,22 +92,48 @@ export function CommandPalette({
   onSelectMonitor: (id: string) => void;
   onSelectFolder: (id: string | "all") => void;
   onChangeSort: (mode: SortMode) => void;
+  onMonitorPatch: (id: string, data: Record<string, unknown>, success: string) => void;
+  onDeleteRequest: (id: string, name: string) => void;
 }) {
-  const close = () => onOpenChange(false);
+  // Type a thing's name, get its actions: when the query narrows to exactly
+  // one monitor, a per-monitor ops group appears (pause/pin/delete). With no
+  // or multiple matches the group stays hidden — the list never grows with
+  // the fleet. Strict substring matching, so ops never surface for a monitor
+  // the fuzzy list itself isn't showing. The query resets on every close
+  // (Esc, overlay, item-select all route through handleOpenChange) so the
+  // palette always opens fresh — no setState-in-effect needed.
+  const [query, setQuery] = useState("");
+  const handleOpenChange = (o: boolean) => {
+    if (!o) setQuery("");
+    onOpenChange(o);
+  };
+  const close = () => handleOpenChange(false);
   const run = (fn: () => void) => {
     close();
     fn();
   };
+  const q = query.trim().toLowerCase();
+  const matched =
+    q.length > 0
+      ? monitors.filter((m) =>
+          `${m.name} ${hostOf(m.url)} ${m.account ?? ""}`.toLowerCase().includes(q),
+        )
+      : [];
+  const opsMonitor = matched.length === 1 ? matched[0] : null;
 
   return (
     <CommandDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={handleOpenChange}
       title="Command palette"
       description="Search monitors and run actions"
       className="sm:max-w-lg"
     >
-      <CommandInput placeholder="Search monitors, actions, folders…" />
+      <CommandInput
+        value={query}
+        onValueChange={setQuery}
+        placeholder="Search monitors, actions, folders…"
+      />
       <CommandList className="max-h-[min(60vh,420px)]">
         <CommandEmpty>No results — try a monitor name, “sort”, or “new”.</CommandEmpty>
 
@@ -130,8 +164,59 @@ export function CommandPalette({
           })}
         </CommandGroup>
 
+        {opsMonitor && (
+          <>
+            <CommandSeparator />
+            <CommandGroup
+              heading={`Actions for “${opsMonitor.name}”`}
+            >
+              <CommandItem
+                value={`monitor pause resume ${opsMonitor.name}`}
+                onSelect={() =>
+                  run(() =>
+                    onMonitorPatch(
+                      opsMonitor.id,
+                      { enabled: !opsMonitor.enabled },
+                      opsMonitor.enabled ? "Paused" : "Resumed",
+                    ),
+                  )
+                }
+              >
+                {opsMonitor.enabled ? <Pause /> : <Play />}
+                {opsMonitor.enabled ? "Pause checks" : "Resume checks"}
+              </CommandItem>
+              <CommandItem
+                value={`monitor pin ${opsMonitor.name}`}
+                onSelect={() =>
+                  run(() =>
+                    onMonitorPatch(
+                      opsMonitor.id,
+                      { pinned: !opsMonitor.pinned },
+                      opsMonitor.pinned ? "Unpinned" : "Pinned to top",
+                    ),
+                  )
+                }
+              >
+                {opsMonitor.pinned ? <PinOff /> : <Pin />}
+                {opsMonitor.pinned ? "Unpin" : "Pin to top"}
+              </CommandItem>
+              <CommandItem
+                value={`monitor delete ${opsMonitor.name}`}
+                className="text-down"
+                onSelect={() => run(() => onDeleteRequest(opsMonitor.id, opsMonitor.name))}
+              >
+                <Trash2 />
+                Delete…
+              </CommandItem>
+            </CommandGroup>
+          </>
+        )}
+
         <CommandSeparator />
 
+        {/* Decision residue (critique 2026-09-16 P2): seven flat actions
+            became four real commands — the three sheets cascade under their
+            own "Open" group, so Actions stops duplicating the toolbar. */}
         <CommandGroup heading="Actions">
           <CommandItem onSelect={() => run(onNewMonitor)}>
             <Plus />
@@ -141,6 +226,17 @@ export function CommandPalette({
             <RefreshCw />
             Refresh now
           </CommandItem>
+          <CommandItem onSelect={() => run(onOpenSettings)}>
+            <LockKeyhole className={cn(adminUnlocked && "text-teal")} />
+            {adminUnlocked ? "Settings (unlocked)" : "Settings & keep-awake"}
+          </CommandItem>
+          <CommandItem onSelect={() => run(onLogout)} className="text-down">
+            <LogOut />
+            Sign out
+          </CommandItem>
+        </CommandGroup>
+
+        <CommandGroup heading="Open">
           <CommandItem onSelect={() => run(onOpenPings)}>
             <CalendarClock />
             Scheduled pings
@@ -152,14 +248,6 @@ export function CommandPalette({
           <CommandItem onSelect={() => run(onOpenIncidents)}>
             <AlertTriangle />
             Incidents &amp; notes
-          </CommandItem>
-          <CommandItem onSelect={() => run(onOpenSettings)}>
-            <LockKeyhole className={cn(adminUnlocked && "text-teal")} />
-            {adminUnlocked ? "Settings (unlocked)" : "Settings & keep-awake"}
-          </CommandItem>
-          <CommandItem onSelect={() => run(onLogout)} className="text-down">
-            <LogOut />
-            Sign out
           </CommandItem>
         </CommandGroup>
 

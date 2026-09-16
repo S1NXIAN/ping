@@ -14,7 +14,9 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -23,16 +25,32 @@ import { useToast } from "@/hooks/use-toast";
 import { api, ApiError, normalizeUrl } from "@/lib/ping-client";
 import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
 
-const INTERVALS = [
-  { value: "60", label: "1 minute" },
-  { value: "120", label: "2 minutes" },
-  { value: "300", label: "5 minutes (recommended)" },
-  { value: "600", label: "10 minutes" },
-  { value: "1800", label: "30 minutes" },
-  { value: "3600", label: "1 hour" },
-  { value: "21600", label: "6 hours" },
-  { value: "43200", label: "12 hours" },
-  { value: "86400", label: "1 day" },
+// Nine flat choices were decision residue (critique 2026-09-16 P2); three
+// cadence chunks carry the same values with one decision instead of nine —
+// "which rhythm?" then "which step?". No capability was removed.
+const INTERVAL_GROUPS: { label: string; options: { value: string; label: string }[] }[] = [
+  {
+    label: "Minutes",
+    options: [
+      { value: "60", label: "1 minute" },
+      { value: "120", label: "2 minutes" },
+      { value: "300", label: "5 minutes (recommended)" },
+      { value: "600", label: "10 minutes" },
+    ],
+  },
+  {
+    label: "Hours",
+    options: [
+      { value: "1800", label: "30 minutes" },
+      { value: "3600", label: "1 hour" },
+      { value: "21600", label: "6 hours" },
+      { value: "43200", label: "12 hours" },
+    ],
+  },
+  {
+    label: "Days",
+    options: [{ value: "86400", label: "1 day" }],
+  },
 ];
 
 /** value = extra confirmations; label = total failed checks needed. */
@@ -353,10 +371,17 @@ export function AddMonitorDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {INTERVALS.map((i) => (
-                      <SelectItem key={i.value} value={i.value}>
-                        {i.label}
-                      </SelectItem>
+                    {INTERVAL_GROUPS.map((g) => (
+                      <SelectGroup key={g.label}>
+                        <SelectLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          {g.label}
+                        </SelectLabel>
+                        {g.options.map((i) => (
+                          <SelectItem key={i.value} value={i.value}>
+                            {i.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
                     ))}
                   </SelectContent>
                 </Select>

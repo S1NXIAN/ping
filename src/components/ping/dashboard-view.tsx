@@ -200,6 +200,9 @@ export function DashboardView({
 
   // ⌘K / Ctrl+K command palette
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // Palette-initiated delete — confirmed here with the same consequence copy
+  // as the card's dialog (the palette itself can't host a confirm step).
+  const [paletteDelete, setPaletteDelete] = useState<{ id: string; name: string } | null>(null);
 
   // drag-and-drop reorder (manual sort only)
   const [dragId, setDragId] = useState<string | null>(null);
@@ -218,6 +221,40 @@ export function DashboardView({
   const worst24h = uptimes24h.length ? Math.min(...uptimes24h) : null;
 
   const detailMonitor = detailId ? (monitors.find((m) => m.id === detailId) ?? null) : null;
+
+  // Palette monitor ops (distill pass): pause/pin run directly; the palette
+  // is the keyboard path to the same API the card ⋮ uses.
+  const paletteMonitorPatch = useCallback(
+    async (id: string, data: Record<string, unknown>, success: string) => {
+      try {
+        await api(`/api/monitors/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+        toast({ description: success });
+      } catch (e) {
+        toast({
+          description: e instanceof Error ? e.message : "Could not update the monitor",
+          variant: "destructive",
+        });
+      }
+      refresh(true);
+    },
+    [refresh, toast],
+  );
+
+  const paletteMonitorDelete = useCallback(async () => {
+    if (!paletteDelete) return;
+    const { id } = paletteDelete;
+    setPaletteDelete(null);
+    try {
+      await api(`/api/monitors/${id}`, { method: "DELETE" });
+      toast({ description: "Monitor deleted" });
+    } catch (e) {
+      toast({
+        description: e instanceof Error ? e.message : "Could not delete the monitor",
+        variant: "destructive",
+      });
+    }
+    refresh(true);
+  }, [paletteDelete, refresh, toast]);
   const scheduleMonitor = scheduleTargetId
     ? (monitors.find((m) => m.id === scheduleTargetId) ?? null)
     : null;
@@ -1180,7 +1217,33 @@ export function DashboardView({
         onSelectMonitor={(id) => setDetailId(id)}
         onSelectFolder={(id) => setActiveFolder(id)}
         onChangeSort={changeSort}
+        onMonitorPatch={paletteMonitorPatch}
+        onDeleteRequest={(id, name) => setPaletteDelete({ id, name })}
       />
+
+      <AlertDialog
+        open={!!paletteDelete}
+        onOpenChange={(o) => !o && setPaletteDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{paletteDelete?.name}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The monitor and its entire recorded check history will be removed.
+              This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-down text-down-foreground hover:bg-down active:scale-[0.98]"
+              onClick={paletteMonitorDelete}
+            >
+              Delete monitor
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <TextPromptDialog
         open={folderDialog.open}
