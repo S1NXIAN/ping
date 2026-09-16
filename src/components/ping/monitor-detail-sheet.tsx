@@ -373,7 +373,7 @@ export function MonitorDetailSheet({
               barClassName="h-9"
               className="gap-[2px]"
             />
-            <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
+            <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
               <span>30 days ago</span>
               <span className="flex items-center gap-2">
                 {/* Legend keys mirror the bars exactly — the no-data key is the

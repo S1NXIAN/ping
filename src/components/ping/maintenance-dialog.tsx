@@ -292,7 +292,7 @@ export function MaintenanceDialog({
                         onClick={() => void cancelWindow(w.id)}
                         disabled={cancellingId === w.id}
                         aria-label="Cancel this maintenance window"
-                        className="rounded p-1 text-muted-foreground hover:bg-down/10 hover:text-down disabled:opacity-50"
+                        className="rounded-none p-1 text-muted-foreground hover:bg-down/10 hover:text-down disabled:opacity-50"
                       >
                         {cancellingId === w.id ? (
                           <Loader2 className="size-3.5 animate-spin" />

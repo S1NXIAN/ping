@@ -336,7 +336,7 @@ export function MonitorCard({
               onBlur={() => setDragArmed(false)}
               draggable={false}
               className={cn(
-                "mt-1 hidden size-6 shrink-0 cursor-grab touch-none place-items-center rounded text-muted-foreground/50 transition-colors active:cursor-grabbing sm:grid",
+                "mt-1 hidden size-6 shrink-0 cursor-grab touch-none place-items-center rounded-none text-muted-foreground/50 transition-colors active:cursor-grabbing sm:grid",
                 "hover:text-foreground focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                 dragArmed && "text-foreground",
               )}

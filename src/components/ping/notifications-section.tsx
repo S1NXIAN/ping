@@ -402,9 +402,9 @@ export function NotificationsSection({
           </div>
           <p className="text-[10px] leading-relaxed text-muted-foreground/80">
             Route a channel to one monitor to keep that monitor&rsquo;s alerts separate from the rest.
-            Payload: <code className="rounded bg-muted px-1">text</code> (Slack),{" "}
-            <code className="rounded bg-muted px-1">content</code> (Discord) and a structured{" "}
-            <code className="rounded bg-muted px-1">{"{ event, monitor, check }"}</code> object —
+            Payload: <code className="rounded-none bg-muted px-1">text</code> (Slack),{" "}
+            <code className="rounded-none bg-muted px-1">content</code> (Discord) and a structured{" "}
+            <code className="rounded-none bg-muted px-1">{"{ event, monitor, check }"}</code> object —
             receivers pick what they understand.
           </p>
         </form>

@@ -553,7 +553,7 @@ export function DashboardView({
               <Search className="size-3.5 shrink-0" aria-hidden="true" />
               <span className="hidden md:inline">Search…</span>
               <kbd
-                className="pointer-events-none hidden rounded border border-border/70 bg-muted/60 px-1.5 py-px text-[10px] font-medium text-muted-foreground md:inline"
+                className="pointer-events-none hidden rounded-none border border-border/70 bg-muted/60 px-1.5 py-px text-[10px] font-medium text-muted-foreground md:inline"
                 aria-hidden="true"
               >
                 ⌘K
@@ -662,8 +662,8 @@ export function DashboardView({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            {/* documented primary: 36px (h-9) — size="sm" measured 32px (critique 2026-09-16 P3) */}
             <Button
-              size="sm"
               onClick={() => setAddOpen(true)}
               className="hidden bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/25 transition-transform hover:bg-primary/90 active:scale-[0.98] sm:inline-flex"
             >
@@ -719,7 +719,7 @@ export function DashboardView({
                   <DropdownMenuTrigger asChild>
                     <button
                       aria-label={`Folder actions for ${f.name}`}
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-none p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Settings className="size-3.5" />
@@ -804,7 +804,7 @@ export function DashboardView({
               (structure is drawn with 1px hairlines, not four floating fat
               cards); ≥sm restores the incumbent four-card row. One generous
               break below separates overview from the working group. */}
-          <div className="mb-7 grid grid-cols-2 gap-px border bg-border sm:grid-cols-4 sm:gap-2.5 sm:border-0 sm:bg-transparent">
+          <div className="mb-6 grid grid-cols-2 gap-px border bg-border sm:grid-cols-4 sm:gap-2 sm:border-0 sm:bg-transparent">
             <StatCard
               label="Monitors"
               value={summary ? `${summary.up}/${summary.monitors}` : "—"}
@@ -874,7 +874,7 @@ export function DashboardView({
               />
               {!query && (
                 <kbd
-                  className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-border/70 bg-muted/60 px-1.5 py-px text-[10px] font-medium text-muted-foreground sm:block"
+                  className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded-none border border-border/70 bg-muted/60 px-1.5 py-px text-[10px] font-medium text-muted-foreground sm:block"
                   aria-hidden="true"
                 >
                   /
