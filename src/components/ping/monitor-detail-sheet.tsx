@@ -507,7 +507,7 @@ export function MonitorDetailSheet({
             <AlertDialogCancel>Keep it</AlertDialogCancel>
             <AlertDialogAction
               onClick={doDelete}
-              className="bg-down text-white hover:bg-down/90"
+              className="bg-down text-down-foreground hover:bg-down active:scale-[0.98]"
             >
               Delete monitor
             </AlertDialogAction>

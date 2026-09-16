@@ -53,6 +53,7 @@ import {
   api,
   ApiError,
   formatCountdown,
+  formatDateTime,
   formatInterval,
   formatMs,
   formatUptime,
@@ -64,6 +65,18 @@ import { cn } from "@/lib/utils";
 import { StatusDot, statusLabel } from "./status-dot";
 import { TextPromptDialog } from "./text-prompt-dialog";
 import { checksToSegments, UptimeBars } from "./uptime-bars";
+
+/** Duration since an outage began, from its real first failed check:
+ *  "12m" / "3h 05m" / "1d 4h" / "<1m". */
+function formatDownFor(startedAt: string): string {
+  const s = Math.max(0, (Date.now() - new Date(startedAt).getTime()) / 1000);
+  const m = Math.floor(s / 60);
+  if (m < 1) return "<1m";
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ${String(m % 60).padStart(2, "0")}m`;
+  return `${Math.floor(h / 24)}d ${h % 24}h`;
+}
 
 /** Time left in an active maintenance window: "12m left" / "1h 05m left". */
 function formatMaintenanceLeft(endsAt: string): string {
@@ -93,6 +106,10 @@ export function MonitorCard({
   onCheckNow,
   onSchedulePing,
   onScheduleMaintenance,
+  onViewIncidents,
+  /** Start of the monitor's ONGOING incident (its real first failed check),
+   *  or null when none is known — null never becomes a guess. */
+  downSince,
   nextPingAt,
   maintenanceWindow,
   canReorder,
@@ -103,6 +120,8 @@ export function MonitorCard({
 }: {
   monitor: MonitorDTO;
   folders: FolderDTO[];
+  onViewIncidents: () => void;
+  downSince: string | null;
   onOpen: () => void;
   onRenamed: (name: string) => void;
   onEdited: () => void;
@@ -501,6 +520,55 @@ export function MonitorCard({
               <p className="mt-1.5 truncate text-[11px] text-down/90" title={monitor.lastError}>
                 {monitor.lastError}
               </p>
+            )}
+
+            {/* The outage moment, answered on the card: how long (the ongoing
+                incident's real first failed check — never an estimate) and
+                what to do next. Silence opens the maintenance dialog
+                pre-filled to now; View incident opens the incidents timeline.
+                Hidden under an active maintenance window — silence is
+                meaningless while alerts are already quiet. */}
+            {status === "down" && !maintenanceNow && (
+              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-down/90">
+                {downSince && (
+                  <span
+                    className="inline-flex items-center gap-1 py-2 font-medium text-down tabular-nums"
+                    title={`Down since ${formatDateTime(downSince)} — stitched from real failed checks`}
+                  >
+                    down {formatDownFor(downSince)}
+                  </span>
+                )}
+                {downSince && (
+                  <span className="text-down/40" aria-hidden="true">·</span>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onScheduleMaintenance();
+                  }}
+                  title="Schedule a maintenance window — checks keep running and stay recorded, alerts go quiet"
+                  className="-my-2 inline-flex min-h-11 items-center rounded-none px-0.5 font-medium underline-offset-2 transition-colors hover:text-down hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                >
+                  Silence alerts…
+                </button>
+                {downSince && (
+                  <>
+                    <span className="text-down/40" aria-hidden="true">·</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewIncidents();
+                      }}
+                      title="Open the incidents timeline — down periods stitched from real checks"
+                      className="-my-2 inline-flex min-h-11 items-center rounded-none px-0.5 font-medium underline-offset-2 transition-colors hover:text-down hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                    >
+                      View incident
+                    </button>
+                  </>
+                )}
+              </div>
             )}
             </div>
           </div>

@@ -238,6 +238,7 @@ Sharp corners are the system's signature: every radius token is forced to 0px (c
 - **Shadow Strategy:** 1px inset top highlight only (see Elevation).
 - **Border:** 1px Hairline; hover raises border to Signal White at 25% and lifts the card 1px.
 - **Internal Padding:** 14px vertical × 16px horizontal (stat cards); 16px for larger containers.
+- **Outage row (down cards):** while a monitor is down and not under maintenance, the card answers "how long, and what now?" in one 11px rose line: the real down duration (from the ongoing incident's first failed check — tabular, never estimated; hidden when no incident is known rather than guessed), then `Silence alerts…` (opens the maintenance dialog pre-filled to now) and `View incident` (opens the incidents sheet) as rose text actions with ≥44px hit areas. Suppressed under an active maintenance window — silence is meaningless while alerts are already quiet.
 
 ### Inputs / Fields
 - **Style:** Input Charcoal at 30% fill, 1px Input Charcoal border, sharp corners, 36px tall, Ash White 14px text.

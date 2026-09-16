@@ -167,22 +167,36 @@ export function DashboardView({
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [maintenanceTargetId, setMaintenanceTargetId] = useState<string | null>(null);
 
-  // incidents — postmortem-note sheet, plus the 30d count that drives the
-  // toolbar's rose state (same endpoint the sheet renders; refreshed on
-  // mount and on sheet close so the badge never outlives its data)
-  const [incidentsOpen, setIncidentsOpen] = useState(false);
-  const [incidentCount, setIncidentCount] = useState(0);
-  const loadIncidentCount = useCallback(async () => {
+  // incidents — postmortem-note sheet, plus the 30d list that drives both
+  // the toolbar's rose state and the cards' outage rows (same endpoint the
+  // sheet renders; refreshed on mount and on sheet close so the badge never
+  // outlives its data)
+  const [incidents, setIncidents] = useState<AdminIncidentDTO[] | null>(null);
+  const loadIncidents = useCallback(async () => {
     try {
       const r = await api<{ incidents: AdminIncidentDTO[] }>("/api/incidents");
-      setIncidentCount(r.incidents.length);
+      setIncidents(r.incidents);
     } catch {
-      // The sheet surfaces its own errors; the badge keeps the last count.
+      // The sheet surfaces its own errors; the badge keeps the last list.
     }
   }, []);
   useEffect(() => {
-    void loadIncidentCount();
-  }, [loadIncidentCount]);
+    void loadIncidents();
+  }, [loadIncidents]);
+  const incidentCount = incidents?.length ?? 0;
+
+  // Down cards' honest "down since": the ONGOING incident's real first
+  // failed check (endedAt == null). No incident known → no claim, never a
+  // guess; the label simply stays hidden.
+  const downSinceByMonitor = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const inc of incidents ?? []) {
+      if (inc.endedAt == null) map.set(inc.monitorId, inc.startedAt);
+    }
+    return map;
+  }, [incidents]);
+
+  const [incidentsOpen, setIncidentsOpen] = useState(false);
 
   // ⌘K / Ctrl+K command palette
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -1007,6 +1021,8 @@ export function DashboardView({
                     onCheckNow={() => refresh(true)}
                     onSchedulePing={() => setScheduleTargetId(m.id)}
                     onScheduleMaintenance={() => setMaintenanceTargetId(m.id)}
+                    onViewIncidents={() => setIncidentsOpen(true)}
+                    downSince={downSinceByMonitor.get(m.id) ?? null}
                     nextPingAt={nextPingByMonitor.get(m.id) ?? null}
                     maintenanceWindow={maintenanceByMonitor.get(m.id) ?? null}
                     canReorder={sortMode === "manual" && manualList.length > 1}
@@ -1116,7 +1132,7 @@ export function DashboardView({
         open={incidentsOpen}
         onOpenChange={(o) => {
           setIncidentsOpen(o);
-          if (!o) void loadIncidentCount();
+          if (!o) void loadIncidents();
         }}
       />
 
@@ -1187,7 +1203,7 @@ export function DashboardView({
                 setFolderDelete({ open: false, folder: null });
                 if (id) void deleteFolder(id);
               }}
-              className="bg-down text-white hover:bg-down/90"
+              className="bg-down text-down-foreground hover:bg-down active:scale-[0.98]"
             >
               Delete folder
             </AlertDialogAction>
