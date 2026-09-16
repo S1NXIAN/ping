@@ -523,7 +523,30 @@ export function DashboardView({
               </kbd>
             </Button>
             {summary && (
-              <div className="hidden items-center gap-1.5 md:flex">
+              <>
+                {/* Fleet health survives the <md header squeeze: the full pills
+                    only fit from md up, so phones get the same truth as one
+                    compact chip (critique 2026-09-16 P2 — "is anything down?"
+                    never required scrolling to the stat quadrants). Numbers
+                    tint only when real — zero stays neutral, the idle rule. */}
+                <div
+                  className="flex h-6 items-center gap-1.5 rounded-none border border-border bg-muted/40 px-2 text-[11px] tabular-nums md:hidden"
+                  aria-label={`${summary.up} up, ${summary.down} down${summary.degraded ? `, ${summary.degraded} slow` : ""}`}
+                >
+                  <span className={summary.up > 0 ? "text-up" : "text-muted-foreground"} aria-hidden="true">
+                    {summary.up}↑
+                  </span>
+                  <span className={summary.down > 0 ? "text-down" : "text-muted-foreground"} aria-hidden="true">
+                    {summary.down}↓
+                  </span>
+                  {summary.degraded > 0 && (
+                    <span className="text-warn" aria-hidden="true">
+                      {summary.degraded}~
+                    </span>
+                  )}
+                </div>
+                {/* Full pills: md and up. */}
+                <div className="hidden items-center gap-1.5 md:flex">
                 {/* Header pills tint only when the count is real (the paused
                     pill's idle pattern): a rose "0 down" was a false alarm —
                     color encodes state, and zero is not a state. */}
@@ -544,7 +567,8 @@ export function DashboardView({
                 {summary.degraded > 0 &&
                   headerPill("slow", summary.degraded, "border-warn/30 bg-warn/10 text-warn")}
                 {summary.paused > 0 && headerPill("paused", summary.paused, "border-border bg-muted text-muted-foreground")}
-              </div>
+                </div>
+              </>
             )}
             <Button
               variant="ghost"
@@ -866,21 +890,23 @@ export function DashboardView({
             </Select>
             </div>
 
-            {/* working tools — 44px touch squares on touch (DESIGN.md: density
-                is visual, not physical); never stretched equal thirds (a
-                stretched icon-only button reads as fat and ambiguous). Labels
-                and natural width return from sm up. */}
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* working tools — self-describing at every width (critique
+                2026-09-16 P2: tooltips don't exist on touch, so meaning can't
+                live in hover-only titles). Phones read 10px labels next to the
+                icons at natural width — never stretched equal thirds — with
+                the 44px touch height kept (DESIGN.md: density is visual, not
+                physical); sm+ restores the incumbent 12px labels. */}
+            <div className="flex flex-wrap items-center gap-1 sm:gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setPingsOpen(true)}
-              className="relative h-11 w-11 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3"
+              className="relative h-11 gap-1 px-1.5 text-[10px] sm:h-9 sm:gap-1.5 sm:px-3 sm:text-xs"
               aria-label={`Scheduled pings${pendingPingCount ? ` (${pendingPingCount} upcoming)` : ""}`}
               title="Scheduled pings — one-off checks at a specific time"
             >
               <CalendarClock className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Scheduled</span>
+              <span>Scheduled</span>
               {pendingPingCount > 0 && (
                 <span
                   className={cn(
@@ -898,7 +924,7 @@ export function DashboardView({
               size="sm"
               onClick={() => setMaintenanceOpen(true)}
               className={cn(
-                "relative h-11 w-11 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3",
+                "relative h-11 gap-1 px-1.5 text-[10px] sm:h-9 sm:gap-1.5 sm:px-3 sm:text-xs",
                 activeMaintenanceCount > 0 &&
                   "border-warn/45 bg-warn/15 text-warn hover:bg-warn/20 hover:text-warn",
               )}
@@ -906,7 +932,7 @@ export function DashboardView({
               title="Maintenance windows — silence alerts during planned work"
             >
               <Wrench className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Maintenance</span>
+              <span>Maintenance</span>
               {activeMaintenanceCount > 0 && (
                 <span
                   className="ml-0.5 grid min-w-4 place-items-center rounded-none bg-warn/20 px-1 text-[10px] font-semibold tabular-nums text-warn"
@@ -921,7 +947,7 @@ export function DashboardView({
               size="sm"
               onClick={() => setIncidentsOpen(true)}
               className={cn(
-                "relative h-11 w-11 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3",
+                "relative h-11 gap-1 px-1.5 text-[10px] sm:h-9 sm:gap-1.5 sm:px-3 sm:text-xs",
                 // Rose state voice (mirrors Maintenance's amber): the /10 wash
                 // is the AA-safe rose recipe (4.63:1; /15 measures 4.35:1).
                 incidentCount > 0 &&
@@ -931,7 +957,7 @@ export function DashboardView({
               title="Incidents — down periods over the last 30 days, with postmortem notes shown on the public status page"
             >
               <AlertTriangle className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Incidents</span>
+              <span>Incidents</span>
               {incidentCount > 0 && (
                 <span
                   className="ml-0.5 grid min-w-4 place-items-center rounded-none border border-down/40 bg-background/50 px-1 text-[10px] font-semibold tabular-nums text-down"

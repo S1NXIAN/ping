@@ -469,7 +469,7 @@ export function MonitorDetailSheet({
                       <td className="px-3 py-1.5 text-right text-foreground/80">
                         {formatMs(c.responseMs)}
                       </td>
-                      <td className="max-w-[140px] truncate px-3 py-1.5 text-muted-foreground">
+                      <td className="max-w-[140px] truncate px-3 py-1.5 text-muted-foreground" title={c.error ?? undefined}>
                         {c.error ?? ""}
                       </td>
                     </tr>

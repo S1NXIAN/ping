@@ -198,6 +198,11 @@ A charcoal drafting-paper scale with no hue tint, one white pencil, and three se
 
 A dense, single-page instrument panel inside a centered 72rem (`max-w-6xl`) column. A sticky 56px header (h-14) carries the wordmark, ⌘K search, live up/down counts, and primary actions; content scrolls under it. On `lg`+ a sticky 14rem (w-56) folder sidebar docks left with its own hairline border; below `lg` it collapses into a horizontal row of folder chips above the stats. Four stat cards sit in a 2-up mobile / 4-up desktop grid, then a search + sort toolbar, then the monitor list. A slim sticky footer ("updated Ns ago") anchors the bottom.
 
+Adaptation rules (2026-09-16 adapt pass):
+- **Fleet health is never width-gated.** Below `md` the full count pills don't fit, so the header shows one compact chip — `1↑ 0↓` (plus `N~` when slow exists), tabular, numbers tinted only when the count is real (the idle rule). "Is anything down?" must be answerable from the header at every width.
+- **Touch reads labels, not tooltips.** Native `title` tooltips don't exist on touch, so anything whose meaning lives only in a hover title is a defect. The Scheduled / Maintenance / Incidents triggers show their text labels at every width — 10px beside the icon on phones (natural width, never stretched equal thirds, 44px touch height kept), 12px from `sm` up.
+- **Diagnosis wraps, it doesn't vanish.** A down card's error text clamps to two lines instead of one truncated hover-only line — the full error must be readable on touch where no tooltip can save it.
+
 Spacing is tight and rhythmic: 2px pill padding, 4–8px internal gaps, 14px/16px card padding, 24px section gaps. Touch targets stay ≥44px even when type is small — density is visual, not physical.
 
 ## Elevation & Depth
@@ -246,7 +251,7 @@ Sharp corners are the system's signature: every radius token is forced to 0px (c
 - **Error:** destructive ring/border treatment (rose at 20–40%).
 
 ### Navigation
-- **Header:** sticky 56px bar, Soot over the grid, hairline bottom edge; wordmark left ("PING." + tagline in Instrument Gray), ⌘K search button, live up/down count pills, ghost icon actions, white primary "New monitor" right.
+- **Header:** sticky 56px bar, Soot over the grid, hairline bottom edge; wordmark left ("PING." + tagline in Instrument Gray), ⌘K search button, live up/down count pills (compact `1↑ 0↓` chip below `md` — see Adaptation rules), ghost icon actions, white primary "New monitor" right.
 - **Folder sidebar** (lg+): 14rem sticky dock, hairline right border, rows with Accent Charcoal hover, 10px uppercase "MONITORS" section label; collapses to horizontal chips below `lg`.
 - **Footer:** slim, sticky when content is short — "honest uptime monitoring" left, refresh time right.
 

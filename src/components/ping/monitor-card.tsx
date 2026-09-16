@@ -517,7 +517,10 @@ export function MonitorCard({
             </div>
 
             {monitor.lastError && status === "down" && (
-              <p className="mt-1.5 truncate text-[11px] text-down/90" title={monitor.lastError}>
+              // Wraps to two lines: on touch there is no hover title, so the
+              // card itself must carry the diagnosis (the sheet's check table
+              // holds the full history). break-words guards URL-length tokens.
+              <p className="mt-1.5 line-clamp-2 break-words text-[11px] text-down/90" title={monitor.lastError}>
                 {monitor.lastError}
               </p>
             )}
