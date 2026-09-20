@@ -247,7 +247,7 @@ export function SchedulePingDialog({
                         onClick={() => void cancelPing(p.id)}
                         disabled={cancellingId === p.id}
                         aria-label="Cancel this scheduled ping"
-                        className="rounded p-1 text-muted-foreground hover:bg-down/10 hover:text-down disabled:opacity-50"
+                        className="rounded-none p-1 text-muted-foreground hover:bg-down/10 hover:text-down disabled:opacity-50"
                       >
                         {cancellingId === p.id ? (
                           <Loader2 className="size-3.5 animate-spin" />

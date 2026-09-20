@@ -64,10 +64,7 @@ export function LoginView({
       <div className="ping-fade-up relative z-10 w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <PingLogo className="size-14 ping-breathe" />
-          <div className="flex items-baseline gap-1.5">
-            <PingWordmark className="text-2xl" />
-            <span className="text-sm text-muted-foreground">for Render Free</span>
-          </div>
+          <PingWordmark className="text-2xl" />
           <p className="max-w-[280px] text-sm leading-relaxed text-muted-foreground">
             Lightweight, honest uptime monitoring. Real HTTP checks — no invented
             statistics, no uptime guarantees.

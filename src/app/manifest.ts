@@ -8,7 +8,7 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "PING — Uptime for Render Free",
+    name: "PING — honest uptime monitoring",
     short_name: "PING",
     description:
       "A lightweight, honest uptime monitor. Real HTTP checks, real history, keeps Render Free services awake.",

@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   Activity,
   AlertTriangle,
   ArrowDownAZ,
-  ArrowUpAZ,
   CalendarClock,
   FolderPlus,
   Folder,
@@ -23,7 +22,6 @@ import {
   Wrench,
   X,
   XCircle,
-  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,10 +39,25 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useOverview } from "@/hooks/use-overview";
-import { api, ApiError, formatUptime, timeAgo } from "@/lib/ping-client";
-import type { FolderDTO, MaintenanceWindowDTO, MonitorDTO } from "@/lib/ping-types";
+import { api, ApiError, formatUptime, timeAgo, uptimeTone } from "@/lib/ping-client";
+import type {
+  AdminIncidentDTO,
+  FolderDTO,
+  MaintenanceWindowDTO,
+  MonitorDTO,
+} from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
 import { MonitorCard, type CardDnd } from "./monitor-card";
@@ -59,7 +72,7 @@ import { TextPromptDialog } from "./text-prompt-dialog";
 import { StatCard } from "./stat-card";
 import { CommandPalette } from "./command-palette";
 
-export type SortMode = "manual" | "az" | "za" | "status" | "slowest" | "fastest";
+export type SortMode = "manual" | "az" | "status" | "slowest";
 const SORT_STORAGE_KEY = "ping.sort";
 
 export function DashboardView({
@@ -88,20 +101,19 @@ export function DashboardView({
     mode: "create" | "rename";
     folder?: FolderDTO;
   }>({ open: false, mode: "create" });
+  const [folderDelete, setFolderDelete] = useState<{ open: boolean; folder: FolderDTO | null }>({
+    open: false,
+    folder: null,
+  });
 
   // sort — persisted per device
   const [sortMode, setSortMode] = useState<SortMode>("manual");
   useEffect(() => {
     try {
       const v = localStorage.getItem(SORT_STORAGE_KEY);
-      if (
-        v === "manual" ||
-        v === "az" ||
-        v === "za" ||
-        v === "status" ||
-        v === "slowest" ||
-        v === "fastest"
-      )
+      // "za"/"fastest" were distilled away — stale stored values fall
+      // through to the manual default
+      if (v === "manual" || v === "az" || v === "status" || v === "slowest")
         setSortMode(v);
     } catch {
       /* private browsing etc. */
@@ -155,11 +167,42 @@ export function DashboardView({
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [maintenanceTargetId, setMaintenanceTargetId] = useState<string | null>(null);
 
-  // incidents — postmortem-note sheet
+  // incidents — postmortem-note sheet, plus the 30d list that drives both
+  // the toolbar's rose state and the cards' outage rows (same endpoint the
+  // sheet renders; refreshed on mount and on sheet close so the badge never
+  // outlives its data)
+  const [incidents, setIncidents] = useState<AdminIncidentDTO[] | null>(null);
+  const loadIncidents = useCallback(async () => {
+    try {
+      const r = await api<{ incidents: AdminIncidentDTO[] }>("/api/incidents");
+      setIncidents(r.incidents);
+    } catch {
+      // The sheet surfaces its own errors; the badge keeps the last list.
+    }
+  }, []);
+  useEffect(() => {
+    void loadIncidents();
+  }, [loadIncidents]);
+  const incidentCount = incidents?.length ?? 0;
+
+  // Down cards' honest "down since": the ONGOING incident's real first
+  // failed check (endedAt == null). No incident known → no claim, never a
+  // guess; the label simply stays hidden.
+  const downSinceByMonitor = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const inc of incidents ?? []) {
+      if (inc.endedAt == null) map.set(inc.monitorId, inc.startedAt);
+    }
+    return map;
+  }, [incidents]);
+
   const [incidentsOpen, setIncidentsOpen] = useState(false);
 
   // ⌘K / Ctrl+K command palette
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // Palette-initiated delete — confirmed here with the same consequence copy
+  // as the card's dialog (the palette itself can't host a confirm step).
+  const [paletteDelete, setPaletteDelete] = useState<{ id: string; name: string } | null>(null);
 
   // drag-and-drop reorder (manual sort only)
   const [dragId, setDragId] = useState<string | null>(null);
@@ -178,6 +221,40 @@ export function DashboardView({
   const worst24h = uptimes24h.length ? Math.min(...uptimes24h) : null;
 
   const detailMonitor = detailId ? (monitors.find((m) => m.id === detailId) ?? null) : null;
+
+  // Palette monitor ops (distill pass): pause/pin run directly; the palette
+  // is the keyboard path to the same API the card ⋮ uses.
+  const paletteMonitorPatch = useCallback(
+    async (id: string, data: Record<string, unknown>, success: string) => {
+      try {
+        await api(`/api/monitors/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+        toast({ description: success });
+      } catch (e) {
+        toast({
+          description: e instanceof Error ? e.message : "Could not update the monitor",
+          variant: "destructive",
+        });
+      }
+      refresh(true);
+    },
+    [refresh, toast],
+  );
+
+  const paletteMonitorDelete = useCallback(async () => {
+    if (!paletteDelete) return;
+    const { id } = paletteDelete;
+    setPaletteDelete(null);
+    try {
+      await api(`/api/monitors/${id}`, { method: "DELETE" });
+      toast({ description: "Monitor deleted" });
+    } catch (e) {
+      toast({
+        description: e instanceof Error ? e.message : "Could not delete the monitor",
+        variant: "destructive",
+      });
+    }
+    refresh(true);
+  }, [paletteDelete, refresh, toast]);
   const scheduleMonitor = scheduleTargetId
     ? (monitors.find((m) => m.id === scheduleTargetId) ?? null)
     : null;
@@ -212,29 +289,26 @@ export function DashboardView({
       );
     }
 
-    if (sortMode === "az" || sortMode === "za") {
-      const dir = sortMode === "az" ? 1 : -1;
+    if (sortMode === "az") {
       const sorted = [...list].sort(
         (a, b) =>
-          dir *
-            a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }) ||
+          a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }) ||
           a.position - b.position,
       );
       // pinned monitors always float to the top, even when browsing alphabetically
       return [...sorted.filter((m) => m.pinned), ...sorted.filter((m) => !m.pinned)];
     }
 
-    if (sortMode === "slowest" || sortMode === "fastest") {
-      // by real average response time (24h) — monitors with no up checks
-      // (paused/pending/all-failed) always sink to the bottom, honestly.
-      const dir = sortMode === "slowest" ? -1 : 1;
+    if (sortMode === "slowest") {
+      // by real average response time (24h), slowest first — monitors with no
+      // up checks (paused/pending/all-failed) always sink to the bottom, honestly.
       const sorted = [...list].sort((a, b) => {
         const av = a.stats.avgMs24h;
         const bv = b.stats.avgMs24h;
         if (av == null && bv == null) return a.position - b.position;
         if (av == null) return 1;
         if (bv == null) return -1;
-        return dir * (av - bv) || a.position - b.position;
+        return bv - av || a.position - b.position;
       });
       return [...sorted.filter((m) => m.pinned), ...sorted.filter((m) => !m.pinned)];
     }
@@ -465,7 +539,7 @@ export function DashboardView({
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 2xl:max-w-7xl">
           <PingLogo className="size-7" />
           <PingWordmark className="text-base" />
-          <span className="hidden text-xs text-muted-foreground sm:inline">uptime for Render Free</span>
+          <span className="hidden text-xs text-muted-foreground sm:inline">honest uptime monitoring</span>
 
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
             <Button
@@ -474,25 +548,64 @@ export function DashboardView({
               onClick={() => setPaletteOpen(true)}
               aria-label="Open command palette"
               title="Command palette — jump to any monitor or action (Ctrl/⌘+K)"
-              className="h-9 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground md:px-3"
+              className="h-11 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground sm:h-9 md:px-3"
             >
               <Search className="size-3.5 shrink-0" aria-hidden="true" />
               <span className="hidden md:inline">Search…</span>
               <kbd
-                className="pointer-events-none hidden rounded border border-border/70 bg-muted/60 px-1.5 py-px text-[10px] font-medium text-muted-foreground md:inline"
+                className="pointer-events-none hidden rounded-none border border-border/70 bg-muted/60 px-1.5 py-px text-[10px] font-medium text-muted-foreground md:inline"
                 aria-hidden="true"
               >
                 ⌘K
               </kbd>
             </Button>
             {summary && (
-              <div className="hidden items-center gap-1.5 md:flex">
-                {headerPill("up", summary.up, "border-up/25 bg-up/10 text-up")}
-                {headerPill("down", summary.down, "border-down/25 bg-down/10 text-down")}
+              <>
+                {/* Fleet health survives the <md header squeeze: the full pills
+                    only fit from md up, so phones get the same truth as one
+                    compact chip (critique 2026-09-16 P2 — "is anything down?"
+                    never required scrolling to the stat quadrants). Numbers
+                    tint only when real — zero stays neutral, the idle rule. */}
+                <div
+                  className="flex h-6 items-center gap-1.5 rounded-none border border-border bg-muted/40 px-2 text-[11px] tabular-nums md:hidden"
+                  aria-label={`${summary.up} up, ${summary.down} down${summary.degraded ? `, ${summary.degraded} slow` : ""}`}
+                >
+                  <span className={summary.up > 0 ? "text-up" : "text-muted-foreground"} aria-hidden="true">
+                    {summary.up}↑
+                  </span>
+                  <span className={summary.down > 0 ? "text-down" : "text-muted-foreground"} aria-hidden="true">
+                    {summary.down}↓
+                  </span>
+                  {summary.degraded > 0 && (
+                    <span className="text-warn" aria-hidden="true">
+                      {summary.degraded}~
+                    </span>
+                  )}
+                </div>
+                {/* Full pills: md and up. */}
+                <div className="hidden items-center gap-1.5 md:flex">
+                {/* Header pills tint only when the count is real (the paused
+                    pill's idle pattern): a rose "0 down" was a false alarm —
+                    color encodes state, and zero is not a state. */}
+                {headerPill(
+                  "up",
+                  summary.up,
+                  summary.up > 0
+                    ? "border-up/25 bg-up/10 text-up"
+                    : "border-border bg-muted text-muted-foreground",
+                )}
+                {headerPill(
+                  "down",
+                  summary.down,
+                  summary.down > 0
+                    ? "border-down/25 bg-down/10 text-down"
+                    : "border-border bg-muted text-muted-foreground",
+                )}
                 {summary.degraded > 0 &&
                   headerPill("slow", summary.degraded, "border-warn/30 bg-warn/10 text-warn")}
                 {summary.paused > 0 && headerPill("paused", summary.paused, "border-border bg-muted text-muted-foreground")}
-              </div>
+                </div>
+              </>
             )}
             <Button
               variant="ghost"
@@ -501,13 +614,13 @@ export function DashboardView({
               disabled={refreshing}
               aria-label="Refresh"
               title="Refresh now"
-              className="text-muted-foreground hover:text-teal"
+              className="size-11 text-muted-foreground hover:text-teal sm:size-9"
             >
               <RefreshCw className={cn("size-4", refreshing && "animate-spin")} />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Menu" className="text-muted-foreground hover:text-foreground">
+                <Button variant="ghost" size="icon" aria-label="Menu" className="size-11 text-muted-foreground hover:text-foreground sm:size-9">
                   <span className="relative">
                     <Settings className="size-4" aria-hidden="true" />
                     {adminUnlocked && (
@@ -549,8 +662,8 @@ export function DashboardView({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            {/* documented primary: 36px (h-9) — size="sm" measured 32px (critique 2026-09-16 P3) */}
             <Button
-              size="sm"
               onClick={() => setAddOpen(true)}
               className="hidden bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/25 transition-transform hover:bg-primary/90 active:scale-[0.98] sm:inline-flex"
             >
@@ -606,7 +719,7 @@ export function DashboardView({
                   <DropdownMenuTrigger asChild>
                     <button
                       aria-label={`Folder actions for ${f.name}`}
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-none p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Settings className="size-3.5" />
@@ -618,7 +731,10 @@ export function DashboardView({
                     >
                       Rename folder
                     </DropdownMenuItem>
-                    <DropdownMenuItem variant="destructive" onClick={() => deleteFolder(f.id)}>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => setFolderDelete({ open: true, folder: f })}
+                    >
                       Delete folder
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -647,7 +763,7 @@ export function DashboardView({
             <button
               onClick={() => setActiveFolder("all")}
               className={cn(
-                "shrink-0 rounded-none border px-3 py-1.5 text-xs font-medium transition-colors",
+                "inline-flex min-h-11 shrink-0 items-center rounded-none border px-3 py-1.5 text-xs font-medium transition-colors",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                 activeFolder === "all"
                   ? "border-primary/40 bg-primary/15 text-foreground"
@@ -663,7 +779,7 @@ export function DashboardView({
                   key={f.id}
                   onClick={() => setActiveFolder(f.id)}
                   className={cn(
-                    "flex shrink-0 items-center gap-1.5 rounded-none border px-3 py-1.5 text-xs font-medium transition-colors",
+                    "flex min-h-11 shrink-0 items-center gap-1.5 rounded-none border px-3 py-1.5 text-xs font-medium transition-colors",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                     activeFolder === f.id
                       ? "border-primary/40 bg-primary/15 text-foreground"
@@ -677,7 +793,7 @@ export function DashboardView({
             })}
             <button
               onClick={() => setFolderDialog({ open: true, mode: "create" })}
-              className="flex shrink-0 items-center gap-1 rounded-none border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+              className="flex min-h-11 shrink-0 items-center gap-1 rounded-none border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
               aria-label="New folder"
             >
               <FolderPlus className="size-3" /> New
@@ -688,7 +804,7 @@ export function DashboardView({
               (structure is drawn with 1px hairlines, not four floating fat
               cards); ≥sm restores the incumbent four-card row. One generous
               break below separates overview from the working group. */}
-          <div className="mb-7 grid grid-cols-2 gap-px border bg-border sm:grid-cols-4 sm:gap-2.5 sm:border-0 sm:bg-transparent">
+          <div className="mb-6 grid grid-cols-2 gap-px border bg-border sm:grid-cols-4 sm:gap-2 sm:border-0 sm:bg-transparent">
             <StatCard
               label="Monitors"
               value={summary ? `${summary.up}/${summary.monitors}` : "—"}
@@ -716,7 +832,10 @@ export function DashboardView({
               value={formatUptime(summary?.avgUptime24h ?? null)}
               sub={worst24h != null ? `worst ${formatUptime(worst24h)}` : undefined}
               icon={Gauge}
-              tone={summary?.avgUptime24h != null && summary.avgUptime24h < 1 ? "warn" : "default"}
+              // Shared band ink (uptimeTone): displays-as-100% -> emerald,
+              // 90–99.99% amber, <90% rose. Before, a perfect fleet shared
+              // the neutral ink of "no data" — the up state was invisible.
+              tone={uptimeTone(summary?.avgUptime24h) ?? "default"}
             />
             <StatCard
               label="Checks 24h"
@@ -728,7 +847,7 @@ export function DashboardView({
             <StatCard
               label="Failures 24h"
               value={summary ? summary.monitorsWithFailures24h : "—"}
-              sub="monitors affected"
+              sub="monitors with failures"
               icon={XCircle}
               tone={summary && summary.monitorsWithFailures24h > 0 ? "down" : "up"}
             />
@@ -749,13 +868,13 @@ export function DashboardView({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search…"
                 title="Search by name, URL, folder, or account — press / to focus"
-                className="h-9 border-border bg-muted/30 pl-9 focus-visible:border-primary/40 focus-visible:ring-primary/20"
+                className="h-11 border-border bg-muted/30 pl-9 focus-visible:border-primary/40 focus-visible:ring-primary/20 sm:h-9"
                 aria-label="Search monitors"
                 aria-keyshortcuts="/"
               />
               {!query && (
                 <kbd
-                  className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-border/70 bg-muted/60 px-1.5 py-px text-[10px] font-medium text-muted-foreground sm:block"
+                  className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded-none border border-border/70 bg-muted/60 px-1.5 py-px text-[10px] font-medium text-muted-foreground sm:block"
                   aria-hidden="true"
                 >
                   /
@@ -764,7 +883,7 @@ export function DashboardView({
               {query && (
                 <button
                   onClick={() => setQuery("")}
-                  className="absolute right-2.5 top-1/2 -m-2.5 -translate-y-1/2 p-2.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                  className="absolute right-2.5 top-1/2 -m-3.5 -translate-y-1/2 p-3.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                   aria-label="Clear search"
                 >
                   <X className="size-4" />
@@ -773,10 +892,13 @@ export function DashboardView({
             </div>
 
             <Select value={sortMode} onValueChange={changeSort}>
+              {/* data-[size] variant: SelectTrigger's own h-9/h-8 use
+                  attribute-scoped selectors that out-specify bare h-11 —
+                  mirror the pattern or the 44px touch height never applies */}
               <SelectTrigger
                 aria-label="Sort monitors"
                 title="How the monitor list is ordered — manual drag order, alphabetical, status, or response time"
-                className="h-10 w-[124px] shrink-0 text-xs sm:h-9"
+                className="w-[124px] shrink-0 text-xs data-[size=default]:h-11 sm:data-[size=default]:h-9"
               >
                 <SelectValue />
               </SelectTrigger>
@@ -791,11 +913,6 @@ export function DashboardView({
                     <ArrowDownAZ className="size-3.5" aria-hidden="true" /> A–Z
                   </span>
                 </SelectItem>
-                <SelectItem value="za">
-                  <span className="flex items-center gap-2">
-                    <ArrowUpAZ className="size-3.5" aria-hidden="true" /> Z–A
-                  </span>
-                </SelectItem>
                 <SelectItem value="status">
                   <span className="flex items-center gap-2">
                     <Activity className="size-3.5" aria-hidden="true" /> Status
@@ -806,29 +923,27 @@ export function DashboardView({
                     <Gauge className="size-3.5" aria-hidden="true" /> Slowest
                   </span>
                 </SelectItem>
-                <SelectItem value="fastest">
-                  <span className="flex items-center gap-2">
-                    <Zap className="size-3.5" aria-hidden="true" /> Fastest
-                  </span>
-                </SelectItem>
               </SelectContent>
             </Select>
             </div>
 
-            {/* working tools — tight 40px icon group on touch; never stretched
-                equal thirds (a stretched icon-only button reads as fat and
-                ambiguous). Labels and natural width return from sm up. */}
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* working tools — self-describing at every width (critique
+                2026-09-16 P2: tooltips don't exist on touch, so meaning can't
+                live in hover-only titles). Phones read 10px labels next to the
+                icons at natural width — never stretched equal thirds — with
+                the 44px touch height kept (DESIGN.md: density is visual, not
+                physical); sm+ restores the incumbent 12px labels. */}
+            <div className="flex flex-wrap items-center gap-1 sm:gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setPingsOpen(true)}
-              className="relative h-10 w-10 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3"
+              className="relative h-11 gap-1 px-1.5 text-[10px] sm:h-9 sm:gap-1.5 sm:px-3 sm:text-xs"
               aria-label={`Scheduled pings${pendingPingCount ? ` (${pendingPingCount} upcoming)` : ""}`}
               title="Scheduled pings — one-off checks at a specific time"
             >
               <CalendarClock className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Scheduled</span>
+              <span>Scheduled</span>
               {pendingPingCount > 0 && (
                 <span
                   className={cn(
@@ -846,7 +961,7 @@ export function DashboardView({
               size="sm"
               onClick={() => setMaintenanceOpen(true)}
               className={cn(
-                "relative h-10 w-10 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3",
+                "relative h-11 gap-1 px-1.5 text-[10px] sm:h-9 sm:gap-1.5 sm:px-3 sm:text-xs",
                 activeMaintenanceCount > 0 &&
                   "border-warn/45 bg-warn/15 text-warn hover:bg-warn/20 hover:text-warn",
               )}
@@ -854,7 +969,7 @@ export function DashboardView({
               title="Maintenance windows — silence alerts during planned work"
             >
               <Wrench className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Maintenance</span>
+              <span>Maintenance</span>
               {activeMaintenanceCount > 0 && (
                 <span
                   className="ml-0.5 grid min-w-4 place-items-center rounded-none bg-warn/20 px-1 text-[10px] font-semibold tabular-nums text-warn"
@@ -868,12 +983,25 @@ export function DashboardView({
               variant="outline"
               size="sm"
               onClick={() => setIncidentsOpen(true)}
-              className="relative h-10 w-10 justify-center p-0 text-xs sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3"
-              aria-label="Incidents and postmortem notes"
+              className={cn(
+                "relative h-11 gap-1 px-1.5 text-[10px] sm:h-9 sm:gap-1.5 sm:px-3 sm:text-xs",
+                // Rose state voice (mirrors Maintenance's amber): the /10 wash
+                // is the AA-safe rose recipe (4.63:1; /15 measures 4.35:1).
+                incidentCount > 0 &&
+                  "border-down/40 bg-down/10 text-down hover:bg-down/10 hover:text-down",
+              )}
+              aria-label={`Incidents and postmortem notes${incidentCount > 0 ? ` (${incidentCount} in the last 30 days)` : ""}`}
               title="Incidents — down periods over the last 30 days, with postmortem notes shown on the public status page"
             >
               <AlertTriangle className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Incidents</span>
+              <span>Incidents</span>
+              {incidentCount > 0 && (
+                <span
+                  className="ml-0.5 grid min-w-4 place-items-center rounded-none border border-down/40 bg-background/50 px-1 text-[10px] font-semibold tabular-nums text-down"
+                >
+                  {incidentCount}
+                </span>
+              )}
             </Button>
             </div>
           </div>
@@ -895,7 +1023,7 @@ export function DashboardView({
               <button
                 onClick={() => refresh()}
                 disabled={refreshing}
-                className="shrink-0 border border-down/40 px-2.5 py-1 text-xs font-medium transition-colors hover:bg-down/15 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                className="inline-flex min-h-11 shrink-0 items-center border border-down/40 px-3 text-xs font-medium transition-colors hover:bg-down/15 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
               >
                 {refreshing ? "Checking…" : "Try again"}
               </button>
@@ -956,6 +1084,8 @@ export function DashboardView({
                     onCheckNow={() => refresh(true)}
                     onSchedulePing={() => setScheduleTargetId(m.id)}
                     onScheduleMaintenance={() => setMaintenanceTargetId(m.id)}
+                    onViewIncidents={() => setIncidentsOpen(true)}
+                    downSince={downSinceByMonitor.get(m.id) ?? null}
                     nextPingAt={nextPingByMonitor.get(m.id) ?? null}
                     maintenanceWindow={maintenanceByMonitor.get(m.id) ?? null}
                     canReorder={sortMode === "manual" && manualList.length > 1}
@@ -987,7 +1117,7 @@ export function DashboardView({
       <footer className="sticky bottom-0 z-30 mt-auto border-t bg-background/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] text-[11px] text-foreground/65 2xl:max-w-7xl">
           <span className="font-medium tracking-wide text-foreground/90">PING</span>
-          <span>honest uptime for Render Free</span>
+          <span>honest uptime monitoring</span>
           <span className="ml-auto flex items-center gap-3">
             <span>not affiliated with render.com</span>
             <span className="tabular-nums text-foreground/75">
@@ -1061,7 +1191,13 @@ export function DashboardView({
         serverTime={data?.serverTime ?? null}
       />
 
-      <IncidentsSheet open={incidentsOpen} onOpenChange={setIncidentsOpen} />
+      <IncidentsSheet
+        open={incidentsOpen}
+        onOpenChange={(o) => {
+          setIncidentsOpen(o);
+          if (!o) void loadIncidents();
+        }}
+      />
 
       <CommandPalette
         open={paletteOpen}
@@ -1081,7 +1217,33 @@ export function DashboardView({
         onSelectMonitor={(id) => setDetailId(id)}
         onSelectFolder={(id) => setActiveFolder(id)}
         onChangeSort={changeSort}
+        onMonitorPatch={paletteMonitorPatch}
+        onDeleteRequest={(id, name) => setPaletteDelete({ id, name })}
       />
+
+      <AlertDialog
+        open={!!paletteDelete}
+        onOpenChange={(o) => !o && setPaletteDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{paletteDelete?.name}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The monitor and its entire recorded check history will be removed.
+              This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-down text-down-foreground hover:bg-down active:scale-[0.98]"
+              onClick={paletteMonitorDelete}
+            >
+              Delete monitor
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <TextPromptDialog
         open={folderDialog.open}
@@ -1099,6 +1261,44 @@ export function DashboardView({
         submitLabel={folderDialog.mode === "create" ? "Create" : "Rename"}
         onSubmit={folderDialog.mode === "create" ? createFolder : renameFolder}
       />
+
+      {/* Deleting a folder is destructive (the group itself is gone for good),
+          so it gets the same guard as monitor deletion — with an honest count
+          of what happens to the monitors inside: they survive, ungrouped. */}
+      <AlertDialog
+        open={folderDelete.open}
+        onOpenChange={(o) => setFolderDelete((s) => ({ ...s, open: o }))}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{folderDelete.folder?.name}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const n =
+                  data?.monitors.filter((m) => m.folderId === folderDelete.folder?.id).length ?? 0;
+                if (n === 0)
+                  return "The folder is empty — nothing else is affected. This cannot be undone.";
+                if (n === 1)
+                  return "The folder will be removed. Its 1 monitor stays — it moves back to the top level. This cannot be undone.";
+                return `The folder will be removed. Its ${n} monitors stay — they move back to the top level. This cannot be undone.`;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const id = folderDelete.folder?.id;
+                setFolderDelete({ open: false, folder: null });
+                if (id) void deleteFolder(id);
+              }}
+              className="bg-down text-down-foreground hover:bg-down active:scale-[0.98]"
+            >
+              Delete folder
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

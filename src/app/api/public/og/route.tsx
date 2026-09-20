@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
   const host = (req.headers.get("host") ?? "").replace(/:\d+$/, "").slice(0, 40);
 
   // ---- gather live status data (valid token only) ----
-  let headline = "Uptime for Render Free";
+  let headline = "honest uptime monitoring";
   let headlineColor = COLORS.fg;
   let kicker = "PING · UPTIME MONITOR";
   let meta = "Real HTTP checks · honest history · runs free on Render";

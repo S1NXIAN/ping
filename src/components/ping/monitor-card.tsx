@@ -5,7 +5,6 @@ import {
   Activity,
   ArrowDown,
   ArrowUp,
-  ChevronRight,
   Clock,
   ExternalLink,
   Eye,
@@ -54,6 +53,7 @@ import {
   api,
   ApiError,
   formatCountdown,
+  formatDateTime,
   formatInterval,
   formatMs,
   formatUptime,
@@ -63,7 +63,20 @@ import {
 import type { FolderDTO, MaintenanceWindowDTO, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { StatusDot, statusLabel } from "./status-dot";
+import { TextPromptDialog } from "./text-prompt-dialog";
 import { checksToSegments, UptimeBars } from "./uptime-bars";
+
+/** Duration since an outage began, from its real first failed check:
+ *  "12m" / "3h 05m" / "1d 4h" / "<1m". */
+function formatDownFor(startedAt: string): string {
+  const s = Math.max(0, (Date.now() - new Date(startedAt).getTime()) / 1000);
+  const m = Math.floor(s / 60);
+  if (m < 1) return "<1m";
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ${String(m % 60).padStart(2, "0")}m`;
+  return `${Math.floor(h / 24)}d ${h % 24}h`;
+}
 
 /** Time left in an active maintenance window: "12m left" / "1h 05m left". */
 function formatMaintenanceLeft(endsAt: string): string {
@@ -93,6 +106,10 @@ export function MonitorCard({
   onCheckNow,
   onSchedulePing,
   onScheduleMaintenance,
+  onViewIncidents,
+  /** Start of the monitor's ONGOING incident (its real first failed check),
+   *  or null when none is known — null never becomes a guess. */
+  downSince,
   nextPingAt,
   maintenanceWindow,
   canReorder,
@@ -103,6 +120,8 @@ export function MonitorCard({
 }: {
   monitor: MonitorDTO;
   folders: FolderDTO[];
+  onViewIncidents: () => void;
+  downSince: string | null;
   onOpen: () => void;
   onRenamed: (name: string) => void;
   onEdited: () => void;
@@ -122,6 +141,7 @@ export function MonitorCard({
   const { toast } = useToast();
   const [checking, setChecking] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [dragArmed, setDragArmed] = useState(false);
 
@@ -210,11 +230,16 @@ export function MonitorCard({
     await patch({ folderId }, folderId ? "Moved" : "Removed from folder", "move");
   }
 
-  async function rename() {
-    const name = window.prompt("Rename monitor", monitor.name);
-    if (!name || name.trim() === monitor.name) return;
-    await patch({ name: name.trim() }, "Monitor renamed", "rename");
-    onRenamed(name.trim());
+  // Rename via the shared TextPromptDialog — the same instrument as folder
+  // rename, not window.prompt (a native dialog outside the design system, no
+  // inline errors, no busy state). The dialog already trims and blocks empty
+  // values; an unchanged name closes silently (no fake success toast).
+  async function renameMonitor(name: string) {
+    if (name === monitor.name) return;
+    await api(`/api/monitors/${monitor.id}`, { method: "PATCH", body: JSON.stringify({ name }) });
+    toast({ description: "Monitor renamed" });
+    onRenamed(name);
+    onEdited();
   }
 
   async function deleteMonitor() {
@@ -311,7 +336,7 @@ export function MonitorCard({
               onBlur={() => setDragArmed(false)}
               draggable={false}
               className={cn(
-                "mt-1 hidden size-6 shrink-0 cursor-grab touch-none place-items-center rounded text-muted-foreground/50 transition-colors active:cursor-grabbing sm:grid",
+                "mt-1 hidden size-6 shrink-0 cursor-grab touch-none place-items-center rounded-none text-muted-foreground/50 transition-colors active:cursor-grabbing sm:grid",
                 "hover:text-foreground focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                 dragArmed && "text-foreground",
               )}
@@ -435,9 +460,6 @@ export function MonitorCard({
                   {monitor.folderName}
                 </span>
               )}
-              <span className="rounded-none border border-border bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                every {formatInterval(monitor.intervalSec)}
-              </span>
               {nextPingAt && (
                 <span
                   className="inline-flex items-center gap-1 rounded-none border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] text-primary/90"
@@ -465,6 +487,7 @@ export function MonitorCard({
                 Last updated{" "}
                 <span className="text-foreground/95">{timeAgo(monitor.lastCheckAt)}</span>
               </span>
+              <span>every {formatInterval(monitor.intervalSec)}</span>
               {monitor.lastResponseMs != null && (
                 <span
                   className={cn(
@@ -494,9 +517,61 @@ export function MonitorCard({
             </div>
 
             {monitor.lastError && status === "down" && (
-              <p className="mt-1.5 truncate text-[11px] text-down/90" title={monitor.lastError}>
+              // Wraps to two lines: on touch there is no hover title, so the
+              // card itself must carry the diagnosis (the sheet's check table
+              // holds the full history). break-words guards URL-length tokens.
+              <p className="mt-1.5 line-clamp-2 break-words text-[11px] text-down/90" title={monitor.lastError}>
                 {monitor.lastError}
               </p>
+            )}
+
+            {/* The outage moment, answered on the card: how long (the ongoing
+                incident's real first failed check — never an estimate) and
+                what to do next. Silence opens the maintenance dialog
+                pre-filled to now; View incident opens the incidents timeline.
+                Hidden under an active maintenance window — silence is
+                meaningless while alerts are already quiet. */}
+            {status === "down" && !maintenanceNow && (
+              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-down/90">
+                {downSince && (
+                  <span
+                    className="inline-flex items-center gap-1 py-2 font-medium text-down tabular-nums"
+                    title={`Down since ${formatDateTime(downSince)} — stitched from real failed checks`}
+                  >
+                    down {formatDownFor(downSince)}
+                  </span>
+                )}
+                {downSince && (
+                  <span className="text-down/40" aria-hidden="true">·</span>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onScheduleMaintenance();
+                  }}
+                  title="Schedule a maintenance window — checks keep running and stay recorded, alerts go quiet"
+                  className="-my-2 inline-flex min-h-11 items-center rounded-none px-0.5 font-medium underline-offset-2 transition-colors hover:text-down hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                >
+                  Silence alerts…
+                </button>
+                {downSince && (
+                  <>
+                    <span className="text-down/40" aria-hidden="true">·</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewIncidents();
+                      }}
+                      title="Open the incidents timeline — down periods stitched from real checks"
+                      className="-my-2 inline-flex min-h-11 items-center rounded-none px-0.5 font-medium underline-offset-2 transition-colors hover:text-down hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                    >
+                      View incident
+                    </button>
+                  </>
+                )}
+              </div>
             )}
             </div>
           </div>
@@ -525,7 +600,7 @@ export function MonitorCard({
                 aria-label={monitor.pinned ? "Unpin monitor" : "Pin to top"}
                 title={monitor.pinned ? "Unpin" : "Pin to top"}
                 className={cn(
-                  "ml-auto h-10 w-10 hover:bg-secondary sm:ml-0 sm:h-8 sm:w-8",
+                  "ml-auto h-11 w-11 hover:bg-secondary sm:ml-0 sm:h-8 sm:w-8",
                   monitor.pinned
                     ? "text-primary hover:text-primary"
                     : "text-muted-foreground/60 hover:text-primary",
@@ -544,7 +619,7 @@ export function MonitorCard({
                 disabled={checking}
                 aria-label="Check now"
                 title="Check now"
-                className="h-10 w-10 text-muted-foreground hover:bg-secondary hover:text-teal sm:h-8 sm:w-8"
+                className="h-11 w-11 text-muted-foreground hover:bg-secondary hover:text-teal sm:h-8 sm:w-8"
               >
                 {checking ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -559,23 +634,18 @@ export function MonitorCard({
                     size="icon"
                     onClick={(e) => e.stopPropagation()}
                     aria-label="Monitor actions"
-                    className="h-10 w-10 text-muted-foreground hover:bg-secondary hover:text-foreground sm:h-8 sm:w-8"
+                    className="h-11 w-11 text-muted-foreground hover:bg-secondary hover:text-foreground sm:h-8 sm:w-8"
                   >
                     <MoreVertical className="size-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                  <DropdownMenuItem onClick={() => setTimeout(() => void rename(), 0)}>
+                  {/* Four chunks, not ten flat decisions: the monitor's own
+                      controls, then labeled Schedule and Reorder groups, then
+                      the destructive outlier. "Stats & history" is not here —
+                      the card itself opens it, one click away. */}
+                  <DropdownMenuItem onClick={() => setRenameOpen(true)}>
                     <Pencil className="size-4" /> Rename
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onOpen}>
-                    Stats &amp; history <ChevronRight className="size-4" />
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onSchedulePing}>
-                    <Clock className="size-4" /> Schedule ping…
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onScheduleMaintenance}>
-                    <Wrench className="size-4" /> Schedule maintenance…
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled={busyAction === "pause"}
@@ -625,6 +695,17 @@ export function MonitorCard({
                     {monitor.statusHidden ? "Show on status page" : "Hide from status page"}
                   </DropdownMenuItem>
 
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+                    Schedule
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem onClick={onSchedulePing}>
+                    <Clock className="size-4" /> Schedule ping…
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onScheduleMaintenance}>
+                    <Wrench className="size-4" /> Schedule maintenance…
+                  </DropdownMenuItem>
+
                   {canReorder && (
                     <>
                       <DropdownMenuSeparator />
@@ -641,11 +722,17 @@ export function MonitorCard({
                   )}
 
                   <DropdownMenuSeparator />
+                  {/* The destructive outlier gets its own labeled chunk, the
+                      same chunking language as Schedule and Reorder — danger
+                      is a decision, not an afterthought. */}
+                  <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+                    Danger
+                  </DropdownMenuLabel>
                   <DropdownMenuItem
                     variant="destructive"
                     onClick={() => setConfirmDelete(true)}
                   >
-                    <Trash2 className="size-4" /> Delete
+                    <Trash2 className="size-4" /> Delete…
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -674,6 +761,17 @@ export function MonitorCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <TextPromptDialog
+        open={renameOpen}
+        onOpenChange={setRenameOpen}
+        title="Rename monitor"
+        label="Monitor name"
+        initialValue={monitor.name}
+        maxLength={80}
+        submitLabel="Rename"
+        onSubmit={renameMonitor}
+      />
     </>
   );
 }

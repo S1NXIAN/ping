@@ -66,6 +66,23 @@ export function formatMs(ms: number | null | undefined): string {
   return `${(ms / 1000).toFixed(2)} s`;
 }
 
+/**
+ * Uptime band -> status ink, shared by every surface that shows an uptime
+ * percentage (dashboard stat, detail sheet, public status). Bands match the
+ * formatter's rounding so ink and glyph never disagree: values that display
+ * as "100%" (>= 99.995%) are up, 90–99.99% warn, below 90% down. Null stays
+ * null — unknown must never read as healthy.
+ */
+export function uptimeTone(
+  fraction: number | null | undefined,
+): "up" | "warn" | "down" | null {
+  if (fraction == null || Number.isNaN(fraction)) return null;
+  const pct = fraction * 100;
+  if (pct >= 99.995) return "up";
+  if (pct >= 90) return "warn";
+  return "down";
+}
+
 /** 0.9982 -> "99.8%" (null -> "—") */
 export function formatUptime(fraction: number | null | undefined): string {
   if (fraction == null || Number.isNaN(fraction)) return "—";

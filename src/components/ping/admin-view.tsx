@@ -498,7 +498,7 @@ export function AdminView({
               <p className="text-xs leading-relaxed text-muted-foreground">
                 Point any external pinger (cron-job.org, UptimeRobot, a Raspberry Pi cron…) at this
                 URL every 5–10 minutes. It responds with a JSON summary of the checks it just ran.
-                Alternatively use <code className="rounded bg-muted px-1">/api/health</code> for a
+                Alternatively use <code className="rounded-none bg-muted px-1">/api/health</code> for a
                 plain keep-alive that doesn't trigger checks.
               </p>
             </div>
@@ -521,8 +521,8 @@ export function AdminView({
                 <code>{GH_ACTIONS_YAML}</code>
               </pre>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Add the file as <code className="rounded bg-muted px-1">.github/workflows/ping.yml</code>{" "}
-                in any repository, then create a <code className="rounded bg-muted px-1">PING_URL</code>{" "}
+                Add the file as <code className="rounded-none bg-muted px-1">.github/workflows/ping.yml</code>{" "}
+                in any repository, then create a <code className="rounded-none bg-muted px-1">PING_URL</code>{" "}
                 secret with your PING origin. GitHub’s free cron has no hard uptime guarantees and
                 can drift, but it costs nothing and needs no extra account.
               </p>
