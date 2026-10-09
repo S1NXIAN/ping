@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, ChevronRight, Gauge, Loader2, Plus, ScanSearch, X } from "lucide-react";
+import { Bell, ChevronRight, Folder, Gauge, Loader2, Plus, ScanSearch, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -158,8 +158,7 @@ export function AddMonitorDialog({
         !!(
           initial.keyword ||
           initial.slowThresholdMs != null ||
-          (initial.alertDelay ?? 0) > 0 ||
-          initial.folderId
+          (initial.alertDelay ?? 0) > 0
         ),
       );
     } else {
@@ -211,8 +210,7 @@ export function AddMonitorDialog({
   const advCount =
     (keywordActive && keyword.trim() ? 1 : 0) +
     (slowThreshold.trim() !== "" ? 1 : 0) +
-    (alertDelay !== "0" ? 1 : 0) +
-    (folderId !== "none" ? 1 : 0);
+    (alertDelay !== "0" ? 1 : 0);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -284,6 +282,8 @@ export function AddMonitorDialog({
   const intervalOption = INTERVAL_GROUPS.flatMap((g) => g.options).find(
     (o) => o.value === intervalSec,
   );
+  const folderLabel =
+    folderId === "none" ? "No folder" : folders.find((f) => f.id === folderId)?.name ?? "No folder";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -301,18 +301,40 @@ export function AddMonitorDialog({
         {/* drag handle — mobile only */}
         <div aria-hidden="true" className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-muted-foreground/25 sm:hidden" />
 
-        <div className="flex items-center justify-between pb-2 pl-4 pr-2 pt-2.5 sm:pb-1 sm:pl-5 sm:pt-4">
+        <div className="flex items-center justify-between gap-2 pb-2 pl-4 pr-2 pt-2.5 sm:pb-1 sm:pl-5 sm:pt-4">
           <DialogTitle className="text-sm font-semibold leading-none">
             {isEdit ? "Edit monitor" : "New monitor"}
           </DialogTitle>
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            aria-label="Close"
-            className="grid size-11 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:size-9"
-          >
-            <X className="size-4" aria-hidden="true" />
-          </button>
+          <div className="flex items-center gap-1">
+            <Select value={folderId} onValueChange={setFolderId}>
+              <SelectTrigger
+                aria-label="Folder"
+                title="Group monitors in the sidebar"
+                className="h-11 w-auto max-w-[150px] gap-1.5 text-xs sm:h-9"
+              >
+                <Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <SelectValue>
+                  <span className="truncate">{folderLabel}</span>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No folder</SelectItem>
+                {folders.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              aria-label="Close"
+              className="grid size-11 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:size-9"
+            >
+              <X className="size-4" aria-hidden="true" />
+            </button>
+          </div>
         </div>
         <DialogDescription className="sr-only">
           {isEdit
@@ -539,25 +561,6 @@ export function AddMonitorDialog({
                       {ALERT_DELAYS.map((d) => (
                         <SelectItem key={d.value} value={d.value}>
                           {d.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <FieldLabel htmlFor="m-folder" hint="Group monitors in the sidebar.">
-                    Folder
-                  </FieldLabel>
-                  <Select value={folderId} onValueChange={setFolderId}>
-                    <SelectTrigger id="m-folder" className={fieldClass}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No folder</SelectItem>
-                      {folders.map((f) => (
-                        <SelectItem key={f.id} value={f.id}>
-                          {f.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
