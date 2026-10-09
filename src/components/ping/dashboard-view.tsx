@@ -551,12 +551,12 @@ export function DashboardView({
               onClick={() => setPaletteOpen(true)}
               aria-label="Open command palette"
               title="Command palette — jump to any monitor or action (Ctrl/⌘+K)"
-              className="h-11 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground sm:h-9 md:px-3"
+              className="h-11 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground sm:h-9 md:px-3 lg:w-48 xl:w-64"
             >
               <Search className="size-3.5 shrink-0" aria-hidden="true" />
               <span className="hidden md:inline">Search…</span>
               <kbd
-                className="pointer-events-none hidden rounded-none border border-border/70 bg-muted/60 px-1.5 py-px text-[10px] font-medium text-muted-foreground md:inline"
+                className="pointer-events-none hidden rounded-none border border-border/70 bg-muted/60 px-1.5 py-px text-[10px] font-medium text-muted-foreground md:inline lg:ml-auto"
                 aria-hidden="true"
               >
                 ⌘K
