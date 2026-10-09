@@ -30,7 +30,7 @@ Honesty of data as the core mechanism, purpose-built for cold-booting free-tier 
 
 Capabilities (confirmed, shipping):
 
-- Monitors: any http(s) URL, GET or HEAD, intervals 1 min–7 days (presets, or a custom `D`/`H`/`M` value such as `4M` or `3D:15M`), folders, pinning, manual/A–Z/status sorting, drag reorder, per-device sort memory, `/` search focus, ⌘K command palette.
+- Monitors: any http(s) URL, GET or HEAD, intervals 1 min–24 hours (presets, or a custom `H`/`M` value such as `4M` or `4H30M`), folders, pinning, manual/A–Z/status sorting, drag reorder, per-device sort memory, `/` search focus, ⌘K command palette.
 - Real checks: 15 s timeout, 2xx–3xx = up, exact error text on failure; keyword checks (body must contain / must not contain, case-insensitive, first 256 KB, forces GET); latency "slow/degraded" alerts (50–30 000 ms threshold); down-alert confirmations (N consecutive failures before the webhook fires; "confirming N/M" pill).
 - Scheduled pings: one-off checks at exact future moments, with results kept in monitor history.
 - Maintenance windows: checks still recorded and honest, notifications silenced and deferred, public page shows amber maintenance state.
@@ -44,7 +44,7 @@ Constraints (must be preserved by future work):
 
 - Single-instance assumption: in-process scheduler, in-memory login throttle, module-level concurrency guards are process-local.
 - SQLite only; history retention default 30 days + 1 000 checks/monitor; incident notes pruned at a fixed 32 days.
-- Min check interval 60 s (whole minutes only — `S` is not a configurable unit); max 7 days; ≤200 monitors; ≤5 webhook channels; maintenance windows ≤7 days, schedulable ≤90 days ahead.
+- Min check interval 60 s (whole minutes only — `S` is not a configurable unit); max 24 hours; ≤200 monitors; ≤5 webhook channels; maintenance windows ≤7 days, schedulable ≤90 days ahead.
 - Monitor URLs must be http(s) — any host, including internal targets (`localhost`, LAN names, `169.254.*` link-local) by design: creating a monitor requires the authenticated admin session, so this is not an untrusted-input path (see README trust model). Webhook URLs are the untrusted path and stay SSRF-guarded (no loopback/private/link-local, redirects never followed).
 - UTC day buckets everywhere (stats, bars, badges) so views align across timezones.
 - English-only UI; no i18n requirement recorded.

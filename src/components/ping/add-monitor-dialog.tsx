@@ -45,11 +45,8 @@ const INTERVAL_GROUPS: { label: string; options: { value: string; label: string;
       { value: "3600", label: "1 hour" },
       { value: "21600", label: "6 hours" },
       { value: "43200", label: "12 hours" },
+      { value: "86400", label: "24 hours" },
     ],
-  },
-  {
-    label: "Days",
-    options: [{ value: "86400", label: "1 day" }],
   },
 ];
 
@@ -132,7 +129,7 @@ export function AddMonitorDialog({
   const [url, setUrl] = useState("");
   const [folderId, setFolderId] = useState<string>("none");
   const [intervalSec, setIntervalSec] = useState("300");
-  // "custom" replaces the preset select with a free-text D/H/M field.
+  // "custom" replaces the preset select with a free-text H/M field.
   const [intervalCustom, setIntervalCustom] = useState(false);
   const [method, setMethod] = useState<"GET" | "HEAD">("GET");
   const [account, setAccount] = useState("");
@@ -153,10 +150,10 @@ export function AddMonitorDialog({
       setName(initial.name);
       setUrl(initial.url);
       setFolderId(initial.folderId ?? "none");
-      // A value the presets don't cover (e.g. a saved 3D:15M) opens in custom
+      // A value the presets don't cover (e.g. a saved 4H30M) opens in custom
       // mode — and the field then holds TEXT, so seed it with the compact form
-      // ("3d 15m") rather than the raw seconds the API stores.
-      // The grammar is whole-minute (D/H/M), so a legacy sub-minute value (the
+      // ("4h 30m") rather than the raw seconds the API stores.
+      // The grammar is whole-minute (H/M), so a legacy sub-minute value (the
       // old schema allowed any int >= 60) has no exact text form — seed the
       // nearest representable value, which the live preview then states plainly.
       const isCustom = !PRESET_INTERVALS.has(String(initial.intervalSec));
@@ -248,7 +245,7 @@ export function AddMonitorDialog({
     const trimmedKeyword = keyword.trim();
     if (keywordMode !== "off" && trimmedKeyword === "") next.keyword = "Enter a keyword, or set it Off";
 
-    // Custom interval: parse the D/H/M text to the seconds the API stores.
+    // Custom interval: parse the H/M text to the seconds the API stores.
     // A preset value is already seconds, so it needs no parsing.
     let intervalSeconds = Number(intervalSec);
     if (intervalCustom) {
@@ -452,7 +449,7 @@ export function AddMonitorDialog({
                           setIntervalSec(e.target.value);
                           clearError("interval");
                         }}
-                        placeholder="e.g. 4M or 3D:15M"
+                        placeholder="e.g. 4M or 4H30M"
                         autoComplete="off"
                         aria-invalid={fieldErrors.interval ? true : undefined}
                         aria-describedby={fieldErrors.interval ? "m-interval-err" : undefined}
@@ -476,14 +473,14 @@ export function AddMonitorDialog({
                         {fieldErrors.interval}
                       </p>
                     ) : (
-                      // Echo the parsed cadence so the D/H/M string is never
-                      // ambiguous. D/H/M are whole minutes, so every value the
+                      // Echo the parsed cadence so the H/M string is never
+                      // ambiguous. H/M are whole minutes, so every value the
                       // grammar yields is exact on the 30s tick grid — no caveat
                       // needed, and claiming one would imply false imprecision.
                       <p className="text-xs text-muted-foreground">
                         {intervalPreview
                           ? `= every ${formatInterval(intervalPreview)}`
-                          : "D = days, H = hours, M = minutes"}
+                          : "H = hours, M = minutes"}
                       </p>
                     )}
                   </>

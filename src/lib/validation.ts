@@ -30,4 +30,4 @@ export const intervalSecSchema = z
   .number()
   .int()
   .min(INTERVAL_MIN_SEC, `At least ${INTERVAL_MIN_SEC / 60} minute`)
-  .max(INTERVAL_MAX_SEC, `At most ${INTERVAL_MAX_SEC / 86400} days`);
+  .max(INTERVAL_MAX_SEC, `At most ${INTERVAL_MAX_SEC / 3600} hours`);
