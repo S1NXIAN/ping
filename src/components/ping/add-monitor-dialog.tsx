@@ -28,13 +28,13 @@ import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
 // Nine flat choices were decision residue (critique 2026-09-16 P2); three
 // cadence chunks carry the same values with one decision instead of nine —
 // "which rhythm?" then "which step?". No capability was removed.
-const INTERVAL_GROUPS: { label: string; options: { value: string; label: string }[] }[] = [
+const INTERVAL_GROUPS: { label: string; options: { value: string; label: string; recommended?: boolean }[] }[] = [
   {
     label: "Minutes",
     options: [
       { value: "60", label: "1 minute" },
       { value: "120", label: "2 minutes" },
-      { value: "300", label: "5 minutes (recommended)" },
+      { value: "300", label: "5 minutes", recommended: true },
       { value: "600", label: "10 minutes" },
     ],
   },
@@ -277,7 +277,13 @@ export function AddMonitorDialog({
     })();
   }
 
-  const fieldClass = "h-11 sm:h-9";
+  const fieldClass = "h-11 w-full sm:h-9";
+
+  // Trigger shows the plain label; "(recommended)" is list-only so the
+  // value never overflows a half-width column into its neighbour.
+  const intervalOption = INTERVAL_GROUPS.flatMap((g) => g.options).find(
+    (o) => o.value === intervalSec,
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -381,7 +387,7 @@ export function AddMonitorDialog({
                 </FieldLabel>
                 <Select value={intervalSec} onValueChange={setIntervalSec}>
                   <SelectTrigger id="m-interval" className={fieldClass}>
-                    <SelectValue />
+                    <SelectValue>{intervalOption?.label}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {INTERVAL_GROUPS.map((g) => (
@@ -392,6 +398,7 @@ export function AddMonitorDialog({
                         {g.options.map((i) => (
                           <SelectItem key={i.value} value={i.value}>
                             {i.label}
+                            {i.recommended ? " (recommended)" : ""}
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -406,7 +413,7 @@ export function AddMonitorDialog({
                 </FieldLabel>
                 <Select value={method} onValueChange={(v) => setMethod(v as "GET" | "HEAD")}>
                   <SelectTrigger id="m-method" className={fieldClass}>
-                    <SelectValue />
+                    <SelectValue>{method}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="GET">GET (recommended)</SelectItem>
