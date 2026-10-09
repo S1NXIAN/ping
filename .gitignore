@@ -30,9 +30,12 @@ coverage/
 !.env.example
 
 # ── Database (contains password hash & user data — never commit) ────────────
+# Prisma resolves a relative file: URL against the schema dir, so the local
+# database lands in prisma/db/ (and .next/standalone/prisma/db/ in the build).
 db/*.db
 db/*.db-journal
 db/*.sqlite*
+prisma/db/
 *.sqlite
 *.sqlite3
 
