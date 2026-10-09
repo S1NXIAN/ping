@@ -5,6 +5,7 @@
 // (IncidentNote rows) are joined on by the exact timestamp of the first
 // failed check, which is the stable key both sides agree on.
 import { db } from "./db";
+import { Prisma } from "@prisma/client";
 import type { AdminIncidentDTO } from "./ping-types";
 
 export const INCIDENT_WINDOW_DAYS = 30;
@@ -69,22 +70,36 @@ export async function deriveIncidents(
 
   const incidents: DerivedIncident[] = [];
 
+  // 1) All down rows for the whole fleet in ONE query (newest
+  //    MAX_DOWN_ROWS_PER_MONITOR per monitor; older rows can't reach the cut).
+  //    A per-monitor query here was N queries per status-page view.
+  const sinceMs = since.getTime();
+  const rawDowns = await db.$queryRaw<
+    Array<{ monitorId: string; statusCode: number | null; checkedAt: Date | number | string }>
+  >`
+    SELECT monitorId, statusCode, checkedAt FROM (
+      SELECT monitorId, statusCode, checkedAt,
+             ROW_NUMBER() OVER (PARTITION BY monitorId ORDER BY checkedAt DESC) AS rn
+      FROM "Check"
+      WHERE monitorId IN (${Prisma.join(monitors.map((m) => m.id))})
+        AND status = 'down' AND checkedAt >= ${sinceMs}
+    ) WHERE rn <= ${MAX_DOWN_ROWS_PER_MONITOR}`;
+  const downsByMonitor = new Map<string, Array<{ t: number; code: number | null }>>();
+  for (const r of rawDowns) {
+    const list = downsByMonitor.get(r.monitorId) ?? [];
+    list.push({ t: new Date(r.checkedAt as string | number).getTime(), code: r.statusCode ?? null });
+    downsByMonitor.set(r.monitorId, list);
+  }
+  // ROW_NUMBER ordered newest-first; reverse each list to chronological.
+  for (const list of downsByMonitor.values()) list.reverse();
+
   await Promise.all(
     monitors.map(async (monitor) => {
       const gapMs = monitor.intervalSec * 3 * 1000;
       const monitorWindows = windowsByMonitor.get(monitor.id) ?? [];
 
-      // 1) Down rows only (newest cap; older ones can't reach the global cut).
-      const downRows = await db.check.findMany({
-        where: { monitorId: monitor.id, status: "down", checkedAt: { gte: since } },
-        select: { statusCode: true, checkedAt: true },
-        orderBy: { checkedAt: "desc" },
-        take: MAX_DOWN_ROWS_PER_MONITOR,
-      });
-      if (downRows.length === 0) return;
-      const downs = downRows
-        .map((c) => ({ t: c.checkedAt.getTime(), code: c.statusCode ?? null }))
-        .reverse(); // chronological
+      const downs = downsByMonitor.get(monitor.id) ?? [];
+      if (downs.length === 0) return;
 
       // 2) Group consecutive downs into streaks; a data gap > 3× interval
       //    ends a streak (PING was asleep — we can't claim it stayed down).

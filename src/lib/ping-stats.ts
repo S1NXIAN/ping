@@ -4,7 +4,7 @@
 import type { Check, Folder, Monitor } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { db } from "./db";
-import type { CheckDTO, MaintenanceWindowDTO, MonitorDTO, MonitorStatsDTO, ScheduledPingDTO } from "./ping-types";
+import type { CheckDTO, DailyBucket, MaintenanceWindowDTO, MonitorDTO, MonitorStatsDTO, ScheduledPingDTO } from "./ping-types";
 
 const H24 = 24 * 60 * 60 * 1000;
 
@@ -309,9 +309,7 @@ export async function p95For(monitorId: string): Promise<number | null> {
 }
 
 /** Daily up/down buckets for the last 30 days (only days with real checks). */
-export async function dailyBuckets(monitorId: string): Promise<
-  Array<{ date: string; up: number; down: number }>
-> {
+export async function dailyBuckets(monitorId: string): Promise<DailyBucket[]> {
   const map = await dailyBucketsByMonitor([monitorId]);
   return map.get(monitorId) ?? [];
 }
@@ -324,8 +322,8 @@ export async function dailyBuckets(monitorId: string): Promise<
  */
 export async function dailyBucketsByMonitor(
   monitorIds: string[],
-): Promise<Map<string, Array<{ date: string; up: number; down: number }>>> {
-  const result = new Map<string, Array<{ date: string; up: number; down: number }>>();
+): Promise<Map<string, DailyBucket[]>> {
+  const result = new Map<string, DailyBucket[]>();
   if (monitorIds.length === 0) return result;
 
   const sinceMs = Date.now() - 30 * H24; // epoch ms, matching sqlite storage

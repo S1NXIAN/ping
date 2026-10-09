@@ -78,3 +78,26 @@ test("a down fully inside a maintenance window is not an incident", async () => 
   const incidents = await deriveIncidents([m]);
   expect(incidents.length).toBe(0);
 });
+
+test("the batched query keeps each monitor's incidents separate", async () => {
+  const { deriveIncidents } = await import("@/lib/incidents");
+  const a = await db.monitor.create({ data: { name: "a", url: "https://a.com", intervalSec: 60 } });
+  const b = await db.monitor.create({ data: { name: "b", url: "https://b.com", intervalSec: 60 } });
+  const t = (min: number) => new Date(Date.now() - min * 60_000);
+  await db.check.createMany({
+    data: [
+      // a: one incident, closed
+      { monitorId: a.id, status: "down", statusCode: 500, checkedAt: t(9) },
+      { monitorId: a.id, status: "up", checkedAt: t(8) },
+      // b: two separate incidents
+      { monitorId: b.id, status: "down", statusCode: 502, checkedAt: t(7) },
+      { monitorId: b.id, status: "up", checkedAt: t(6) },
+      { monitorId: b.id, status: "down", statusCode: 503, checkedAt: t(5) },
+    ],
+  });
+  const incidents = await deriveIncidents([a, b]);
+  expect(incidents.filter((i) => i.monitorId === a.id).length).toBe(1);
+  expect(incidents.filter((i) => i.monitorId === b.id).length).toBe(2);
+  const bLast = incidents.find((i) => i.monitorId === b.id && i.lastStatusCode === 503);
+  expect(bLast?.endedAt).toBeNull(); // still ongoing
+});

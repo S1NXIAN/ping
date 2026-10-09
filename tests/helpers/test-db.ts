@@ -1,20 +1,7 @@
-// Shared test harness: one throwaway SQLite database per test process.
-// Sets DATABASE_URL BEFORE @/lib/db constructs its PrismaClient, pushes the
-// real schema into the temp file, and exposes a reset for per-test isolation.
-import { execSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
-const dir = mkdtempSync(join(tmpdir(), "ping-test-"));
-const url = `file:${join(dir, "test.db")}`;
-process.env.DATABASE_URL = url;
-
-execSync("bunx prisma db push --skip-generate --accept-data-loss", {
-  env: { ...process.env, DATABASE_URL: url },
-  stdio: "ignore",
-});
-
+// Shared test harness. DATABASE_URL is set (and the schema pushed) by the
+// preloaded tests/setup.ts, which runs before this module — so @/lib/db
+// always points at the throwaway test database. This module just exposes it
+// and a reset helper for per-test isolation.
 export const db = (await import("@/lib/db")).db;
 
 /** Wipes every table between tests (children before parents for FK order). */
