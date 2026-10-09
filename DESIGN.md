@@ -1,6 +1,6 @@
 ---
 name: PING
-description: Honest uptime monitoring for free-tier services that cold-boot — drafted, not decorated.
+description: Honest uptime monitoring for free-tier services that cold-boot — measured, not decorated.
 colors:
   soot: "#0b0c0e"
   card-charcoal: "#121316"
@@ -8,11 +8,14 @@ colors:
   muted-charcoal: "#181a1e"
   surface-charcoal: "#1b1d21"
   accent-charcoal: "#202227"
+  sidebar-charcoal: "#0d0e11"
   hairline: "#25272d"
+  sidebar-hairline: "#1f2126"
   input-charcoal: "#2c2e35"
   signal-white: "#ffffff"
   chalk: "#e6e8ec"
   ash-white: "#e9ebee"
+  bright-chalk: "#f1f2f4"
   instrument-gray: "#9aa0a8"
   beacon-emerald: "#10b981"
   alarm-rose: "#f43f5e"
@@ -125,21 +128,21 @@ components:
 
 ## Overview
 
-**Creative North Star: "The Drafting Table"**
+**Creative North Star: "The Blueprint"**
 
-PING's interface is a drafting table in a dark studio: a fixed blueprint-grid canvas of fine 24px cells and bold 120px majors sits under everything, and the UI floats above it as flat, sharp-cornered instruments — cards, pills, gauges and charts laid out the way a draughtsman lays out tools. The palette is charcoal paper and one white pencil: a neutral charcoal scale with zero hue tint carries every surface, while pure Signal White is the sole brand accent (primary actions, focus rings, links, highlights). Color that remains is data — emerald, rose and amber exist only because monitors have states.
+PING is a blueprint on charcoal paper. A fixed two-tier grid — fine 24px cells and bold 120px majors, white lines at 3.8% and 10% alpha — sits behind every screen, and the interface floats above it as flat, sharp-cornered instruments: cards, pills, gauges, charts. The palette is drafting paper and one white pencil: a neutral charcoal scale with zero hue tint carries every surface, and pure Signal White is the sole brand accent. What color remains is measurement — emerald, rose and amber exist only because a monitor has a state, never to decorate.
 
-The voice is technical calm. Everything is measurable, labeled, and aligned; nothing is decorative, and no number is invented. Type stays small and instrument-like (nothing over 24px — the system has no display type by design), numerals are always tabular so readings don't jitter, and depth comes from light — 1px inner highlights and a faint ambient glow — never from shadows. Corners are sharp everywhere except the single live status dot, the one circle in the entire system, whose 2.4s sonar ripple is the product's heartbeat.
+The voice is precise and restrained. Every number is real, labeled, and aligned; nothing is ornamental. Type stays small and instrument-like (nothing exceeds 24px — the system has no display type by design), numerals are always tabular so live readings don't jitter, and depth comes from light — a 1px inner highlight and a faint ambient glow — never from shadows. Corners are sharp everywhere except the single live status dot, the one circle in the system, whose 2.4s sonar ripple is the product's heartbeat.
 
 **Key Characteristics:**
-- Blueprint grid canvas (24px fine + 120px major, white lines at 3.8%/10% alpha) fixed behind all content
+- Blueprint grid canvas (24px fine + 120px major, white at 3.8%/10% alpha) fixed behind all content
 - One white accent on charcoal; status hues are data, not decoration
 - Uptime numbers tint by band (emerald 100% / amber 90–99.9% / rose <90%); "no data" is a dashed outline, never invisible
-- Radius 0 everywhere — one exception: the 10px status dot
+- Radius 0 everywhere — one exception, the 10px status dot
 - Depth is light, not shadow: inset 1px top highlights + radial ambient glow
 - Instrument typography: 10px uppercase tracked labels, tabular numerals, dense hierarchy
-- Precise and responsive: 1px hover lift, 0.98 press, 200ms feedback on every control
-- Hand-rolled SVG instruments (sparkline, uptime bars, response chart) instead of chart libraries
+- Precise and restrained: 1px hover lift, 0.98 press, 200ms feedback on every control
+- Hand-rolled SVG instruments (sparkline, uptime bars, response chart, badge, OG card) instead of chart libraries
 
 ## Colors
 
@@ -147,21 +150,24 @@ A charcoal drafting-paper scale with no hue tint, one white pencil, and three se
 
 ### Primary
 - **Signal White** (#ffffff): The only brand accent. Primary CTAs (white fill, Soot text), focus rings, links, pinned states, key numbers on stat cards. Its rarity is the point — if white appears everywhere, nothing leads.
-- **Chalk** (#e6e8ec): The soft-white working pencil — sparkline strokes, chart primary, the legacy `--teal` alias (`text-teal`/`bg-teal` all resolve here). Used where pure white would shout.
+- **Chalk** (#e6e8ec): The soft-white working pencil — sparkline strokes, chart primary line, the `--teal` alias (`text-teal`/`bg-teal` all resolve here), and the `100%` badge fill. Used where pure white would shout.
+- **Bright Chalk** (#f1f2f4): The `--accent-foreground` ink — text on Accent Charcoal hover fills (ghost/outline controls, sidebar hover). One step brighter than Ash White so hovered text lifts without going full white.
 
 ### Secondary (semantic status — data, not decoration)
-- **Beacon Emerald** (#10b981): "Up". Status dots, up-pills, uptime values, healthy bar segments, chart line for success.
-- **Alarm Rose** (#f43f5e): "Down". Failed ticks, downtime bars, destructive actions, outage counts. Solid rose fills take Soot ink (`--down-foreground` / `--destructive-foreground`, 5.33:1 AA) — never white; hover keeps the fill constant (darkening pushes contrast to a 4.5 knife-edge), the CTA press (0.98 scale) is the interaction cue.
+- **Beacon Emerald** (#10b981): "Up". Status dots, up-pills, uptime values, healthy bar segments, chart success line.
+- **Alarm Rose** (#f43f5e): "Down". Failed ticks, downtime bars, destructive actions, outage counts. Solid rose fills take Soot ink (`--down-foreground`, 5.33:1 AA) — never white; hover keeps the fill constant (darkening pushes contrast to a 4.5 knife-edge), the 0.98 CTA press is the interaction cue.
 - **Caution Amber** (#f59e0b): "Slow / degraded / maintenance / confirming". Slow-threshold lines on charts, maintenance states, pending ripples.
 
 ### Neutral
 - **Soot** (#0b0c0e): Page background. The drafting paper itself; also text on Signal White.
+- **Sidebar Charcoal** (#0d0e11): The folder-dock surface, one shade below Soot so the dock reads as a separate sheet.
 - **Card Charcoal** (#121316): Card and sheet surfaces — the instruments on the table.
 - **Popover Charcoal** (#15161a): Menus, dropdowns, command palette — one step up from cards.
 - **Muted Charcoal** (#181a1e): Muted fills, sidebar hover.
 - **Surface Charcoal** (#1b1d21): Secondary buttons, quiet filled elements.
 - **Accent Charcoal** (#202227): Hover fills for ghost/outline controls.
 - **Hairline** (#25272d): Every border in the system. 1px, always.
+- **Sidebar Hairline** (#1f2126): The dock's right edge, dimmed against the darker dock surface.
 - **Input Charcoal** (#2c2e35): Input borders and dark input fills.
 - **Instrument Gray** (#9aa0a8): Muted text — labels, metadata, captions. Never for body copy.
 - **Ash White** (#e9ebee): Body text on charcoal.
@@ -169,7 +175,7 @@ A charcoal drafting-paper scale with no hue tint, one white pencil, and three se
 ### Named Rules
 **The One Accent Rule.** Signal White is the only brand color. Emerald, rose and amber are measurement semantics — they may encode a monitor's state, never decorate a layout.
 
-**The Data, Not Decoration Rule.** A colored fill is always an alpha wash over charcoal (10–15% tint + matching text, e.g. `bg-emerald/10` + `text-emerald`). Never solid color blocks; never colored text directly on colored fills.
+**The Data, Not Decoration Rule.** A colored fill is always an alpha wash over charcoal (6–15% tint + matching text + 25–40% border, e.g. `bg-emerald/10 text-emerald border-emerald/30`). Never solid color blocks; never colored text directly on a colored fill.
 
 **The Uptime Band Rule.** Every uptime percentage shares one band language, from one helper (`uptimeTone`): displays-as-100% (≥ 99.995%) in Beacon Emerald (up), 90–99.99% in Caution Amber (warn), below 90% in Alarm Rose (down). No data stays neutral — unknown must never read as healthy. Dashboard stat, detail sheet and public status all speak it.
 
@@ -196,14 +202,14 @@ A charcoal drafting-paper scale with no hue tint, one white pencil, and three se
 
 ## Layout
 
-A dense, single-page instrument panel inside a centered 72rem (`max-w-6xl`) column. A sticky 56px header (h-14) carries the wordmark, ⌘K search, live up/down counts, and primary actions; content scrolls under it. On `lg`+ a sticky 14rem (w-56) folder sidebar docks left with its own hairline border; below `lg` it collapses into a horizontal row of folder chips above the stats. Four stat cards sit in a 2-up mobile / 4-up desktop grid, then a search + sort toolbar, then the monitor list. A slim sticky footer ("updated Ns ago") anchors the bottom.
+A dense, single-page instrument panel inside a centered 72rem (`max-w-6xl`) column (88rem at `2xl`). A sticky 56px header (h-14) carries the wordmark, ⌘K search, live up/down counts, and primary actions; content scrolls under it. On `lg`+ a sticky 14rem (w-56) folder sidebar docks left with its own hairline border; below `lg` it collapses into a horizontal row of folder chips above the stats. Four stat cards sit in a 2-up mobile / 4-up desktop grid — drawn as one instrument strip with hairline dividers on phones, independent cards from `sm` up — then a search + sort toolbar, then the monitor list. A slim sticky footer ("updated Ns ago") anchors the bottom.
 
 Adaptation rules (2026-09-16 adapt pass):
 - **Fleet health is never width-gated.** Below `md` the full count pills don't fit, so the header shows one compact chip — `1↑ 0↓` (plus `N~` when slow exists), tabular, numbers tinted only when the count is real (the idle rule). "Is anything down?" must be answerable from the header at every width.
 - **Touch reads labels, not tooltips.** Native `title` tooltips don't exist on touch, so anything whose meaning lives only in a hover title is a defect. The Scheduled / Maintenance / Incidents triggers show their text labels at every width — 10px beside the icon on phones (natural width, never stretched equal thirds, 44px touch height kept), 12px from `sm` up.
 - **Diagnosis wraps, it doesn't vanish.** A down card's error text clamps to two lines instead of one truncated hover-only line — the full error must be readable on touch where no tooltip can save it.
 
-Spacing is tight and rhythmic: 2px pill padding, 4–8px internal gaps, 14px/16px card padding, 24px section gaps. Touch targets stay ≥44px even when type is small — density is visual, not physical.
+Spacing is tight and rhythmic: 2px pill padding, 4–8px internal gaps, 14px/16px card padding, 24px section gaps. Touch targets stay ≥44px (`h-11`) even when type is small — density is visual, not physical.
 
 ## Elevation & Depth
 
@@ -218,7 +224,7 @@ Flat by default; depth is light, not shadow. Surfaces separate through the charc
 
 ## Shapes
 
-Sharp corners are the system's signature: every radius token is forced to 0px (cards, buttons, inputs, pills, dialogs, thumbnails all use `rounded-none`), and edges meet as precise right angles against the grid. Structure is drawn with 1px hairlines — full borders on containers, one-sided borders (`border-r`, `border-b`) for docks and dividers — never with fill contrast alone. Fill is applied as thin alpha washes over charcoal. The single exception is deliberate and therefore loud: the 10px live status dot is a perfect circle (`border-radius: 9999px`) whose sonar ripple animates outward 6px every 2.4s. One circle, many right angles — that contrast is what makes the dot the product's heartbeat.
+Sharp corners are the system's signature: every radius token is forced to 0px (`--radius-sm/md/lg/xl` all resolve to `0px` in `globals.css`, so `rounded-md/lg/xl` render flat), and edges meet as precise right angles against the grid. Structure is drawn with 1px hairlines — full borders on containers, one-sided borders (`border-r`, `border-b`) for docks and dividers — never with fill contrast alone. Fill is applied as thin alpha washes over charcoal. The single exception is deliberate and therefore loud: the 10px live status dot is a perfect circle (`border-radius: 9999px`) whose sonar ripple animates outward 6px every 2.4s. One circle, many right angles — that contrast is what makes the dot the product's heartbeat. Even the SVG badge and share card draw with `rx="0"`.
 
 ### Named Rules
 **The Sharp Edge Rule.** Radius 0 everywhere, at every interactive size. The status dot is the only circle in the system; never round anything else.
@@ -234,7 +240,7 @@ Sharp corners are the system's signature: every radius token is forced to 0px (c
 - **Focus:** 3px Signal White ring at 50% (`ring-[3px] ring-ring/50`) — visible on every interactive element.
 
 ### Pills
-- **Style:** the recurring status chip — 10px/500 text, 2px×8px padding, sharp corners, Hairline-strength colored border at ~25–40% alpha over a 6–15% alpha wash of the same hue (e.g. up-pill: `border-emerald/30 bg-emerald/10 text-emerald`).
+- **Style:** the recurring status chip — 10px/500 text, 2px×8px padding, sharp corners, a Hairline-strength colored border at ~25–40% alpha over a 6–15% alpha wash of the same hue (e.g. up-pill: `border-emerald/30 bg-emerald/10 text-emerald`).
 - **State:** tone encodes meaning — white (pinned/account), Beacon Emerald (up), Caution Amber (slow/maintenance/confirming "2/3"), chalk (keyword/intervals). Never larger than 11px text. Header count pills tint only when count > 0 — a zero is neutral, never a colored false alarm.
 
 ### Cards / Containers
@@ -251,8 +257,8 @@ Sharp corners are the system's signature: every radius token is forced to 0px (c
 - **Error:** destructive ring/border treatment (rose at 20–40%).
 
 ### Navigation
-- **Header:** sticky 56px bar, Soot over the grid, hairline bottom edge; wordmark left ("PING." + tagline in Instrument Gray), ⌘K search button, live up/down count pills (compact `1↑ 0↓` chip below `md` — see Adaptation rules), ghost icon actions, white primary "New monitor" right.
-- **Folder sidebar** (lg+): 14rem sticky dock, hairline right border, rows with Accent Charcoal hover, 10px uppercase "MONITORS" section label; collapses to horizontal chips below `lg`.
+- **Header:** sticky 56px bar, Soot at 85% over the grid with backdrop blur, hairline bottom edge; wordmark left ("PING." + tagline in Instrument Gray), ⌘K search button, live up/down count pills (compact `1↑ 0↓` chip below `md` — see Adaptation rules), ghost icon actions, white primary "New monitor" right.
+- **Folder sidebar** (lg+): 14rem sticky dock on Sidebar Charcoal, Sidebar Hairline right border, rows with Accent Charcoal hover, 10px uppercase "MONITORS" section label; collapses to horizontal chips below `lg`.
 - **Footer:** slim, sticky when content is short — "honest uptime monitoring" left, refresh time right.
 
 ### Status Dot (signature)
@@ -261,7 +267,7 @@ Sharp corners are the system's signature: every radius token is forced to 0px (c
 - **Behavior:** live states emit a sonar ripple — `box-shadow` ring expanding 0→6px in 2.4s `cubic-bezier(0.4, 0, 0.6, 1)`, infinite, tinted per state at 55% alpha.
 
 ### SVG Instruments (signature)
-Hand-rolled, no chart library: **sparkline** (Chalk 1.5px stroke + soft white area fill, emerald latest-point dot, gaps where data is missing); **uptime bars** (20 sharp segments — emerald full, rose empty, amber partial, dashed-outline gray for "no data", never faked); **response-time chart** (real time axis, dashed hairline gridlines, rose ticks for failed checks, amber dashed slow-threshold line, hover tooltip). Captions state exactly what was measured.
+Hand-rolled, no chart library: **sparkline** (Chalk 1.6px stroke + soft white area fill, emerald latest-point dot, gaps where data is missing); **uptime bars** (20 sharp segments — emerald full, rose empty, amber partial, dashed-outline gray for "no data", never faked); **response-time chart** (real time axis, dashed hairline gridlines, rose ticks for failed checks, amber dashed slow-threshold line, hover tooltip); **shields-style badge** (sharp `rx=0`, dark label block + status color); **OG share card** (charcoal canvas, white pulse waveform, real day-bars). Captions state exactly what was measured.
 
 ## Do's and Don'ts
 
@@ -269,12 +275,12 @@ Hand-rolled, no chart library: **sparkline** (Chalk 1.5px stroke + soft white ar
 - **Do** keep every surface one of the charcoal steps and separate them with 1px Hairline borders (#25272d).
 - **Do** use Signal White for exactly one primary action per view; everything else gets outline or ghost treatment.
 - **Do** render all numerals with `tabular-nums` and label all metrics as 10px uppercase + 0.1em tracking.
-- **Do** show alpha washes over charcoal for status fills (10–15% bg + matching text + 25–40% border).
+- **Do** show alpha washes over charcoal for status fills (6–15% bg + matching text + 25–40% border).
 - **Do** give every interactive element the 3px white focus ring, 1px hover lift, and 0.98 press — feedback is part of the craft.
 
 ### Don't:
-- **Don't** round anything except the status dot (no `rounded-md/lg/xl`, no pill-shaped buttons).
+- **Don't** round anything except the status dot (no `rounded-md/lg/xl`, no pill-shaped buttons) — the theme forces every radius token to 0, so don't reintroduce a non-zero one.
 - **Don't** introduce a second brand hue, a gradient, or a drop shadow — depth is light, color is data.
 - **Don't** stack rounded cards inside rounded cards or blur backgrounds (no glassmorphism) — the generic-SaaS look is the anti-reference.
 - **Don't** go playful: no bouncy/spring animations, no emoji decoration, no casual illustration — motion is limited to the ripple, breathe, fade-up (0.35s) and 200ms state transitions.
-- **Don't** fake data in any visual: gaps stay gaps (hatched bars, broken lines), unmeasured windows show "—".
+- **Don't** fake data in any visual: gaps stay gaps (hatched/dashed bars, broken lines), unmeasured windows show "—".
