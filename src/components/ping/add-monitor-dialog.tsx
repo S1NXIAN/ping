@@ -339,7 +339,7 @@ export function AddMonitorDialog({
                   clearError("url");
                 }}
                 onBlur={checkUrlBlur}
-                placeholder="https://my-app.onrender.com"
+                placeholder="https://example.com"
                 aria-invalid={fieldErrors.url ? true : undefined}
                 aria-describedby={fieldErrors.url ? "m-url-err" : undefined}
                 className={fieldClass}
@@ -359,7 +359,7 @@ export function AddMonitorDialog({
                 id="m-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Optional — defaults to host"
+                placeholder="My service"
                 maxLength={80}
                 className={fieldClass}
               />
@@ -373,7 +373,7 @@ export function AddMonitorDialog({
                 id="m-account"
                 value={account}
                 onChange={(e) => setAccount(e.target.value)}
-                placeholder="e.g. render — personal@mail.com"
+                placeholder="personal@mail.com"
                 maxLength={60}
                 autoComplete="off"
                 className={fieldClass}
