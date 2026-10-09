@@ -370,7 +370,10 @@ export function MonitorCard({
                   pinned
                 </StatusPill>
               )}
-              <StatusPill tone={statusTone} uppercase>
+              {/* min-w-13 + center: live/down/slow are the three states a card
+                  flips between, so they share one width — the pill no longer
+                  twitches wider on "down". Longer labels still grow. */}
+              <StatusPill tone={statusTone} uppercase className="min-w-13 justify-center">
                 {checking
                   ? "checking…"
                   : status === "down" && maintenanceNow

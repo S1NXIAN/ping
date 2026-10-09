@@ -50,7 +50,7 @@ export function StatusDot({
 export function statusLabel(status: DotStatus): string {
   switch (status) {
     case "up":
-      return "Up";
+      return "Live";
     case "down":
       return "Down";
     case "paused":

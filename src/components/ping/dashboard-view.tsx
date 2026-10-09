@@ -519,9 +519,11 @@ export function DashboardView({
   }
 
   const headerPill = (label: string, value: number, tone: PillTone) => (
-    <StatusPill tone={tone} size="lg" className="tabular-nums">
+    <StatusPill tone={tone} size="lg" uppercase className="tabular-nums">
       {value}
-      <span className="text-muted-foreground">{label}</span>
+      {/* min-w keeps "live" and "down" the same width — the label, not the
+          count, is what made "1 down" wider than "1 live". */}
+      <span className="min-w-10 text-center text-muted-foreground">{label}</span>
     </StatusPill>
   );
 
@@ -569,7 +571,7 @@ export function DashboardView({
                     tint only when real — zero stays neutral, the idle rule. */}
                 <div
                   className="flex h-6 items-center gap-1.5 rounded-none border border-border bg-muted/40 px-2 text-[11px] tabular-nums md:hidden"
-                  aria-label={`${summary.up} up, ${summary.down} down${summary.degraded ? `, ${summary.degraded} slow` : ""}`}
+                  aria-label={`${summary.up} live, ${summary.down} down${summary.degraded ? `, ${summary.degraded} slow` : ""}`}
                 >
                   <span className={summary.up > 0 ? "text-up" : "text-muted-foreground"} aria-hidden="true">
                     {summary.up}↑
@@ -588,7 +590,7 @@ export function DashboardView({
                 {/* Header pills tint only when the count is real (the paused
                     pill's idle pattern): a rose "0 down" was a false alarm —
                     color encodes state, and zero is not a state. */}
-                {headerPill("up", summary.up, summary.up > 0 ? "up" : "neutral")}
+                {headerPill("live", summary.up, summary.up > 0 ? "up" : "neutral")}
                 {headerPill("down", summary.down, summary.down > 0 ? "down" : "neutral")}
                 {summary.degraded > 0 && headerPill("slow", summary.degraded, "warn")}
                 {summary.paused > 0 && headerPill("paused", summary.paused, "neutral")}
