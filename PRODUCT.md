@@ -45,7 +45,7 @@ Constraints (must be preserved by future work):
 - Single-instance assumption: in-process scheduler, in-memory login throttle, module-level concurrency guards are process-local.
 - SQLite only; history retention default 30 days + 1 000 checks/monitor; incident notes pruned at a fixed 32 days.
 - Min check interval 60 s; ≤200 monitors; ≤5 webhook channels; maintenance windows ≤7 days, schedulable ≤90 days ahead.
-- Monitor URLs must be http(s) with a dotted hostname.
+- Monitor URLs must be http(s) — any host, including internal targets (`localhost`, LAN names, `169.254.*` link-local) by design: creating a monitor requires the authenticated admin session, so this is not an untrusted-input path (see README trust model). Webhook URLs are the untrusted path and stay SSRF-guarded (no loopback/private/link-local, redirects never followed).
 - UTC day buckets everywhere (stats, bars, badges) so views align across timezones.
 - English-only UI; no i18n requirement recorded.
 - Concurrency guards (in-flight per monitor, tick overlap, scheduled-ping optimistic claim) must never be removed to "fix" double triggers.
