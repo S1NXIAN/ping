@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { api, formatCountdown, formatDateTime, formatMs, timeAgo } from "@/lib/ping-client";
 import type { ScheduledPingDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
+import { StatusPill } from "./status-pill";
 
 /**
  * Full list of scheduled pings: upcoming first (soonest), then recent real
@@ -50,9 +51,9 @@ export function ScheduledPingsSheet({
             <CalendarClock className="size-4 text-primary" aria-hidden="true" />
             Scheduled pings
             {upcoming.length > 0 && (
-              <span className="rounded-none border border-primary/30 bg-primary/10 px-1.5 py-px text-[10px] font-medium tabular-nums text-primary">
+              <StatusPill tone="accent" size="sm" className="tabular-nums">
                 {upcoming.length}
-              </span>
+              </StatusPill>
             )}
           </SheetTitle>
           <SheetDescription>

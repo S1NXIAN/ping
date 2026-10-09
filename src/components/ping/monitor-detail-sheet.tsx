@@ -47,20 +47,14 @@ import {
   hostOf,
   timeAgo,
   uptimeTone,
+  uptimeToneClass,
 } from "@/lib/ping-client";
 import type { MonitorDetailResponse, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { HistoryChart } from "./history-chart";
 import { StatusDot, statusLabel } from "./status-dot";
+import { StatusPill, type PillTone } from "./status-pill";
 import { dailyToSegments, UptimeBars } from "./uptime-bars";
-
-/** Band -> ink class; null (no data) stays muted — unknown never reads healthy. */
-function uptimeToneClass(tone: ReturnType<typeof uptimeTone>): string {
-  if (tone === "up") return "text-up";
-  if (tone === "warn") return "text-warn";
-  if (tone === "down") return "text-down";
-  return "text-muted-foreground";
-}
 
 function Stat({
   label,
@@ -216,18 +210,13 @@ export function MonitorDetailSheet({
           <SheetTitle className="flex flex-wrap items-center gap-2 pr-8 text-left">
             <StatusDot status={checking ? "checking" : status} />
             <span className="truncate">{m?.name ?? "Monitor"}</span>
-            <span
-              className={cn(
-                "rounded-none border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide",
-                status === "up"
-                  ? "border-up/25 bg-up/10 text-up"
-                  : status === "down"
-                    ? "border-down/25 bg-down/10 text-down"
-                    : "border-border bg-muted text-muted-foreground",
-              )}
+            <StatusPill
+              tone={status === "up" ? "up" : status === "down" ? "down" : "neutral"}
+              size="sm"
+              uppercase
             >
               {checking ? "checking…" : statusLabel(status)}
-            </span>
+            </StatusPill>
           </SheetTitle>
           <SheetDescription className="flex flex-wrap items-center gap-x-3 gap-y-1 text-left">
             <a
@@ -249,31 +238,31 @@ export function MonitorDetailSheet({
               </span>
             )}
             {m?.account && (
-              <span className="inline-flex items-center gap-1 rounded-none border border-teal/25 bg-teal/10 px-1.5 py-px text-[10px] text-teal">
-                <UserRound className="size-2.5" aria-hidden="true" />
+              <StatusPill tone="teal" size="sm" icon={UserRound}>
                 {m.account}
-              </span>
+              </StatusPill>
             )}
             {m?.pinned && (
-              <span className="inline-flex items-center gap-1 rounded-none border border-primary/25 bg-primary/10 px-1.5 py-px text-[10px] text-primary">
-                <Pin className="size-2.5" aria-hidden="true" />
+              <StatusPill tone="accent" size="sm" icon={Pin}>
                 pinned
-              </span>
+              </StatusPill>
             )}
             {m && m.alertDelay > 0 && (
-              <span
+              <StatusPill
+                tone="warn"
+                size="sm"
+                icon={Hourglass}
+                className="text-warn/90"
                 title={
                   m.lastStatus === "down" && m.consecutiveDowns <= m.alertDelay
                     ? `Down alerts fire after ${m.alertDelay + 1} consecutive failed checks — this downtime is already recorded, only the notification is waiting`
                     : `Down webhooks wait for ${m.alertDelay + 1} consecutive failed checks`
                 }
-                className="inline-flex items-center gap-1 rounded-none border border-warn/25 bg-warn/[0.06] px-1.5 py-px text-[10px] font-medium text-warn/90"
               >
-                <Hourglass className="size-2.5" aria-hidden="true" />
                 {m.lastStatus === "down" && m.consecutiveDowns <= m.alertDelay
                   ? `confirming ${m.consecutiveDowns}/${m.alertDelay + 1}`
                   : `alerts after ${m.alertDelay + 1} failed checks`}
-              </span>
+              </StatusPill>
             )}
             <span>Last updated {timeAgo(m?.lastCheckAt)}</span>
           </SheetDescription>

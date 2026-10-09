@@ -29,6 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import { api, ApiError, timeAgo } from "@/lib/ping-client";
 import type { MonitorDTO, WebhookChannelDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
+import { StatusPill, pillToneClass } from "./status-pill";
 
 /**
  * Webhook notification channels — POST to Slack/Discord/generic receivers
@@ -205,9 +206,9 @@ export function NotificationsSection({
                   <WebhookIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
                   <span className="text-sm font-medium">{ch.name}</span>
                   <span className="flex items-center gap-1">
-                    {ch.notifyDown && <EventBadge tone="down">down</EventBadge>}
-                    {ch.notifyUp && <EventBadge tone="up">up</EventBadge>}
-                    {ch.notifySlow && <EventBadge tone="warn">slow</EventBadge>}
+                    {ch.notifyDown && <StatusPill tone="down" size="sm" uppercase>down</StatusPill>}
+                    {ch.notifyUp && <StatusPill tone="up" size="sm" uppercase>up</StatusPill>}
+                    {ch.notifySlow && <StatusPill tone="warn" size="sm" uppercase>slow</StatusPill>}
                   </span>
                   {monitors.length > 0 && (
                     <Select
@@ -220,9 +221,7 @@ export function NotificationsSection({
                       <SelectTrigger
                         className={cn(
                           "h-6 w-auto max-w-[150px] gap-1 rounded-none border px-2 text-[10px] font-medium",
-                          ch.monitorId
-                            ? "border-primary/30 bg-primary/10 text-primary"
-                            : "border-border bg-muted text-muted-foreground",
+                          pillToneClass(ch.monitorId ? "accent" : "neutral"),
                         )}
                         aria-label={`Route channel ${ch.name} to a monitor`}
                         title={
@@ -410,22 +409,5 @@ export function NotificationsSection({
         </form>
       </div>
     </section>
-  );
-}
-
-function EventBadge({ tone, children }: { tone: "down" | "up" | "warn"; children: React.ReactNode }) {
-  return (
-    <span
-      className={cn(
-        "rounded-none border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide",
-        tone === "down"
-          ? "border-down/30 bg-down/10 text-down"
-          : tone === "up"
-            ? "border-up/30 bg-up/10 text-up"
-            : "border-warn/30 bg-warn/10 text-warn",
-      )}
-    >
-      {children}
-    </span>
   );
 }

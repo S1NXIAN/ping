@@ -12,6 +12,7 @@ import {
   formatUptime,
   timeAgo,
   uptimeTone,
+  uptimeToneClass,
 } from "@/lib/ping-client";
 import type {
   DailyBucket,
@@ -24,15 +25,13 @@ import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
 import { ResponseSparkline } from "./response-sparkline";
 import { StatusDot } from "./status-dot";
+import { StatusPill } from "./status-pill";
 
 const REFRESH_MS = 30_000;
 
-/** Band -> ink class; null (no data) keeps the quiet meta ink. */
-function uptimeToneClass(tone: ReturnType<typeof uptimeTone>): string {
-  if (tone === "up") return "text-up";
-  if (tone === "warn") return "text-warn";
-  if (tone === "down") return "text-down";
-  return "text-foreground/85";
+/** Public page: the null (no-data) band keeps the slightly brighter meta ink. */
+function publicToneClass(tone: ReturnType<typeof uptimeTone>): string {
+  return uptimeToneClass(tone, "text-foreground/85");
 }
 
 /**
@@ -112,9 +111,9 @@ export function PublicStatusView({ token }: { token: string }) {
         <div className="mx-auto flex h-14 max-w-2xl items-center gap-2 px-4">
           <PingLogo className="size-7" />
           <PingWordmark className="text-base" />
-          <span className="rounded-none border border-primary/30 bg-primary/10 px-2 py-px text-[10px] font-medium uppercase tracking-wider text-primary">
+          <StatusPill tone="accent" size="sm" uppercase>
             status
-          </span>
+          </StatusPill>
           <span className="ml-auto text-xs text-muted-foreground">
             {data ? `updated ${timeAgo(data.serverTime, now)}` : "…"}
           </span>
@@ -354,33 +353,37 @@ function MonitorRow({ monitor, now }: { monitor: PublicStatusMonitor; now: numbe
         <StatusDot status={monitor.status} pulse={monitor.status === "up" || monitor.status === "down"} />
         <h2 className="min-w-0 truncate text-sm font-medium text-foreground">{monitor.name}</h2>
         {degraded && (
-          <span
+          <StatusPill
+            tone="warn"
+            size="sm"
+            uppercase
+            icon={Gauge}
             title="Up, but the latest check was slower than this service's latency threshold"
-            className="inline-flex items-center gap-1 rounded-none border border-warn/35 bg-warn/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-warn"
           >
-            <Gauge className="size-2.5" aria-hidden="true" />
             degraded
-          </span>
+          </StatusPill>
         )}
         {maintenance && (
-          <span
+          <StatusPill
+            tone="warn"
+            size="sm"
+            uppercase
+            icon={Wrench}
             title="Planned maintenance — checks continue and are recorded; “down” here is expected"
-            className="inline-flex items-center gap-1 rounded-none border border-warn/35 bg-warn/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-warn"
           >
-            <Wrench className="size-2.5" aria-hidden="true" />
             maintenance
-          </span>
+          </StatusPill>
         )}
         {monitor.status === "paused" && (
-          <span className="rounded-none border border-border bg-muted px-1.5 py-px text-[10px] uppercase tracking-wide text-muted-foreground">
+          <StatusPill tone="neutral" size="sm" uppercase>
             paused
-          </span>
+          </StatusPill>
         )}
         <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
           {monitor.uptime7d != null ? (
             <span className="tabular-nums">
               7d{" "}
-              <span className={cn("font-medium", uptimeToneClass(uptimeTone(monitor.uptime7d)))}>
+              <span className={cn("font-medium", publicToneClass(uptimeTone(monitor.uptime7d)))}>
                 {formatUptime(monitor.uptime7d)}
               </span>
             </span>
@@ -439,7 +442,7 @@ function MonitorRow({ monitor, now }: { monitor: PublicStatusMonitor; now: numbe
         {monitor.uptime30d != null ? (
           <span>
             30d{" "}
-            <span className={cn("tabular-nums", uptimeToneClass(uptimeTone(monitor.uptime30d)))}>
+            <span className={cn("tabular-nums", publicToneClass(uptimeTone(monitor.uptime30d)))}>
               {formatUptime(monitor.uptime30d)}
             </span>
           </span>
@@ -474,17 +477,19 @@ function IncidentList({ incidents, now }: { incidents: PublicIncident[]; now: nu
                 {ended ? (
                   <span className="text-xs text-muted-foreground">resolved</span>
                 ) : (
-                  <span className="rounded-none border border-down/40 bg-down/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-down">
+                  <StatusPill tone="down" size="sm" uppercase>
                     ongoing
-                  </span>
+                  </StatusPill>
                 )}
                 {inc.duringMaintenance && (
-                  <span
+                  <StatusPill
+                    tone="warn"
+                    size="sm"
+                    uppercase
                     title="This down period overlapped a planned maintenance window"
-                    className="rounded-none border border-warn/35 bg-warn/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-warn"
                   >
                     during maintenance
-                  </span>
+                  </StatusPill>
                 )}
                 <span className="ml-auto text-xs tabular-nums text-muted-foreground">
                   {formatDuration(Math.round(durationMs / 1000))}
@@ -540,16 +545,9 @@ function MaintenanceList({ maintenance, now }: { maintenance: PublicMaintenance[
             <li key={`${w.monitorId}-${w.startsAt}-${i}`} className="py-2.5 first:pt-0 last:pb-0">
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                 <span className="text-sm font-medium text-foreground">{w.monitorName}</span>
-                <span
-                  className={cn(
-                    "rounded-none border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide",
-                    isActive
-                      ? "border-warn/40 bg-warn/10 text-warn"
-                      : "border-border bg-muted text-muted-foreground",
-                  )}
-                >
+                <StatusPill tone={isActive ? "warn" : "neutral"} size="sm" uppercase>
                   {isActive ? "in progress" : "scheduled"}
-                </span>
+                </StatusPill>
                 <span className="ml-auto text-xs tabular-nums text-muted-foreground">
                   {formatDuration(Math.round((end - start) / 1000))}
                 </span>

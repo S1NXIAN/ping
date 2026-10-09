@@ -26,6 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { api, ApiError, formatDateTime, formatDuration } from "@/lib/ping-client";
 import type { AdminIncidentDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
+import { StatusPill } from "./status-pill";
 
 /**
  * Admin view of the last 30 days of incidents (derived from real checks)
@@ -107,9 +108,9 @@ export function IncidentsSheet({
             <AlertTriangle className="size-4 text-down/90" aria-hidden="true" />
             Incidents
             {incidents && incidents.length > 0 && (
-              <span className="rounded-none border border-down/30 bg-down/10 px-1.5 py-px text-[10px] font-medium tabular-nums text-down">
+              <StatusPill tone="down" size="sm" className="tabular-nums">
                 {incidents.length}
-              </span>
+              </StatusPill>
             )}
           </SheetTitle>
           <SheetDescription>
@@ -205,17 +206,19 @@ function IncidentRow({
         {ended ? (
           <span className="text-[11px] text-muted-foreground">resolved</span>
         ) : (
-          <span className="rounded-none border border-down/40 bg-down/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-down">
+          <StatusPill tone="down" size="sm" uppercase>
             ongoing
-          </span>
+          </StatusPill>
         )}
         {inc.duringMaintenance && (
-          <span
+          <StatusPill
+            tone="warn"
+            size="sm"
+            uppercase
             title="This down period overlapped a planned maintenance window"
-            className="rounded-none border border-warn/35 bg-warn/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-warn"
           >
             during maintenance
-          </span>
+          </StatusPill>
         )}
         <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
           {formatDuration(Math.round(durationMs / 1000))}

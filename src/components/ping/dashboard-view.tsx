@@ -71,6 +71,7 @@ import { IncidentsSheet } from "./incidents-sheet";
 import { TextPromptDialog } from "./text-prompt-dialog";
 import { StatCard } from "./stat-card";
 import { CommandPalette } from "./command-palette";
+import { StatusPill, type PillTone } from "./status-pill";
 
 export type SortMode = "manual" | "az" | "status" | "slowest";
 const SORT_STORAGE_KEY = "ping.sort";
@@ -517,11 +518,11 @@ export function DashboardView({
     }
   }
 
-  const headerPill = (label: string, value: number, tone: string) => (
-    <span className={cn("inline-flex h-6 items-center gap-1 rounded-none border px-2.5 text-xs tabular-nums", tone)}>
+  const headerPill = (label: string, value: number, tone: PillTone) => (
+    <StatusPill tone={tone} size="lg" className="tabular-nums">
       {value}
       <span className="text-muted-foreground">{label}</span>
-    </span>
+    </StatusPill>
   );
 
   return (
@@ -587,23 +588,10 @@ export function DashboardView({
                 {/* Header pills tint only when the count is real (the paused
                     pill's idle pattern): a rose "0 down" was a false alarm —
                     color encodes state, and zero is not a state. */}
-                {headerPill(
-                  "up",
-                  summary.up,
-                  summary.up > 0
-                    ? "border-up/25 bg-up/10 text-up"
-                    : "border-border bg-muted text-muted-foreground",
-                )}
-                {headerPill(
-                  "down",
-                  summary.down,
-                  summary.down > 0
-                    ? "border-down/25 bg-down/10 text-down"
-                    : "border-border bg-muted text-muted-foreground",
-                )}
-                {summary.degraded > 0 &&
-                  headerPill("slow", summary.degraded, "border-warn/30 bg-warn/10 text-warn")}
-                {summary.paused > 0 && headerPill("paused", summary.paused, "border-border bg-muted text-muted-foreground")}
+                {headerPill("up", summary.up, summary.up > 0 ? "up" : "neutral")}
+                {headerPill("down", summary.down, summary.down > 0 ? "down" : "neutral")}
+                {summary.degraded > 0 && headerPill("slow", summary.degraded, "warn")}
+                {summary.paused > 0 && headerPill("paused", summary.paused, "neutral")}
                 </div>
               </>
             )}
@@ -996,11 +984,9 @@ export function DashboardView({
               <AlertTriangle className="size-4" aria-hidden="true" />
               <span>Incidents</span>
               {incidentCount > 0 && (
-                <span
-                  className="ml-0.5 grid min-w-4 place-items-center rounded-none border border-down/40 bg-background/50 px-1 text-[10px] font-semibold tabular-nums text-down"
-                >
+                <StatusPill tone="down" className="ml-0.5 min-w-4 justify-center bg-background/50 font-semibold tabular-nums">
                   {incidentCount}
-                </span>
+                </StatusPill>
               )}
             </Button>
             </div>

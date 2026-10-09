@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { api, formatDateTime, formatDuration } from "@/lib/ping-client";
 import type { MaintenanceWindowDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
+import { StatusPill } from "./status-pill";
 
 /**
  * All maintenance windows: active first (ends-soonest), then upcoming, then
@@ -53,9 +54,9 @@ export function MaintenanceSheet({
             <Wrench className="size-4 text-warn" aria-hidden="true" />
             Maintenance
             {active.length > 0 && (
-              <span className="rounded-none border border-warn/40 bg-warn/10 px-1.5 py-px text-[10px] font-medium tabular-nums text-warn">
+              <StatusPill tone="warn" size="sm" className="tabular-nums">
                 {active.length} active
-              </span>
+              </StatusPill>
             )}
           </SheetTitle>
           <SheetDescription>

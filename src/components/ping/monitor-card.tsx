@@ -63,6 +63,7 @@ import {
 import type { FolderDTO, MaintenanceWindowDTO, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { StatusDot, statusLabel } from "./status-dot";
+import { StatusPill, type PillTone } from "./status-pill";
 import { TextPromptDialog } from "./text-prompt-dialog";
 import { checksToSegments, UptimeBars } from "./uptime-bars";
 
@@ -164,16 +165,16 @@ export function MonitorCard({
   const maintenanceUpcoming =
     maintenanceWindow != null && new Date(maintenanceWindow.startsAt).getTime() > Date.now();
 
-  const statusTone =
+  const statusTone: PillTone =
     status === "up"
       ? degraded
-        ? "bg-warn/15 text-warn border-warn/40"
-        : "bg-up/10 text-up border-up/25"
+        ? "warn"
+        : "up"
       : status === "down"
         ? maintenanceNow
-          ? "bg-warn/15 text-warn border-warn/40"
-          : "bg-down/10 text-down border-down/25"
-        : "bg-muted text-muted-foreground border-border";
+          ? "warn"
+          : "down"
+        : "neutral";
 
   const beingDragged = dnd?.isDragging === true && dragArmed;
 
@@ -365,20 +366,11 @@ export function MonitorCard({
                 {monitor.name}
               </button>
               {monitor.pinned && (
-                <span
-                  title="Pinned to top"
-                  className="inline-flex items-center gap-1 rounded-none border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary"
-                >
-                  <Pin className="size-2.5" aria-hidden="true" />
+                <StatusPill tone="accent" icon={Pin} title="Pinned to top">
                   pinned
-                </span>
+                </StatusPill>
               )}
-              <span
-                className={cn(
-                  "rounded-none border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
-                  statusTone,
-                )}
-              >
+              <StatusPill tone={statusTone} uppercase>
                 {checking
                   ? "checking…"
                   : status === "down" && maintenanceNow
@@ -386,88 +378,92 @@ export function MonitorCard({
                     : degraded
                       ? "slow"
                       : statusLabel(status)}
-              </span>
+              </StatusPill>
               {degraded && monitor.slowThresholdMs != null && (
-                <span
+                <StatusPill
+                  tone="warn"
+                  icon={Gauge}
                   title={`Response time above the ${monitor.slowThresholdMs} ms latency threshold${
                     monitor.lastResponseMs != null ? ` — last check ${formatMs(monitor.lastResponseMs)}` : ""
                   }`}
-                  className="inline-flex items-center gap-1 rounded-none border border-warn/40 bg-warn/15 px-2 py-0.5 text-[10px] font-medium text-warn"
                 >
-                  <Gauge className="size-2.5" aria-hidden="true" />
                   {monitor.lastResponseMs != null
                     ? `${formatMs(monitor.lastResponseMs)} > ${monitor.slowThresholdMs} ms`
                     : `> ${monitor.slowThresholdMs} ms`}
-                </span>
+                </StatusPill>
               )}
               {maintenanceNow && (
-                <span
+                <StatusPill
+                  tone="warn"
+                  icon={Wrench}
                   title={`Maintenance until ${new Date(maintenanceWindow!.endsAt).toLocaleString()} — alerts silenced`}
-                  className="inline-flex items-center gap-1 rounded-none border border-warn/30 bg-warn/10 px-2 py-0.5 text-[10px] font-medium text-warn"
                 >
-                  <Wrench className="size-2.5" aria-hidden="true" />
                   {formatMaintenanceLeft(maintenanceWindow!.endsAt)}
-                </span>
+                </StatusPill>
               )}
               {maintenanceUpcoming && (
-                <span
+                <StatusPill
+                  tone="warn"
+                  icon={Wrench}
+                  className="text-warn/80"
                   title={`Maintenance starts ${new Date(maintenanceWindow!.startsAt).toLocaleString()}`}
-                  className="inline-flex items-center gap-1 rounded-none border border-warn/25 bg-warn/[0.06] px-2 py-0.5 text-[10px] text-warn/80"
                 >
-                  <Wrench className="size-2.5" aria-hidden="true" />
                   maint. {formatCountdown(maintenanceWindow!.startsAt)}
-                </span>
+                </StatusPill>
               )}
               {monitor.account && (
-                <span
-                  className="inline-flex max-w-52 items-center gap-1 rounded-none border border-teal/25 bg-teal/10 px-2 py-0.5 text-[10px] text-teal"
+                <StatusPill
+                  tone="teal"
+                  icon={UserRound}
+                  className="max-w-52"
                   title={`Account used: ${monitor.account}`}
                 >
-                  <UserRound className="size-2.5 shrink-0" aria-hidden="true" />
                   <span className="min-w-0 truncate">{monitor.account}</span>
-                </span>
+                </StatusPill>
               )}
               {monitor.keyword && (
-                <span
+                <StatusPill
+                  tone="accent"
+                  icon={ScanSearch}
+                  className="max-w-52 text-primary/90"
                   title={
                     monitor.keywordMode === "excludes"
                       ? `Keyword check — the response must NOT contain “${monitor.keyword}” (case-insensitive, first 256 KB)`
                       : `Keyword check — the response must contain “${monitor.keyword}” (case-insensitive, first 256 KB)`
                   }
-                  className="inline-flex max-w-52 items-center gap-1 rounded-none border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] text-primary/90"
                 >
-                  <ScanSearch className="size-2.5 shrink-0" aria-hidden="true" />
                   <span className="min-w-0 truncate">
                     {monitor.keywordMode === "excludes" ? "no" : "has"} “{monitor.keyword}”
                   </span>
-                </span>
+                </StatusPill>
               )}
               {status === "down" &&
                 !maintenanceNow &&
                 monitor.alertDelay > 0 &&
                 monitor.consecutiveDowns <= monitor.alertDelay && (
-                  <span
+                  <StatusPill
+                    tone="warn"
+                    icon={Hourglass}
+                    className="text-warn/90"
                     title={`Down alerts fire after ${monitor.alertDelay + 1} consecutive failed checks — the status above is already honest downtime`}
-                    className="inline-flex items-center gap-1 rounded-none border border-warn/25 bg-warn/[0.08] px-2 py-0.5 text-[10px] font-medium text-warn/90"
                   >
-                    <Hourglass className="size-2.5" aria-hidden="true" />
                     confirming {monitor.consecutiveDowns}/{monitor.alertDelay + 1}
-                  </span>
+                  </StatusPill>
                 )}
               {monitor.folderName && (
-                <span className="inline-flex items-center gap-1 rounded-none border border-border bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                  <Folder className="size-2.5" aria-hidden="true" />
+                <StatusPill tone="neutral" icon={Folder}>
                   {monitor.folderName}
-                </span>
+                </StatusPill>
               )}
               {nextPingAt && (
-                <span
-                  className="inline-flex items-center gap-1 rounded-none border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] text-primary/90"
+                <StatusPill
+                  tone="accent"
+                  icon={Clock}
+                  className="text-primary/90"
                   title={`Scheduled ping ${formatCountdown(nextPingAt)} — ${new Date(nextPingAt).toLocaleString()}`}
                 >
-                  <Clock className="size-2.5" aria-hidden="true" />
                   ping {formatCountdown(nextPingAt)}
-                </span>
+                </StatusPill>
               )}
             </div>
 

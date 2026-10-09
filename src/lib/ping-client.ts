@@ -83,6 +83,21 @@ export function uptimeTone(
   return "down";
 }
 
+/**
+ * Uptime band -> ink class. One source for every surface; callers pass the
+ * ink they want for the null (no-data) band, since it differs by context
+ * (dashboard/sheet use quiet muted, public page a slightly brighter meta).
+ */
+export function uptimeToneClass(
+  tone: ReturnType<typeof uptimeTone>,
+  nullClass = "text-muted-foreground",
+): string {
+  if (tone === "up") return "text-up";
+  if (tone === "warn") return "text-warn";
+  if (tone === "down") return "text-down";
+  return nullClass;
+}
+
 /** 0.9982 -> "99.8%" (null -> "—") */
 export function formatUptime(fraction: number | null | undefined): string {
   if (fraction == null || Number.isNaN(fraction)) return "—";
