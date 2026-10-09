@@ -631,7 +631,7 @@ export function DashboardView({
                   ) : (
                     <LockKeyhole className="size-4" />
                   )}
-                  Settings &amp; keep-awake
+                  Settings
                   <span
                     className={cn(
                       "ml-auto text-[10px] font-medium",

@@ -228,7 +228,7 @@ export function CommandPalette({
           </CommandItem>
           <CommandItem onSelect={() => run(onOpenSettings)}>
             <LockKeyhole className={cn(adminUnlocked && "text-teal")} />
-            {adminUnlocked ? "Settings (unlocked)" : "Settings & keep-awake"}
+            {adminUnlocked ? "Settings (unlocked)" : "Settings"}
           </CommandItem>
           <CommandItem onSelect={() => run(onLogout)} className="text-down">
             <LogOut />
