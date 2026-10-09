@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import { api, ApiError, normalizeUrl } from "@/lib/ping-client";
+import { api, ApiError, formatInterval, normalizeUrl, parseInterval } from "@/lib/ping-client";
 import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
 
 // Nine flat choices were decision residue (critique 2026-09-16 P2); three
@@ -68,7 +68,12 @@ const KEYWORD_MODES = [
   { value: "excludes", label: "Body must not contain it" },
 ];
 
-type FieldErrors = { url?: string; slow?: string; keyword?: string };
+/** Sentinel for the "Custom…" row — never a real interval value. */
+const CUSTOM_INTERVAL = "custom";
+/** Every preset value, for telling a curated choice from a hand-typed one. */
+const PRESET_INTERVALS = new Set(INTERVAL_GROUPS.flatMap((g) => g.options).map((o) => o.value));
+
+type FieldErrors = { url?: string; slow?: string; keyword?: string; interval?: string };
 
 /** Top-aligned label with a compact "?" tooltip instead of helper paragraphs. */
 function FieldLabel({
@@ -127,6 +132,8 @@ export function AddMonitorDialog({
   const [url, setUrl] = useState("");
   const [folderId, setFolderId] = useState<string>("none");
   const [intervalSec, setIntervalSec] = useState("300");
+  // "custom" replaces the preset select with a free-text D/H/M field.
+  const [intervalCustom, setIntervalCustom] = useState(false);
   const [method, setMethod] = useState<"GET" | "HEAD">("GET");
   const [account, setAccount] = useState("");
   const [keywordMode, setKeywordMode] = useState<"off" | "contains" | "excludes">("off");
@@ -146,7 +153,19 @@ export function AddMonitorDialog({
       setName(initial.name);
       setUrl(initial.url);
       setFolderId(initial.folderId ?? "none");
-      setIntervalSec(String(initial.intervalSec));
+      // A value the presets don't cover (e.g. a saved 3D:15M) opens in custom
+      // mode — and the field then holds TEXT, so seed it with the compact form
+      // ("3d 15m") rather than the raw seconds the API stores.
+      // The grammar is whole-minute (D/H/M), so a legacy sub-minute value (the
+      // old schema allowed any int >= 60) has no exact text form — seed the
+      // nearest representable value, which the live preview then states plainly.
+      const isCustom = !PRESET_INTERVALS.has(String(initial.intervalSec));
+      setIntervalCustom(isCustom);
+      setIntervalSec(
+        isCustom
+          ? formatInterval(Math.ceil(initial.intervalSec / 60) * 60)
+          : String(initial.intervalSec),
+      );
       setMethod(initial.method);
       setAccount(initial.account ?? "");
       setKeywordMode(initial.keyword ? initial.keywordMode : "off");
@@ -166,6 +185,7 @@ export function AddMonitorDialog({
       setUrl("");
       setFolderId(defaultFolderId ?? "none");
       setIntervalSec("300");
+      setIntervalCustom(false);
       setMethod("GET");
       setAccount("");
       setKeywordMode("off");
@@ -228,17 +248,26 @@ export function AddMonitorDialog({
     const trimmedKeyword = keyword.trim();
     if (keywordMode !== "off" && trimmedKeyword === "") next.keyword = "Enter a keyword, or set it Off";
 
+    // Custom interval: parse the D/H/M text to the seconds the API stores.
+    // A preset value is already seconds, so it needs no parsing.
+    let intervalSeconds = Number(intervalSec);
+    if (intervalCustom) {
+      const parsed = parseInterval(intervalSec);
+      if ("error" in parsed) next.interval = parsed.error;
+      else intervalSeconds = parsed.seconds;
+    }
+
     setFieldErrors(next);
     if (Object.values(next).some(Boolean)) {
       // surface hidden advanced-field errors
       if (next.slow || next.keyword) setAdvancedOpen(true);
-      document.getElementById("m-url")?.focus();
+      document.getElementById(next.interval ? "m-interval" : "m-url")?.focus();
       return;
     }
 
     const body: Record<string, unknown> = {
       url: normalized,
-      intervalSec: Number(intervalSec),
+      intervalSec: intervalSeconds,
       method,
       folderId: folderId === "none" ? null : folderId,
       account: account.trim(),
@@ -282,6 +311,12 @@ export function AddMonitorDialog({
   const intervalOption = INTERVAL_GROUPS.flatMap((g) => g.options).find(
     (o) => o.value === intervalSec,
   );
+  // Live preview of the custom field: the parsed seconds, or null while the
+  // text is incomplete/invalid (the hint then falls back to the unit legend).
+  const intervalPreview = intervalCustom ? (() => {
+    const r = parseInterval(intervalSec);
+    return "seconds" in r ? r.seconds : null;
+  })() : null;
   const folderLabel =
     folderId === "none" ? "No folder" : folders.find((f) => f.id === folderId)?.name ?? "No folder";
 
@@ -407,26 +442,86 @@ export function AddMonitorDialog({
                 <FieldLabel htmlFor="m-interval" hint="How often PING sends a real HTTP request.">
                   Check interval
                 </FieldLabel>
-                <Select value={intervalSec} onValueChange={setIntervalSec}>
-                  <SelectTrigger id="m-interval" className={fieldClass}>
-                    <SelectValue>{intervalOption?.label}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {INTERVAL_GROUPS.map((g) => (
-                      <SelectGroup key={g.label}>
-                        <SelectLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          {g.label}
-                        </SelectLabel>
-                        {g.options.map((i) => (
-                          <SelectItem key={i.value} value={i.value}>
-                            {i.label}
-                            {i.recommended ? " (recommended)" : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {intervalCustom ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="m-interval"
+                        value={intervalSec}
+                        onChange={(e) => {
+                          setIntervalSec(e.target.value);
+                          clearError("interval");
+                        }}
+                        placeholder="e.g. 4M or 3D:15M"
+                        autoComplete="off"
+                        aria-invalid={fieldErrors.interval ? true : undefined}
+                        aria-describedby={fieldErrors.interval ? "m-interval-err" : undefined}
+                        className={fieldClass}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          setIntervalCustom(false);
+                          setIntervalSec("300");
+                          clearError("interval");
+                        }}
+                        className="h-11 shrink-0 text-xs sm:h-9"
+                      >
+                        Presets
+                      </Button>
+                    </div>
+                    {fieldErrors.interval ? (
+                      <p id="m-interval-err" role="alert" className="text-xs text-down">
+                        {fieldErrors.interval}
+                      </p>
+                    ) : (
+                      // Echo the parsed cadence so the D/H/M string is never
+                      // ambiguous. D/H/M are whole minutes, so every value the
+                      // grammar yields is exact on the 30s tick grid — no caveat
+                      // needed, and claiming one would imply false imprecision.
+                      <p className="text-xs text-muted-foreground">
+                        {intervalPreview
+                          ? `= every ${formatInterval(intervalPreview)}`
+                          : "D = days, H = hours, M = minutes"}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <Select
+                    value={intervalSec}
+                    onValueChange={(v) => {
+                      if (v === CUSTOM_INTERVAL) {
+                        setIntervalCustom(true);
+                        // Seed the field from the current choice so the user
+                        // edits rather than retypes.
+                        setIntervalSec(formatInterval(Number(intervalSec)));
+                        return;
+                      }
+                      setIntervalSec(v);
+                    }}
+                  >
+                    <SelectTrigger id="m-interval" className={fieldClass}>
+                      <SelectValue>{intervalOption?.label}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INTERVAL_GROUPS.map((g) => (
+                        <SelectGroup key={g.label}>
+                          <SelectLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                            {g.label}
+                          </SelectLabel>
+                          {g.options.map((i) => (
+                            <SelectItem key={i.value} value={i.value}>
+                              {i.label}
+                              {i.recommended ? " (recommended)" : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      ))}
+                      <SelectItem value={CUSTOM_INTERVAL}>Custom…</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               <div className="space-y-2">

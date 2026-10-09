@@ -7,6 +7,7 @@
 // README. The admin is already authenticated, so this is not untrusted input;
 // blocking internal targets would break legitimate internal monitoring.
 import { z } from "zod";
+import { INTERVAL_MAX_SEC, INTERVAL_MIN_SEC } from "./ping-client";
 
 /** A monitor URL: any http(s) URL, internal or public. */
 export const monitorUrlSchema = z
@@ -22,3 +23,11 @@ export const monitorUrlSchema = z
       return false;
     }
   }, "Enter a valid http(s) URL");
+
+/** Check interval in seconds. Bounded to the range the scheduler and the
+ *  custom-interval grammar can honour (see INTERVAL_MIN_SEC / MAX_SEC). */
+export const intervalSecSchema = z
+  .number()
+  .int()
+  .min(INTERVAL_MIN_SEC, `At least ${INTERVAL_MIN_SEC / 60} minute`)
+  .max(INTERVAL_MAX_SEC, `At most ${INTERVAL_MAX_SEC / 86400} days`);

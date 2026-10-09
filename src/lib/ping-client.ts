@@ -1,5 +1,63 @@
 // Small client-side helpers for PING: fetch wrapper + formatters.
 
+/** Check-interval bounds, shared with the API schemas (see lib/validation.ts).
+ *  The floor is 60s and seconds are not a grammar unit: the scheduler wakes
+ *  every 30s, so anything finer could not be honoured exactly — and showing a
+ *  cadence we can't keep would break the no-invented-numbers contract. */
+export const INTERVAL_MIN_SEC = 60;
+export const INTERVAL_MAX_SEC = 604800; // 7 days
+
+const INTERVAL_UNIT_SEC: Record<string, number> = { d: 86400, h: 3600, m: 60 };
+
+const INTERVAL_SYNTAX_ERROR = "Use a number and unit, e.g. 4M or 3D:15M";
+
+/**
+ * Parses a custom check interval such as `4M`, `48H`, `3D:15M` or `1d 12h 30m`.
+ * Units are D/H/M, case-insensitive, separated by `:`, spaces or nothing.
+ * Units are unbounded (48H is valid) — only the summed total is range-checked.
+ * Returns total seconds, the unit the API, DB and scheduler already use.
+ */
+export function parseInterval(input: string): { seconds: number } | { error: string } {
+  const raw = input.trim();
+  if (!raw) return { error: "Enter an interval, e.g. 4M or 3D:15M" };
+
+  // Split on separators. Runs of `:`/whitespace collapse, so a doubled
+  // separator ("4M::5H") is tolerated; a leading/trailing one leaves an empty
+  // part and is rejected.
+  const parts = raw.split(/[:\s]+/);
+  if (parts.some((p) => !p)) return { error: INTERVAL_SYNTAX_ERROR };
+
+  const seen = new Set<string>();
+  let total = 0;
+  for (const part of parts) {
+    // Each part is one or more <int><unit> groups ("3D15M" and "4M" both ok).
+    const groups = part.match(/\d+[a-zA-Z]+/g);
+    if (!groups || groups.join("") !== part) return { error: INTERVAL_SYNTAX_ERROR };
+    for (const group of groups) {
+      const match = group.match(/^(\d+)([a-zA-Z]+)$/)!;
+      const amount = Number(match[1]);
+      const unit = match[2].toLowerCase();
+      // Own keys only: `unit in MAP` walks the prototype chain, so
+      // "constructor"/"toString" would pass and yield NaN.
+      if (!Object.hasOwn(INTERVAL_UNIT_SEC, unit))
+        return {
+          error:
+            unit === "s"
+              ? "Seconds aren't supported — checks run on a 30s scheduler. Try 1M."
+              : `Unknown unit "${match[2]}" — use D, H or M`,
+        };
+      if (seen.has(unit)) return { error: `"${unit.toUpperCase()}" is given twice` };
+      seen.add(unit);
+      total += amount * INTERVAL_UNIT_SEC[unit];
+    }
+  }
+
+  if (total < INTERVAL_MIN_SEC) return { error: `At least ${INTERVAL_MIN_SEC / 60}M` };
+  if (total > INTERVAL_MAX_SEC)
+    return { error: `At most ${INTERVAL_MAX_SEC / 86400} days` };
+  return { seconds: total };
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -106,12 +164,21 @@ export function formatUptime(fraction: number | null | undefined): string {
   return `${pct.toFixed(pct >= 99 ? 2 : 1)}%`;
 }
 
-/** 300 -> "5m", 3600 -> "1h" */
+/** 300 -> "5m", 3600 -> "1h", 260100 -> "3d 15m".
+ *  Zero-skipping compound: only the units present are shown. */
 export function formatInterval(seconds: number): string {
-  if (seconds % 86400 === 0 && seconds >= 86400) return `${seconds / 86400}d`;
-  if (seconds % 3600 === 0 && seconds >= 3600) return `${seconds / 3600}h`;
-  if (seconds % 60 === 0 && seconds >= 60) return `${seconds / 60}m`;
-  return `${seconds}s`;
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  const parts: string[] = [];
+  if (d) parts.push(`${d}d`);
+  if (h) parts.push(`${h}h`);
+  if (m) parts.push(`${m}m`);
+  // `s` never comes from the grammar (the scheduler can't honour it) but a
+  // legacy/API-supplied value must still render truthfully.
+  if (s) parts.push(`${s}s`);
+  return parts.length ? parts.join(" ") : "0s";
 }
 
 export function formatDuration(seconds: number): string {
