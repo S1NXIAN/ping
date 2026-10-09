@@ -156,7 +156,6 @@ export function AddMonitorDialog({
       // editing something with advanced values set → start expanded
       setAdvancedOpen(
         !!(
-          initial.account ||
           initial.keyword ||
           initial.slowThresholdMs != null ||
           (initial.alertDelay ?? 0) > 0 ||
@@ -210,7 +209,6 @@ export function AddMonitorDialog({
   }
 
   const advCount =
-    (account.trim() ? 1 : 0) +
     (keywordActive && keyword.trim() ? 1 : 0) +
     (slowThreshold.trim() !== "" ? 1 : 0) +
     (alertDelay !== "0" ? 1 : 0) +
@@ -361,6 +359,21 @@ export function AddMonitorDialog({
               />
             </div>
 
+            <div className="space-y-2">
+              <FieldLabel htmlFor="m-account" hint="Label for which account runs this service.">
+                Account used
+              </FieldLabel>
+              <Input
+                id="m-account"
+                value={account}
+                onChange={(e) => setAccount(e.target.value)}
+                placeholder="e.g. render — personal@mail.com"
+                maxLength={60}
+                autoComplete="off"
+                className={fieldClass}
+              />
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <FieldLabel htmlFor="m-interval" hint="How often PING sends a real HTTP request.">
@@ -425,21 +438,6 @@ export function AddMonitorDialog({
               </summary>
 
               <div className="space-y-4 border-t border-border/60 px-3 py-3">
-                <div className="space-y-2">
-                  <FieldLabel htmlFor="m-account" hint="Label for which account runs this service.">
-                    Account used
-                  </FieldLabel>
-                  <Input
-                    id="m-account"
-                    value={account}
-                    onChange={(e) => setAccount(e.target.value)}
-                    placeholder="e.g. render — personal@mail.com"
-                    maxLength={60}
-                    autoComplete="off"
-                    className={fieldClass}
-                  />
-                </div>
-
                 <div className="space-y-2">
                   <FieldLabel htmlFor="m-keyword-mode" hint="Require or forbid text in the response body.">
                     <span className="inline-flex items-center gap-1.5">
