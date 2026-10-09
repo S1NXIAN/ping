@@ -111,6 +111,10 @@ export async function deliverWebhook(url: string, payload: WebhookPayload): Prom
     const res = await fetch(url, {
       method: "POST",
       cache: "no-store",
+      // Never follow redirects: a public URL could 302 to an internal host
+      // (e.g. the cloud metadata service), which the isPrivateWebhookUrl
+      // check above cannot see. A redirect is treated as a failed delivery.
+      redirect: "manual",
       signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
       headers: {
         "content-type": "application/json",
@@ -127,6 +131,14 @@ export async function deliverWebhook(url: string, payload: WebhookPayload): Prom
     const ms = Math.round(performance.now() - started);
     if (res.ok) {
       return { ok: true, statusCode: res.status, error: null, ms };
+    }
+    if (res.status >= 300 && res.status < 400) {
+      return {
+        ok: false,
+        statusCode: res.status,
+        error: `Redirect not followed (HTTP ${res.status}) — point the channel at its final URL`,
+        ms,
+      };
     }
     return {
       ok: false,

@@ -68,7 +68,6 @@ skills/
 Caddyfile
 mini-services/
 examples/
-tests/
 
 # ── Misc ────────────────────────────────────────────────────────────────────
 *.pem

@@ -2,6 +2,7 @@
 // /api/monitors/[id]. Every number comes from the Check table; when there
 // is no data the value is null, never an estimate.
 import type { Check, Folder, Monitor } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { db } from "./db";
 import type { CheckDTO, MaintenanceWindowDTO, MonitorDTO, MonitorStatsDTO, ScheduledPingDTO } from "./ping-types";
 
@@ -87,15 +88,18 @@ export function toMaintenanceDTO(
   };
 }
 
-function uptime(counts: StatusCounts, monitorId: string): number | null {
-  let up = 0;
-  let total = 0;
+/** One pass over a groupBy(monitorId, status) result → uptime fraction per monitor. */
+function uptimeByMonitor(counts: StatusCounts): Map<string, number> {
+  const totals = new Map<string, { up: number; total: number }>();
   for (const c of counts) {
-    if (c.monitorId !== monitorId) continue;
-    total += c._count._all;
-    if (c.status === "up") up += c._count._all;
+    const e = totals.get(c.monitorId) ?? { up: 0, total: 0 };
+    e.total += c._count._all;
+    if (c.status === "up") e.up += c._count._all;
+    totals.set(c.monitorId, e);
   }
-  return total > 0 ? up / total : null;
+  const out = new Map<string, number>();
+  for (const [id, e] of totals) if (e.total > 0) out.set(id, e.up / e.total);
+  return out;
 }
 
 export interface StatsBundle {
@@ -168,6 +172,23 @@ export async function collectMonitorStats(): Promise<StatsBundle> {
   const statsByMonitor = new Map<string, MonitorStatsDTO>();
   const recentByMonitor = new Map<string, CheckDTO[]>();
 
+  // Index the grouped rows by monitor once — the per-monitor lookups below
+  // used to be a .find() over each result set (O(monitors²) on every poll).
+  const index = <T extends { monitorId: string }>(rows: T[]) => {
+    const m = new Map<string, T>();
+    for (const r of rows) m.set(r.monitorId, r);
+    return m;
+  };
+  const t24By = index(t24);
+  const t7By = index(t7);
+  const downsBy = index(downs);
+  const allTimeBy = index(allTime);
+  const checks24By = new Map<string, number>();
+  for (const r of c24) checks24By.set(r.monitorId, (checks24By.get(r.monitorId) ?? 0) + r._count._all);
+  const up24By = uptimeByMonitor(c24);
+  const up7By = uptimeByMonitor(c7);
+  const up30By = uptimeByMonitor(c30);
+
   const monitorIds = new Set<string>([
     ...c24.map((r) => r.monitorId),
     ...c7.map((r) => r.monitorId),
@@ -179,17 +200,15 @@ export async function collectMonitorStats(): Promise<StatsBundle> {
   ]);
 
   for (const id of monitorIds) {
-    const t24Row = t24.find((r) => r.monitorId === id);
-    const t7Row = t7.find((r) => r.monitorId === id);
-    const downRow = downs.find((r) => r.monitorId === id);
-    const allRow = allTime.find((r) => r.monitorId === id);
+    const t24Row = t24By.get(id);
+    const t7Row = t7By.get(id);
+    const downRow = downsBy.get(id);
+    const allRow = allTimeBy.get(id);
     statsByMonitor.set(id, {
-      uptime24h: uptime(c24, id),
-      uptime7d: uptime(c7, id),
-      uptime30d: uptime(c30, id),
-      checks24h: (c24 ?? [])
-        .filter((r) => r.monitorId === id)
-        .reduce((acc, r) => acc + r._count._all, 0),
+      uptime24h: up24By.get(id) ?? null,
+      uptime7d: up7By.get(id) ?? null,
+      uptime30d: up30By.get(id) ?? null,
+      checks24h: checks24By.get(id) ?? 0,
       avgMs24h: t24Row?._avg.responseMs ?? null,
       minMs24h: t24Row?._min.responseMs ?? null,
       maxMs24h: t24Row?._max.responseMs ?? null,
@@ -293,19 +312,41 @@ export async function p95For(monitorId: string): Promise<number | null> {
 export async function dailyBuckets(monitorId: string): Promise<
   Array<{ date: string; up: number; down: number }>
 > {
+  const map = await dailyBucketsByMonitor([monitorId]);
+  return map.get(monitorId) ?? [];
+}
+
+/**
+ * Daily up/down buckets for many monitors at once — ONE grouped query for
+ * the whole fleet (the public status page needs a series per monitor; a
+ * per-monitor loop was 200+ queries per page view at the monitor cap).
+ * Monitors with no checks in the window simply have no map entry.
+ */
+export async function dailyBucketsByMonitor(
+  monitorIds: string[],
+): Promise<Map<string, Array<{ date: string; up: number; down: number }>>> {
+  const result = new Map<string, Array<{ date: string; up: number; down: number }>>();
+  if (monitorIds.length === 0) return result;
+
   const sinceMs = Date.now() - 30 * H24; // epoch ms, matching sqlite storage
-  const rows = await db.$queryRaw<Array<{ day: string; status: string; cnt: number }>>`
-    SELECT date(checkedAt / 1000, 'unixepoch') AS day, status, COUNT(*) AS cnt FROM "Check"
-    WHERE monitorId = ${monitorId} AND checkedAt >= ${sinceMs}
-    GROUP BY day, status
-    ORDER BY day ASC`;
-  const map = new Map<string, { up: number; down: number }>();
+  const rows = await db.$queryRaw<Array<{ monitorId: string; day: string; status: string; cnt: number }>>`
+    SELECT monitorId, date(checkedAt / 1000, 'unixepoch') AS day, status, COUNT(*) AS cnt
+    FROM "Check"
+    WHERE monitorId IN (${Prisma.join(monitorIds)}) AND checkedAt >= ${sinceMs}
+    GROUP BY monitorId, day, status
+    ORDER BY monitorId ASC, day ASC`;
+
   for (const r of rows) {
     const cnt = Number(r.cnt); // COUNT(*) arrives as BigInt
-    const entry = map.get(r.day) ?? { up: 0, down: 0 };
-    if (r.status === "up") entry.up += cnt;
-    else entry.down += cnt;
-    map.set(r.day, entry);
+    const list = result.get(r.monitorId) ?? [];
+    const last = list[list.length - 1];
+    if (last && last.date === r.day) {
+      if (r.status === "up") last.up += cnt;
+      else last.down += cnt;
+    } else {
+      list.push({ date: r.day, up: r.status === "up" ? cnt : 0, down: r.status === "up" ? 0 : cnt });
+    }
+    result.set(r.monitorId, list);
   }
-  return Array.from(map.entries()).map(([date, v]) => ({ date, ...v }));
+  return result;
 }

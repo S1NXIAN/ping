@@ -112,6 +112,21 @@ and no uptime number is ever shown for a window PING didn't actually measure.
 - **Import/export** — your monitor configuration as JSON (includes accounts,
   webhook channels with their routing, and upcoming maintenance windows).
 
+### Trust model (read this before exposing PING)
+
+PING is single-admin software: whoever holds the password controls every
+monitor. Two consequences follow, and they are deliberate:
+
+- **Monitor URLs may point anywhere**, including `localhost`, LAN addresses
+  and `169.254.*` link-local hosts — monitoring internal services is a normal
+  use. Creating a monitor requires the admin session, so this is not an
+  untrusted-input path. If you expose PING to the internet, treat the password
+  as the only thing standing between a stranger and your internal network.
+- **Webhook URLs are the untrusted path** (they leave PING and can be
+  influenced by a compromised account), so they are held to a stricter rule:
+  no loopback/private/link-local targets, and redirects are never followed —
+  a public URL that 302s to an internal host is refused.
+
 ## Run locally
 
 ```bash

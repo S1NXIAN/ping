@@ -124,14 +124,6 @@ export function clearUnlockCookie(res: NextResponse) {
   });
 }
 
-/** Reads + verifies the unlock cookie for an authenticated request. */
-export async function getUnlockExpiry(
-  req: NextRequest,
-  passwordHash: string,
-): Promise<Date | null> {
-  return verifyUnlockToken(req.cookies.get(UNLOCK_COOKIE)?.value, passwordHash);
-}
-
 /**
  * Guard for the settings/admin APIs: requires BOTH a valid session and a
  * valid (unexpired) admin unlock. Returns a 401 response when either is

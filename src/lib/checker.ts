@@ -354,6 +354,7 @@ export async function runDueChecks(): Promise<TickResult> {
       (m) => !m.lastCheckAt || now - m.lastCheckAt.getTime() >= (m.intervalSec - 5) * 1000,
     );
 
+    let ran = 0;
     let up = 0;
     let down = 0;
     for (let i = 0; i < due.length; i += MAX_CONCURRENCY) {
@@ -367,14 +368,15 @@ export async function runDueChecks(): Promise<TickResult> {
         ),
       );
       for (const r of results) {
-        if (!r) continue;
+        if (!r) continue; // already in flight elsewhere — nothing was run
+        ran += 1;
         if (r.status === "up") up += 1;
         else down += 1;
       }
     }
 
     const result: TickResult = {
-      ran: due.length,
+      ran,
       up,
       down,
       durationMs: Math.round(performance.now() - started),

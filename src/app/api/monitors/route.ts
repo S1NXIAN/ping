@@ -3,23 +3,12 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
 import { runCheck, nextMonitorPosition, KEYWORD_MAX_LENGTH, MAX_MONITORS } from "@/lib/checker";
+import { monitorUrlSchema } from "@/lib/validation";
 import { emptyStats, toMonitorDTO } from "@/lib/ping-stats";
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(80).optional(),
-  url: z
-    .string()
-    .trim()
-    .min(4, "URL is required")
-    .max(500)
-    .refine((v) => {
-      try {
-        const u = new URL(v);
-        return (u.protocol === "http:" || u.protocol === "https:") && u.hostname.includes(".");
-      } catch {
-        return false;
-      }
-    }, "Enter a valid http(s) URL"),
+  url: monitorUrlSchema,
   folderId: z.string().trim().min(1).nullish(),
   intervalSec: z.number().int().min(60).max(86400).optional(),
   method: z.enum(["GET", "HEAD"]).optional(),

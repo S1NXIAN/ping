@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { adminGuard } from "@/lib/ping-auth";
 import { nextMonitorPosition, KEYWORD_MAX_LENGTH } from "@/lib/checker";
+import { monitorUrlSchema } from "@/lib/validation";
 import { MAX_WEBHOOK_CHANNELS } from "@/lib/webhooks";
 import type { ImportResult } from "@/lib/ping-types";
 
@@ -13,7 +14,7 @@ const schema = z.object({
     .array(
       z.object({
         name: z.string().trim().min(1).max(80),
-        url: z.string().trim().min(4).max(500),
+        url: monitorUrlSchema,
         method: z.enum(["GET", "HEAD"]).default("GET"),
         intervalSec: z.number().int().min(60).max(86400).default(300),
         enabled: z.boolean().default(true),

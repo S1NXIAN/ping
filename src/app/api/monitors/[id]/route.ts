@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
 import { KEYWORD_MAX_LENGTH } from "@/lib/checker";
+import { monitorUrlSchema } from "@/lib/validation";
 import { dailyBuckets, toCheckDTO, toMonitorDTO, p95For, emptyStats } from "@/lib/ping-stats";
 import type { MonitorDetailResponse } from "@/lib/ping-types";
 
@@ -119,20 +120,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
 const patchSchema = z.object({
   name: z.string().trim().min(1, "Name cannot be empty").max(80).optional(),
-  url: z
-    .string()
-    .trim()
-    .min(4)
-    .max(500)
-    .refine((v) => {
-      try {
-        const u = new URL(v);
-        return (u.protocol === "http:" || u.protocol === "https:") && u.hostname.includes(".");
-      } catch {
-        return false;
-      }
-    }, "Enter a valid http(s) URL")
-    .optional(),
+  url: monitorUrlSchema.optional(),
   folderId: z.string().trim().min(1).nullish(),
   intervalSec: z.number().int().min(60).max(86400).optional(),
   enabled: z.boolean().optional(),
