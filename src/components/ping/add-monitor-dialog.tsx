@@ -501,9 +501,12 @@ export function AddMonitorDialog({
                       }}
                       className={cn(
                         "h-11 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:h-9",
+                        // The selected segment is the DARKER one — it reads as
+                        // pressed-in against the group's lighter track. Bright
+                        // text carries the emphasis, not the fill.
                         scheduleMode === mode
-                          ? "bg-secondary text-foreground"
-                          : "bg-card text-muted-foreground hover:text-foreground",
+                          ? "bg-card text-foreground"
+                          : "bg-secondary text-muted-foreground hover:text-foreground",
                       )}
                     >
                       {label}
@@ -513,48 +516,48 @@ export function AddMonitorDialog({
                 {scheduleMode === "interval" &&
                   (intervalCustom ? (
                     <>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          id="m-interval"
-                          value={intervalSec}
-                          onChange={(e) => {
-                            setIntervalSec(e.target.value);
-                            clearError("interval");
-                          }}
-                          placeholder="e.g. 4M or 4H30M"
-                          autoComplete="off"
-                          aria-invalid={fieldErrors.interval ? true : undefined}
-                          aria-describedby={fieldErrors.interval ? "m-interval-err" : undefined}
-                          className={fieldClass}
-                        />
-                        <Button
+                      <Input
+                        id="m-interval"
+                        value={intervalSec}
+                        onChange={(e) => {
+                          setIntervalSec(e.target.value);
+                          clearError("interval");
+                        }}
+                        placeholder="e.g. 4M or 4H30M"
+                        autoComplete="off"
+                        aria-invalid={fieldErrors.interval ? true : undefined}
+                        aria-describedby={fieldErrors.interval ? "m-interval-err" : undefined}
+                        className={fieldClass}
+                      />
+                      {/* Hint and the way back to presets share one line, so
+                          the field itself keeps the full column width. */}
+                      <div className="flex items-center justify-between gap-2">
+                        {fieldErrors.interval ? (
+                          <p id="m-interval-err" role="alert" className="text-xs text-down">
+                            {fieldErrors.interval}
+                          </p>
+                        ) : (
+                          // Echo the parsed cadence so the H/M string is never
+                          // ambiguous. H/M are whole minutes, so every value the
+                          // grammar yields is exact on the 30s tick grid.
+                          <p className="text-xs text-muted-foreground">
+                            {intervalPreview
+                              ? `= every ${formatInterval(intervalPreview)}`
+                              : "H = hours, M = minutes"}
+                          </p>
+                        )}
+                        <button
                           type="button"
-                          variant="ghost"
                           onClick={() => {
                             setIntervalCustom(false);
                             setIntervalSec("300");
                             clearError("interval");
                           }}
-                          className="h-11 shrink-0 text-xs sm:h-9"
+                          className="shrink-0 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:text-foreground focus-visible:outline-none"
                         >
                           Presets
-                        </Button>
+                        </button>
                       </div>
-                      {fieldErrors.interval ? (
-                        <p id="m-interval-err" role="alert" className="text-xs text-down">
-                          {fieldErrors.interval}
-                        </p>
-                      ) : (
-                        // Echo the parsed cadence so the H/M string is never
-                        // ambiguous. H/M are whole minutes, so every value the
-                        // grammar yields is exact on the 30s tick grid — no caveat
-                        // needed, and claiming one would imply false imprecision.
-                        <p className="text-xs text-muted-foreground">
-                          {intervalPreview
-                            ? `= every ${formatInterval(intervalPreview)}`
-                            : "H = hours, M = minutes"}
-                        </p>
-                      )}
                     </>
                   ) : (
                     <Select

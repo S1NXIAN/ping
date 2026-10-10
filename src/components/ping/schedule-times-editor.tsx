@@ -79,7 +79,10 @@ export function ScheduleTimesEditor({
               value={t}
               onChange={(e) => setAt(i, e.target.value)}
               aria-label={`Time ${i + 1}`}
-              className="h-11 w-32 tabular-nums sm:h-9"
+              // Lines up with the schedule selector: full row on mobile (where
+              // the grid has collapsed to one column), and the selector's own
+              // column width from sm up.
+              className="h-11 min-w-0 flex-1 tabular-nums sm:h-9 sm:flex-none sm:w-[calc(50%-0.5rem)]"
             />
             <span className="text-xs text-muted-foreground">daily</span>
             <Button
