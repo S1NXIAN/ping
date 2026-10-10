@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
 import { runCheck, nextMonitorPosition, KEYWORD_MAX_LENGTH, MAX_MONITORS } from "@/lib/checker";
-import { monitorUrlSchema, intervalSecSchema } from "@/lib/validation";
+import { monitorUrlSchema, intervalSecSchema, scheduleFields, scheduleError } from "@/lib/validation";
 import { emptyStats, toMonitorDTO } from "@/lib/ping-stats";
 
 const createSchema = z.object({
@@ -42,6 +42,7 @@ const createSchema = z.object({
     .min(0, "Alert delay must be 0 or more")
     .max(10, "Alert delay can be at most 10 extra checks")
     .optional(),
+  ...scheduleFields,
 });
 
 export async function POST(req: NextRequest) {
@@ -57,7 +58,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { name, url, folderId, intervalSec, method, account, keyword, keywordMode, slowThresholdMs, alertDelay } = parsed.data;
+  const { name, url, folderId, intervalSec, method, account, keyword, keywordMode, slowThresholdMs, alertDelay, scheduleMode, scheduleTimes, timezone } = parsed.data;
+
+  // A times-of-day monitor needs both a time list and a zone, or it would
+  // silently never run.
+  const schedErr = scheduleError({ scheduleMode, scheduleTimes, timezone });
+  if (schedErr) return NextResponse.json({ error: schedErr }, { status: 400 });
 
   if (folderId) {
     const folder = await db.folder.findUnique({ where: { id: folderId } });
@@ -98,6 +104,9 @@ export async function POST(req: NextRequest) {
       keywordMode: keywordMode ?? "contains",
       slowThresholdMs: slowThresholdMs ?? null,
       alertDelay: alertDelay ?? 0,
+      scheduleMode: scheduleMode ?? "interval",
+      scheduleTimes: scheduleMode === "times" ? (scheduleTimes ?? null) : null,
+      timezone: scheduleMode === "times" ? (timezone ?? null) : null,
       position,
     },
   });

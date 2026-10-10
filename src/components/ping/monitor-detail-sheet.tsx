@@ -50,6 +50,7 @@ import {
   uptimeToneClass,
 } from "@/lib/ping-client";
 import type { MonitorDetailResponse, MonitorDTO } from "@/lib/ping-types";
+import { formatTimesForDisplay } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { HistoryChart } from "./history-chart";
 import { StatusDot, statusLabel } from "./status-dot";
@@ -229,8 +230,11 @@ export function MonitorDetailSheet({
               <ExternalLink className="size-3" aria-hidden="true" />
             </a>
             <span className="inline-flex items-center gap-1">
-              <History className="size-3" aria-hidden="true" /> every{" "}
-              {m ? formatInterval(m.intervalSec) : "—"} · {m?.method ?? "GET"}
+              <History className="size-3" aria-hidden="true" />
+              {m?.scheduleMode === "times" && m.scheduleTimes.length > 0
+                ? `at ${formatTimesForDisplay(m.scheduleTimes, m.timezone ?? "UTC")}`
+                : `every ${m ? formatInterval(m.intervalSec) : "—"}`}{" "}
+              · {m?.method ?? "GET"}
             </span>
             {m?.folderName && (
               <span className="inline-flex items-center gap-1">

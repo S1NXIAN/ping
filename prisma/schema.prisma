@@ -21,7 +21,20 @@ model Monitor {
   name           String
   url            String
   method         String    @default("GET") // GET | HEAD
-  intervalSec    Int       @default(300) // seconds between checks (min 60)
+  intervalSec    Int       @default(300) // seconds between checks (min 60); used when scheduleMode = "interval"
+  // How the check cadence is defined:
+  //   "interval" → every intervalSec seconds (above)
+  //   "times"    → at fixed clock times every day (scheduleTimes, in timezone)
+  // Additive with a default, so rows written before this column keep working.
+  scheduleMode   String    @default("interval") // "interval" | "times"
+  // Comma-separated zero-padded "HH:MM" wall-clock times in `timezone`,
+  // e.g. "03:00,13:00". Stored as wall clock (never instants) so the times
+  // survive a timezone change or a DST shift as the times the user typed.
+  // null = no times configured (an "interval" monitor).
+  scheduleTimes  String?
+  // IANA zone the times are read in, e.g. "Asia/Manila". null for interval
+  // monitors; required when scheduleMode = "times".
+  timezone       String?
   enabled        Boolean   @default(true)
   folderId       String?
   folder         Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)

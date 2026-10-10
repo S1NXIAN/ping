@@ -6,6 +6,7 @@
 // failed check, which is the stable key both sides agree on.
 import { db } from "./db";
 import { Prisma } from "@prisma/client";
+import { nominalPeriodSec, parseTimes } from "./schedule";
 import type { AdminIncidentDTO } from "./ping-types";
 
 export const INCIDENT_WINDOW_DAYS = 30;
@@ -46,7 +47,13 @@ export interface DerivedIncident {
  * scan, but the work is bounded no matter how much history is kept.
  */
 export async function deriveIncidents(
-  monitors: { id: string; name: string; intervalSec: number }[],
+  monitors: {
+    id: string;
+    name: string;
+    intervalSec: number;
+    scheduleMode?: string;
+    scheduleTimes?: string | null;
+  }[],
 ): Promise<DerivedIncident[]> {
   if (monitors.length === 0) return [];
   const since = new Date(Date.now() - INCIDENT_WINDOW_DAYS * 86400_000);
@@ -95,7 +102,16 @@ export async function deriveIncidents(
 
   await Promise.all(
     monitors.map(async (monitor) => {
-      const gapMs = monitor.intervalSec * 3 * 1000;
+      // The gap that means "PING was asleep" scales to the monitor's real
+      // cadence. A times-of-day monitor has no fixed interval, so its nominal
+      // period is derived from its clock times (1:00 PM + 3:00 AM -> a real
+      // 14h overnight gap). Using a stored interval here would split every
+      // incident at that gap.
+      const nominalSec =
+        monitor.scheduleMode === "times"
+          ? nominalPeriodSec(parseTimes(monitor.scheduleTimes))
+          : monitor.intervalSec;
+      const gapMs = nominalSec * 3 * 1000;
       const monitorWindows = windowsByMonitor.get(monitor.id) ?? [];
 
       const downs = downsByMonitor.get(monitor.id) ?? [];

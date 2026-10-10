@@ -11,12 +11,13 @@ and no uptime number is ever shown for a window PING didn't actually measure.
 
 ## Features
 
-- **Monitors** — any http(s) URL, custom name, GET or HEAD, intervals from 1
-  minute to 24 hours — pick a preset or type a custom value like `4M` or
-  `4H30M` (`H`/`M`, combinable). Group monitors into **folders**, rename
-  anything, pause or resume individual monitors, and tag each with the
-  **account used** (optional label for whichever account runs the service —
-  searchable).
+- **Monitors** — any http(s) URL, custom name, GET or HEAD, and one of two
+  schedules: an **interval** from 1 minute to 24 hours (pick a preset or type a
+  custom value like `4M` or `4H30M`), or **times of day** — fixed clock times
+  every day, e.g. 1:00 PM and 3:00 AM, in a timezone you choose. Group monitors
+  into **folders**, rename anything, pause or resume individual monitors, and
+  tag each with the **account used** (optional label for whichever account runs
+  the service — searchable).
 - **Ordering** — pin monitors to the top, drag to reorder (desktop) or move
   up/down from the menu (works on touch), and switch the list between manual,
   A–Z, Z–A, and status-first sorting. Pinned monitors float to the top in

@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   if (unauthorized) return unauthorized;
 
   const monitors = await db.monitor.findMany({
-    select: { id: true, name: true, intervalSec: true },
+    select: { id: true, name: true, intervalSec: true, scheduleMode: true, scheduleTimes: true },
     orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }],
   });
   const derived = await deriveIncidents(monitors);

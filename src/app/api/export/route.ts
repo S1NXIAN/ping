@@ -36,6 +36,9 @@ export async function GET(req: NextRequest) {
       keywordMode: m.keywordMode,
       slowThresholdMs: m.slowThresholdMs,
       alertDelay: m.alertDelay,
+      scheduleMode: m.scheduleMode === "times" ? "times" : "interval",
+      scheduleTimes: m.scheduleTimes,
+      timezone: m.timezone,
       folder: folders.find((f) => f.id === m.folderId)?.name ?? null,
     })),
     webhookChannels: channels.map((ch) => ({

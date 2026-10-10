@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { adminGuard } from "@/lib/ping-auth";
 import { nextMonitorPosition, KEYWORD_MAX_LENGTH } from "@/lib/checker";
-import { monitorUrlSchema, intervalSecSchema } from "@/lib/validation";
+import { monitorUrlSchema, intervalSecSchema, scheduleModeSchema, scheduleTimesSchema, timezoneSchema, scheduleError } from "@/lib/validation";
 import { MAX_WEBHOOK_CHANNELS } from "@/lib/webhooks";
 import type { ImportResult } from "@/lib/ping-types";
 
@@ -36,6 +36,11 @@ const schema = z.object({
           .transform((v) => (v == null || Number.isNaN(v) ? null : v)),
         alertDelay: z.number().int().min(0).max(10).optional(),
         folder: z.string().trim().max(40).nullish(),
+        // Schedule mode. Absent in exports written before times-of-day existed,
+        // so both are optional and default to the interval behaviour.
+        scheduleMode: scheduleModeSchema.optional(),
+        scheduleTimes: scheduleTimesSchema.nullish(),
+        timezone: timezoneSchema.nullish(),
       }),
     )
     .max(200),
@@ -121,6 +126,17 @@ export async function POST(req: NextRequest) {
       skipped += 1;
       continue;
     }
+    // A times monitor without a time list or a zone would never run (or would
+    // run in the wrong zone). Reject it here rather than persist a dead
+    // monitor — the same invariant create and patch enforce.
+    const schedErr = scheduleError({
+      scheduleMode: m.scheduleMode,
+      scheduleTimes: m.scheduleTimes,
+      timezone: m.timezone,
+    });
+    if (schedErr) {
+      return NextResponse.json({ error: `${m.name}: ${schedErr}` }, { status: 400 });
+    }
     const row = await db.monitor.create({
       data: {
         name: m.name,
@@ -133,6 +149,9 @@ export async function POST(req: NextRequest) {
         keywordMode: m.keywordMode,
         slowThresholdMs: m.slowThresholdMs ?? null,
         alertDelay: m.alertDelay ?? 0,
+        scheduleMode: m.scheduleMode === "times" ? "times" : "interval",
+        scheduleTimes: m.scheduleMode === "times" ? (m.scheduleTimes ?? null) : null,
+        timezone: m.scheduleMode === "times" ? (m.timezone ?? null) : null,
         folderId: m.folder ? (folderIds.get(m.folder) ?? null) : null,
         position: nextPosition,
       },

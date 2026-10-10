@@ -4,6 +4,7 @@
 import type { Check, Folder, Monitor } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { db } from "./db";
+import { parseTimes } from "./schedule";
 import type { CheckDTO, DailyBucket, MaintenanceWindowDTO, MonitorDTO, MonitorStatsDTO, ScheduledPingDTO } from "./ping-types";
 
 const H24 = 24 * 60 * 60 * 1000;
@@ -262,6 +263,9 @@ export function toMonitorDTO(
     url: monitor.url,
     method: monitor.method === "HEAD" ? "HEAD" : "GET",
     intervalSec: monitor.intervalSec,
+    scheduleMode: monitor.scheduleMode === "times" ? "times" : "interval",
+    scheduleTimes: parseTimes(monitor.scheduleTimes),
+    timezone: monitor.timezone ?? null,
     enabled: monitor.enabled,
     folderId: monitor.folderId,
     folderName: folder?.name ?? null,

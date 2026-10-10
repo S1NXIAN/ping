@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
   const monitors = await db.monitor.findMany({
     where: { statusHidden: false },
-    select: { id: true, name: true, intervalSec: true },
+    select: { id: true, name: true, intervalSec: true, scheduleMode: true, scheduleTimes: true },
   });
 
   const incidents = await deriveIncidents(monitors);

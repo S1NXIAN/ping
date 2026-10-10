@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
 import { KEYWORD_MAX_LENGTH } from "@/lib/checker";
-import { monitorUrlSchema, intervalSecSchema } from "@/lib/validation";
+import { monitorUrlSchema, intervalSecSchema, scheduleFields, scheduleError } from "@/lib/validation";
 import { dailyBuckets, toCheckDTO, toMonitorDTO, p95For, emptyStats } from "@/lib/ping-stats";
 import type { MonitorDetailResponse } from "@/lib/ping-types";
 
@@ -150,6 +150,7 @@ const patchSchema = z.object({
     .min(0, "Alert delay must be 0 or more")
     .max(10, "Alert delay can be at most 10 extra checks")
     .optional(),
+  ...scheduleFields,
 });
 
 export async function PATCH(req: NextRequest, { params }: Params) {
@@ -172,7 +173,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const data: Record<string, unknown> = {};
-  const { name, url, folderId, intervalSec, enabled, method, pinned, statusHidden, account, keyword, keywordMode, slowThresholdMs, alertDelay } = parsed.data;
+  const { name, url, folderId, intervalSec, enabled, method, pinned, statusHidden, account, keyword, keywordMode, slowThresholdMs, alertDelay, scheduleMode, scheduleTimes, timezone } = parsed.data;
   if (name !== undefined) data.name = name;
   if (url !== undefined) data.url = url;
   if (intervalSec !== undefined) data.intervalSec = intervalSec;
@@ -185,6 +186,24 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     data.alertDelay = alertDelay;
     // A changed confirmation policy makes the old streak meaningless.
     data.consecutiveDowns = 0;
+  }
+  // Schedule: the mode decides which fields are meaningful. Switching to
+  // interval clears the times/zone (an interval monitor has neither); switching
+  // to times requires both. The cross-field rule is checked against the
+  // resulting state, so a patch that only flips the mode still validates.
+  if (scheduleMode !== undefined || scheduleTimes !== undefined || timezone !== undefined) {
+    const nextMode = scheduleMode ?? (monitor.scheduleMode === "times" ? "times" : "interval");
+    const nextTimes = scheduleTimes !== undefined ? scheduleTimes : monitor.scheduleTimes;
+    const nextZone = timezone !== undefined ? timezone : monitor.timezone;
+    const schedErr = scheduleError({
+      scheduleMode: nextMode,
+      scheduleTimes: nextTimes,
+      timezone: nextZone,
+    });
+    if (schedErr) return NextResponse.json({ error: schedErr }, { status: 400 });
+    data.scheduleMode = nextMode;
+    data.scheduleTimes = nextMode === "times" ? (nextTimes ?? null) : null;
+    data.timezone = nextMode === "times" ? (nextZone ?? null) : null;
   }
   // absent → untouched; null or "" → off; string → set. A changed keyword
   // (or mode) re-targets the check semantics, so the failure streak resets —

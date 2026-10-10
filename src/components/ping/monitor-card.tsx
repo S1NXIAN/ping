@@ -61,6 +61,7 @@ import {
   timeAgo,
 } from "@/lib/ping-client";
 import type { FolderDTO, MaintenanceWindowDTO, MonitorDTO } from "@/lib/ping-types";
+import { formatTimesForDisplay } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { StatusDot, statusLabel } from "./status-dot";
 import { StatusPill, type PillTone } from "./status-pill";
@@ -486,7 +487,11 @@ export function MonitorCard({
                 Last updated{" "}
                 <span className="text-foreground/95">{timeAgo(monitor.lastCheckAt)}</span>
               </span>
-              <span>every {formatInterval(monitor.intervalSec)}</span>
+              <span>
+                {monitor.scheduleMode === "times" && monitor.scheduleTimes.length > 0
+                  ? `at ${formatTimesForDisplay(monitor.scheduleTimes, monitor.timezone ?? "UTC")}`
+                  : `every ${formatInterval(monitor.intervalSec)}`}
+              </span>
               {monitor.lastResponseMs != null && (
                 <span
                   className={cn(

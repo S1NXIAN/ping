@@ -23,7 +23,9 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { api, ApiError, formatInterval, normalizeUrl, parseInterval } from "@/lib/ping-client";
-import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
+import type { FolderDTO, MonitorDTO, ScheduleMode } from "@/lib/ping-types";
+import { cn } from "@/lib/utils";
+import { ScheduleTimesEditor } from "./schedule-times-editor";
 
 // Nine flat choices were decision residue (critique 2026-09-16 P2); three
 // cadence chunks carry the same values with one decision instead of nine —
@@ -70,7 +72,16 @@ const CUSTOM_INTERVAL = "custom";
 /** Every preset value, for telling a curated choice from a hand-typed one. */
 const PRESET_INTERVALS = new Set(INTERVAL_GROUPS.flatMap((g) => g.options).map((o) => o.value));
 
-type FieldErrors = { url?: string; slow?: string; keyword?: string; interval?: string };
+/** The viewer's own IANA zone — the sensible default for a new schedule. */
+function browserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+type FieldErrors = { url?: string; slow?: string; keyword?: string; interval?: string; times?: string };
 
 /** Top-aligned label with a compact "?" tooltip instead of helper paragraphs. */
 function FieldLabel({
@@ -131,6 +142,10 @@ export function AddMonitorDialog({
   const [intervalSec, setIntervalSec] = useState("300");
   // "custom" replaces the preset select with a free-text H/M field.
   const [intervalCustom, setIntervalCustom] = useState(false);
+  // Times-of-day mode: a list of "HH:MM" clock times in a chosen IANA zone.
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>("interval");
+  const [times, setTimes] = useState<string[]>([]);
+  const [timezone, setTimezone] = useState("");
   const [method, setMethod] = useState<"GET" | "HEAD">("GET");
   const [account, setAccount] = useState("");
   const [keywordMode, setKeywordMode] = useState<"off" | "contains" | "excludes">("off");
@@ -165,6 +180,9 @@ export function AddMonitorDialog({
       );
       setMethod(initial.method);
       setAccount(initial.account ?? "");
+      setScheduleMode(initial.scheduleMode);
+      setTimes(initial.scheduleTimes);
+      setTimezone(initial.timezone ?? browserTimezone());
       setKeywordMode(initial.keyword ? initial.keywordMode : "off");
       setKeyword(initial.keyword ?? "");
       setSlowThreshold(initial.slowThresholdMs != null ? String(initial.slowThresholdMs) : "");
@@ -185,6 +203,9 @@ export function AddMonitorDialog({
       setIntervalCustom(false);
       setMethod("GET");
       setAccount("");
+      setScheduleMode("interval");
+      setTimes([]);
+      setTimezone(browserTimezone());
       setKeywordMode("off");
       setKeyword("");
       setSlowThreshold("");
@@ -254,17 +275,29 @@ export function AddMonitorDialog({
       else intervalSeconds = parsed.seconds;
     }
 
+    // Times-of-day mode needs at least one time and a zone, or the monitor
+    // would silently never run.
+    if (scheduleMode === "times") {
+      if (times.length === 0) next.times = "Add at least one time";
+      else if (!timezone) next.times = "Pick a timezone";
+    }
+
     setFieldErrors(next);
     if (Object.values(next).some(Boolean)) {
       // surface hidden advanced-field errors
       if (next.slow || next.keyword) setAdvancedOpen(true);
-      document.getElementById(next.interval ? "m-interval" : "m-url")?.focus();
+      document
+        .getElementById(next.times ? "m-times" : next.interval ? "m-interval" : "m-url")
+        ?.focus();
       return;
     }
 
     const body: Record<string, unknown> = {
       url: normalized,
       intervalSec: intervalSeconds,
+      scheduleMode,
+      scheduleTimes: scheduleMode === "times" ? times.join(",") : null,
+      timezone: scheduleMode === "times" ? timezone : null,
       method,
       folderId: folderId === "none" ? null : folderId,
       account: account.trim(),
@@ -436,89 +469,128 @@ export function AddMonitorDialog({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <FieldLabel htmlFor="m-interval" hint="How often PING sends a real HTTP request.">
-                  Check interval
+                <FieldLabel
+                  htmlFor="m-interval"
+                  hint="An interval repeats every N seconds; times of day run at fixed clock times daily."
+                >
+                  Schedule
                 </FieldLabel>
-                {intervalCustom ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="m-interval"
-                        value={intervalSec}
-                        onChange={(e) => {
-                          setIntervalSec(e.target.value);
-                          clearError("interval");
-                        }}
-                        placeholder="e.g. 4M or 4H30M"
-                        autoComplete="off"
-                        aria-invalid={fieldErrors.interval ? true : undefined}
-                        aria-describedby={fieldErrors.interval ? "m-interval-err" : undefined}
-                        className={fieldClass}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => {
-                          setIntervalCustom(false);
-                          setIntervalSec("300");
-                          clearError("interval");
-                        }}
-                        className="h-11 shrink-0 text-xs sm:h-9"
-                      >
-                        Presets
-                      </Button>
-                    </div>
-                    {fieldErrors.interval ? (
-                      <p id="m-interval-err" role="alert" className="text-xs text-down">
-                        {fieldErrors.interval}
-                      </p>
-                    ) : (
-                      // Echo the parsed cadence so the H/M string is never
-                      // ambiguous. H/M are whole minutes, so every value the
-                      // grammar yields is exact on the 30s tick grid — no caveat
-                      // needed, and claiming one would imply false imprecision.
-                      <p className="text-xs text-muted-foreground">
-                        {intervalPreview
-                          ? `= every ${formatInterval(intervalPreview)}`
-                          : "H = hours, M = minutes"}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <Select
-                    value={intervalSec}
-                    onValueChange={(v) => {
-                      if (v === CUSTOM_INTERVAL) {
-                        setIntervalCustom(true);
-                        // Seed the field from the current choice so the user
-                        // edits rather than retypes.
-                        setIntervalSec(formatInterval(Number(intervalSec)));
-                        return;
-                      }
-                      setIntervalSec(v);
-                    }}
-                  >
-                    <SelectTrigger id="m-interval" className={fieldClass}>
-                      <SelectValue>{intervalOption?.label}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {INTERVAL_GROUPS.map((g) => (
-                        <SelectGroup key={g.label}>
-                          <SelectLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                            {g.label}
-                          </SelectLabel>
-                          {g.options.map((i) => (
-                            <SelectItem key={i.value} value={i.value}>
-                              {i.label}
-                              {i.recommended ? " (recommended)" : ""}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      ))}
-                      <SelectItem value={CUSTOM_INTERVAL}>Custom…</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
+                {/* Mode switch: the two cadences are genuinely different kinds
+                    of schedule, so the control says so rather than hiding one
+                    inside the other's dropdown. */}
+                <div
+                  role="radiogroup"
+                  aria-label="Schedule type"
+                  className="grid grid-cols-2 gap-px border bg-border"
+                >
+                  {(
+                    [
+                      ["interval", "Interval"],
+                      ["times", "Times of day"],
+                    ] as const
+                  ).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      role="radio"
+                      aria-checked={scheduleMode === mode}
+                      onClick={() => {
+                        setScheduleMode(mode);
+                        clearError("interval");
+                        clearError("times");
+                      }}
+                      className={cn(
+                        "h-11 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:h-9",
+                        scheduleMode === mode
+                          ? "bg-secondary text-foreground"
+                          : "bg-card text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {scheduleMode === "interval" &&
+                  (intervalCustom ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="m-interval"
+                          value={intervalSec}
+                          onChange={(e) => {
+                            setIntervalSec(e.target.value);
+                            clearError("interval");
+                          }}
+                          placeholder="e.g. 4M or 4H30M"
+                          autoComplete="off"
+                          aria-invalid={fieldErrors.interval ? true : undefined}
+                          aria-describedby={fieldErrors.interval ? "m-interval-err" : undefined}
+                          className={fieldClass}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => {
+                            setIntervalCustom(false);
+                            setIntervalSec("300");
+                            clearError("interval");
+                          }}
+                          className="h-11 shrink-0 text-xs sm:h-9"
+                        >
+                          Presets
+                        </Button>
+                      </div>
+                      {fieldErrors.interval ? (
+                        <p id="m-interval-err" role="alert" className="text-xs text-down">
+                          {fieldErrors.interval}
+                        </p>
+                      ) : (
+                        // Echo the parsed cadence so the H/M string is never
+                        // ambiguous. H/M are whole minutes, so every value the
+                        // grammar yields is exact on the 30s tick grid — no caveat
+                        // needed, and claiming one would imply false imprecision.
+                        <p className="text-xs text-muted-foreground">
+                          {intervalPreview
+                            ? `= every ${formatInterval(intervalPreview)}`
+                            : "H = hours, M = minutes"}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <Select
+                      value={intervalSec}
+                      onValueChange={(v) => {
+                        if (v === CUSTOM_INTERVAL) {
+                          setIntervalCustom(true);
+                          // Seed the field from the current choice so the user
+                          // edits rather than retypes.
+                          setIntervalSec(formatInterval(Number(intervalSec)));
+                          return;
+                        }
+                        setIntervalSec(v);
+                      }}
+                    >
+                      <SelectTrigger id="m-interval" className={fieldClass}>
+                        <SelectValue>{intervalOption?.label}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {INTERVAL_GROUPS.map((g) => (
+                          <SelectGroup key={g.label}>
+                            <SelectLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                              {g.label}
+                            </SelectLabel>
+                            {g.options.map((i) => (
+                              <SelectItem key={i.value} value={i.value}>
+                                {i.label}
+                                {i.recommended ? " (recommended)" : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        ))}
+                        <SelectItem value={CUSTOM_INTERVAL}>Custom…</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ))}
               </div>
 
               <div className="space-y-2">
@@ -537,6 +609,23 @@ export function AddMonitorDialog({
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Times mode needs the full width: a list of clock times plus a
+                  zone. Spans both columns so the rows stay readable. */}
+              {scheduleMode === "times" && (
+                <div className="sm:col-span-2">
+                  <ScheduleTimesEditor
+                    times={times}
+                    timezone={timezone}
+                    error={fieldErrors.times}
+                    onChange={(next) => {
+                      setTimes(next);
+                      clearError("times");
+                    }}
+                    onTimezoneChange={setTimezone}
+                  />
+                </div>
+              )}
             </div>
 
             {/* advanced — collapsed by default */}
