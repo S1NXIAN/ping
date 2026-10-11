@@ -22,7 +22,3 @@ Any edit to agent-facing docs (`AGENTS.md`, `docs/`, extension `README.md`) MUST
 ### Coding standards
 
 Any code change MUST follow [`CODING_STANDARD.md`](./CODING_STANDARD.md).
-
-### Commits
-
-Before committing, confirm every applicable rule in [`CODING_STANDARD.md`](./CODING_STANDARD.md) holds for the staged change.
