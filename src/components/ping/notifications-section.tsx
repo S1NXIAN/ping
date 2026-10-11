@@ -84,7 +84,7 @@ export function NotificationsSection({
   }, [handleErr]);
 
   useEffect(() => {
-    load();
+    void load();
     // monitor list for routing dropdowns (session-guarded, no admin lock needed)
     api<{ monitors: MonitorDTO[] }>("/api/overview")
       .then((r) => setMonitors(r.monitors))
@@ -344,19 +344,38 @@ export function NotificationsSection({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Checkbox checked={notifyDown} onCheckedChange={(v) => setNotifyDown(v === true)} />
+            <label
+              htmlFor="wh-notify-down"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground"
+            >
+              <Checkbox
+                id="wh-notify-down"
+                checked={notifyDown}
+                onCheckedChange={(v) => setNotifyDown(v === true)}
+              />
               Notify on down
             </label>
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Checkbox checked={notifyUp} onCheckedChange={(v) => setNotifyUp(v === true)} />
+            <label
+              htmlFor="wh-notify-up"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground"
+            >
+              <Checkbox
+                id="wh-notify-up"
+                checked={notifyUp}
+                onCheckedChange={(v) => setNotifyUp(v === true)}
+              />
               Notify on recovery
             </label>
             <label
+              htmlFor="wh-notify-slow"
               className="flex items-center gap-1.5 text-xs text-muted-foreground"
               title="Fires when an up check exceeds a monitor's slow threshold (set per monitor)"
             >
-              <Checkbox checked={notifySlow} onCheckedChange={(v) => setNotifySlow(v === true)} />
+              <Checkbox
+                id="wh-notify-slow"
+                checked={notifySlow}
+                onCheckedChange={(v) => setNotifySlow(v === true)}
+              />
               Notify when slow
             </label>
             {monitors.length > 0 && (

@@ -107,7 +107,7 @@ export function MonitorDetailSheet({
   useEffect(() => {
     if (open && id) {
       setDetail(null);
-      load();
+      void load();
     }
   }, [open, id, load]);
 
@@ -116,7 +116,7 @@ export function MonitorDetailSheet({
     if (!open || !id) return;
     const t = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
-      load(true);
+      void load(true);
     }, 15000);
     return () => clearInterval(t);
   }, [open, id, load]);

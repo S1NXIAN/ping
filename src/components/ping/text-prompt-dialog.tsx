@@ -88,7 +88,6 @@ export function TextPromptDialog({
               onChange={(e) => setValue(e.target.value)}
               placeholder={placeholder}
               maxLength={maxLength}
-              autoFocus
             />
           </div>
           {error && <InlineAlert>{error}</InlineAlert>}

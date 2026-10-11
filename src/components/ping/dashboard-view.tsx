@@ -93,7 +93,11 @@ export function DashboardView({
   const { toast } = useToast();
 
   // view state
-  const [activeFolder, setActiveFolder] = useState<string | "all">("all");
+  const [activeFolder, setActiveFolder] = useState<string>("all");
+  const [incidentsOpen, setIncidentsOpen] = useState(false);
+  // ⌘K / Ctrl+K command palette — declared before the keydown effect below,
+  // which reads `setPaletteOpen`.
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -199,10 +203,6 @@ export function DashboardView({
     return map;
   }, [incidents]);
 
-  const [incidentsOpen, setIncidentsOpen] = useState(false);
-
-  // ⌘K / Ctrl+K command palette
-  const [paletteOpen, setPaletteOpen] = useState(false);
   // Palette-initiated delete — confirmed here with the same consequence copy
   // as the card's dialog (the palette itself can't host a confirm step).
   const [paletteDelete, setPaletteDelete] = useState<{ id: string; name: string } | null>(null);
@@ -212,8 +212,10 @@ export function DashboardView({
   const [preview, setPreview] = useState<MonitorDTO[] | null>(null);
   const committingRef = useRef(false);
 
-  const monitors = data?.monitors ?? [];
-  const folders = data?.folders ?? [];
+  // `data?.monitors ?? []` and `data?.folders ?? []` allocate fresh arrays every
+  // render; memoise on `data` so the derived maps below stay stable.
+  const monitors = useMemo(() => data?.monitors ?? [], [data]);
+  const folders = useMemo(() => data?.folders ?? [], [data]);
   const summary = data?.summary;
 
   // 24h fleet floor — a mean hides outliers; "worst" is the honest companion
@@ -238,7 +240,7 @@ export function DashboardView({
           variant: "destructive",
         });
       }
-      refresh(true);
+      void refresh(true);
     },
     [refresh, toast],
   );
@@ -256,7 +258,7 @@ export function DashboardView({
         variant: "destructive",
       });
     }
-    refresh(true);
+    void refresh(true);
   }, [paletteDelete, refresh, toast]);
   const scheduleMonitor = scheduleTargetId
     ? (monitors.find((m) => m.id === scheduleTargetId) ?? null)
@@ -384,7 +386,7 @@ export function DashboardView({
   async function createFolder(name: string) {
     await api("/api/folders", { method: "POST", body: JSON.stringify({ name }) });
     toast({ description: `Folder “${name}” created` });
-    refresh(true);
+    void refresh(true);
   }
 
   async function renameFolder(name: string) {
@@ -392,7 +394,7 @@ export function DashboardView({
     if (!folder) return;
     await api(`/api/folders/${folder.id}`, { method: "PATCH", body: JSON.stringify({ name }) });
     toast({ description: "Folder renamed" });
-    refresh(true);
+    void refresh(true);
   }
 
   async function deleteFolder(id: string) {
@@ -400,7 +402,7 @@ export function DashboardView({
       await api(`/api/folders/${id}`, { method: "DELETE" });
       toast({ description: "Folder deleted — its monitors moved to the top level" });
       if (activeFolder === id) setActiveFolder("all");
-      refresh(true);
+      void refresh(true);
     } catch (e) {
       toast({
         description: e instanceof Error ? e.message : "Failed to delete folder",
@@ -460,7 +462,7 @@ export function DashboardView({
       committingRef.current = false;
       setPreview(null);
       setDragId(null);
-      refresh(true);
+      void refresh(true);
     }
   }
 
@@ -504,17 +506,19 @@ export function DashboardView({
 
   async function cancelScheduledPing(id: string) {
     await api(`/api/scheduled-pings/${id}`, { method: "DELETE" });
-    refresh(true);
+    void refresh(true);
   }
 
   async function cancelMaintenance(id: string) {
     await api(`/api/maintenance/${id}`, { method: "DELETE" });
-    refresh(true);
+    void refresh(true);
   }
 
   async function logout() {
     try {
       await api("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Server unreachable — the local session is dropped either way (finally).
     } finally {
       onLogout();
     }

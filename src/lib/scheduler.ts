@@ -35,8 +35,10 @@ export function startScheduler() {
     }
   };
 
-  setTimeout(tick, 4000);
-  setInterval(tick, TICK_INTERVAL_SEC * 1000);
-  setTimeout(prune, 60_000);
-  setInterval(prune, 60 * 60 * 1000);
+  // Wrapped in a void-returning lambda: setInterval ignores the returned
+  // promise, and both functions already catch their own errors.
+  setTimeout(() => void tick(), 4000);
+  setInterval(() => void tick(), TICK_INTERVAL_SEC * 1000);
+  setTimeout(() => void prune(), 60_000);
+  setInterval(() => void prune(), 60 * 60 * 1000);
 }

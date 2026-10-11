@@ -179,7 +179,7 @@ export function AdminView({
   }, [onExpired, onAuthLost, titleDirty]);
 
   useEffect(() => {
-    loadStatusPage();
+    void loadStatusPage();
   }, [loadStatusPage]);
 
   async function statusPageAction(
@@ -228,8 +228,8 @@ export function AdminView({
   }, [onExpired, onAuthLost]);
 
   useEffect(() => {
-    loadInfo();
-    const t = setInterval(loadInfo, 30_000);
+    void loadInfo();
+    const t = setInterval(() => void loadInfo(), 30_000);
     return () => clearInterval(t);
   }, [loadInfo]);
 
@@ -276,7 +276,7 @@ export function AdminView({
               : "Nothing to prune — every check is inside the retention window",
         });
       }
-      loadInfo();
+      void loadInfo();
     } catch (err) {
       toast({
         description: err instanceof Error ? err.message : "Action failed",
@@ -347,7 +347,7 @@ export function AdminView({
             : ""
         }`,
       });
-      loadInfo();
+      void loadInfo();
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.message.startsWith("Admin locked")) {

@@ -316,7 +316,7 @@ export function AddMonitorDialog({
     if (scheduleMode === "interval") body.intervalSec = intervalSeconds;
 
     setBusy(true);
-    (async () => {
+    void (async () => {
       try {
         if (isEdit && initial) {
           await api(`/api/monitors/${initial.id}`, {

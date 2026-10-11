@@ -91,7 +91,6 @@ export function UnlockDialog({
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 autoComplete="current-password"
-                autoFocus
                 className="pr-10"
               />
               <button

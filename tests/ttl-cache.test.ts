@@ -52,6 +52,15 @@ test("a rejected compute is not cached", async () => {
     if (calls === 1) throw new Error("boom");
     return calls;
   };
-  await expect(cache.get("k", compute)).rejects.toThrow("boom");
+  // Await the promise itself: `expect(p).rejects.toThrow()` returns void, so
+  // awaiting it yields nothing and the rejection escapes as unhandled.
+  await cache.get("k", compute).then(
+    () => {
+      throw new Error("expected the first compute to reject");
+    },
+    (e: unknown) => {
+      expect((e as Error).message).toBe("boom");
+    },
+  );
   expect(await cache.get("k", compute)).toBe(2);
 });

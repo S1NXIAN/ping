@@ -79,7 +79,8 @@ export function CommandPalette({
   onOpenChange: (open: boolean) => void;
   monitors: MonitorDTO[];
   folders: FolderDTO[];
-  activeFolder: string | "all";
+  // "all" is the sentinel for no folder filter; it is just a string value.
+  activeFolder: string;
   sortMode: SortMode;
   adminUnlocked: boolean;
   onNewMonitor: () => void;
@@ -90,7 +91,7 @@ export function CommandPalette({
   onOpenSettings: () => void;
   onLogout: () => void;
   onSelectMonitor: (id: string) => void;
-  onSelectFolder: (id: string | "all") => void;
+  onSelectFolder: (id: string) => void;
   onChangeSort: (mode: SortMode) => void;
   onMonitorPatch: (id: string, data: Record<string, unknown>, success: string) => void;
   onDeleteRequest: (id: string, name: string) => void;

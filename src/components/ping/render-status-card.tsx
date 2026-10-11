@@ -44,8 +44,8 @@ export function RenderStatusCard() {
   );
 
   useEffect(() => {
-    load();
-    const t = setInterval(() => load(), 5 * 60_000);
+    void load();
+    const t = setInterval(() => void load(), 5 * 60_000);
     return () => clearInterval(t);
   }, [load]);
 

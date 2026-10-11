@@ -36,14 +36,14 @@ export function useOverview(intervalMs = 15000) {
   }, []);
 
   useEffect(() => {
-    refresh(true);
+    void refresh(true);
     timer.current = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
-      refresh(true);
+      void refresh(true);
     }, intervalMs);
 
     const onVisible = () => {
-      if (!document.hidden) refresh(true);
+      if (!document.hidden) void refresh(true);
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {

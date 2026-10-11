@@ -86,18 +86,23 @@ export function HistoryChart({
   );
 
   useEffect(() => {
-    load(false);
+    void load(false);
   }, [load]);
 
-  // Sheet live-refresh: fetch silently with the CURRENT range (a ref avoids
-  // re-running this effect when `load`'s identity changes with the range).
+  // Sheet live-refresh: fetch silently with the CURRENT range. The ref keeps
+  // the refresh effect from re-running when `load`'s identity changes with the
+  // range; it is written in an effect, never during render.
   const loadRef = useRef(load);
-  loadRef.current = load;
   useEffect(() => {
-    if (refreshKey > 0) loadRef.current(true);
+    loadRef.current = load;
+  }, [load]);
+  useEffect(() => {
+    if (refreshKey > 0) void loadRef.current(true);
   }, [refreshKey]);
 
-  const points = data?.points ?? [];
+  // `data?.points ?? []` allocates a fresh array every render, so it is
+  // memoised on `data` (a stable state object) before anything derives from it.
+  const points = useMemo(() => data?.points ?? [], [data]);
   const upPoints = useMemo(
     () => points.filter((p) => p.ms != null) as (HistoryPoint & { ms: number })[],
     [points],
@@ -115,14 +120,14 @@ export function HistoryChart({
   const t0 = data ? new Date(data.from).getTime() : 0;
   const t1 = data ? new Date(data.to).getTime() : 1;
   const tSpan = Math.max(1, t1 - t0);
-  const xOf = (t: number) => padL + ((t - t0) / tSpan) * plotW;
+  const xOf = useCallback((t: number) => padL + ((t - t0) / tSpan) * plotW, [t0, tSpan, plotW]);
 
   const yMax = useMemo(() => {
     const maxMs = upPoints.length ? Math.max(...upPoints.map((p) => p.ms)) : 0;
     const base = slowThresholdMs != null ? Math.max(maxMs, slowThresholdMs * 1.15) : maxMs;
     return niceMax(base * 1.08);
   }, [upPoints, slowThresholdMs]);
-  const yOf = (ms: number) => padT + (1 - ms / yMax) * plotH;
+  const yOf = useCallback((ms: number) => padT + (1 - ms / yMax) * plotH, [yMax, plotH]);
 
   // Split the line into segments at big gaps (> 3× median spacing) so paused
   // periods read as gaps instead of long fake slopes.
@@ -147,7 +152,7 @@ export function HistoryChart({
     }
     if (cur.length) segs.push(cur);
     return segs;
-  }, [upPoints, tSpan, yMax]);
+  }, [upPoints, xOf, yOf]);
 
   const areaPath = useMemo(() => {
     const first = segments.find((s) => s.length > 1) ?? [];
@@ -165,7 +170,7 @@ export function HistoryChart({
     return `${line} L ${lx.toFixed(1)} ${(padT + plotH).toFixed(1)} L ${sx.toFixed(1)} ${(
       padT + plotH
     ).toFixed(1)} L ${sx.toFixed(1)} ${sy.toFixed(1)} Z`;
-  }, [segments]);
+  }, [segments, plotH]);
 
   const hoverPoint = hover != null ? points[hover] : null;
 

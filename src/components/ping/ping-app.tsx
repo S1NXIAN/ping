@@ -40,7 +40,7 @@ export function PingApp() {
   useEffect(() => {
     if (publicToken) return; // public mode skips session boot entirely
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const s = await api<SessionResponse>("/api/auth/session");
         if (cancelled) return;

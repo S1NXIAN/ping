@@ -72,12 +72,12 @@ export function PublicStatusView({ token }: { token: string }) {
   );
 
   useEffect(() => {
-    refresh(true);
+    void refresh(true);
     const t = setInterval(() => {
-      if (typeof document === "undefined" || !document.hidden) refresh(true);
+      if (typeof document === "undefined" || !document.hidden) void refresh(true);
     }, REFRESH_MS);
     const onVisible = () => {
-      if (!document.hidden) refresh(true);
+      if (!document.hidden) void refresh(true);
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {

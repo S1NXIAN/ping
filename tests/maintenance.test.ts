@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, mock, test } from "bun:test";
 import { db, resetDb } from "./helpers/test-db";
 
 const realFetch = globalThis.fetch;
-let delivered: Array<{ body: any }>;
+let delivered: Array<{ body: unknown }>;
 afterEach(() => {
   globalThis.fetch = realFetch;
 });
@@ -13,7 +13,10 @@ beforeEach(async () => {
   delivered = [];
   globalThis.fetch = mock(async (_url: string | URL, init?: RequestInit) => {
     if (init?.method === "POST") {
-      delivered.push({ body: JSON.parse(String(init.body)) });
+      // The webhook sender always sends a JSON string body (webhooks.ts).
+      const raw = init.body;
+      if (typeof raw !== "string") throw new Error(`expected a string body, got ${typeof raw}`);
+      delivered.push({ body: JSON.parse(raw) });
       return new Response(null, { status: 204 });
     }
     return new Response(null, { status: 503 }); // monitor is down

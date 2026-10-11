@@ -68,12 +68,14 @@ export class ApiError extends Error {
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  // Headers, not an object spread: HeadersInit may be an array of pairs or a
+  // Headers instance, and spreading those into an object would produce index
+  // keys and silently drop the caller's headers.
+  const headers = new Headers(init?.headers);
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const res = await fetch(path, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
+    headers,
     cache: "no-store",
   });
   let body: unknown = null;

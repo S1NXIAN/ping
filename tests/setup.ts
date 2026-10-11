@@ -24,7 +24,9 @@ execSync("bunx prisma db push --skip-generate --accept-data-loss", {
 // every other name resolves to a public address so ordinary delivery tests work.
 import { mock } from "bun:test";
 
-mock.module("node:dns/promises", () => ({
+// mock.module is typed `void | Promise<void>`; registration is synchronous, so
+// the result is deliberately not awaited.
+void mock.module("node:dns/promises", () => ({
   lookup: async (host: string, opts?: { all?: boolean }) => {
     let ip: string | null;
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) ip = host;

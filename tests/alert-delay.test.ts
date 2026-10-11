@@ -13,7 +13,10 @@ function webhookCapture() {
   globalThis.fetch = mock(async (url: string | URL, init?: RequestInit) => {
     // Webhook POSTs carry a JSON body; the monitor's own check GET/HEAD does not.
     if (init?.method === "POST") {
-      delivered.push({ url: String(url), body: JSON.parse(String(init.body)) });
+      // The webhook sender always sends a JSON string body (webhooks.ts).
+      const raw = init.body;
+      if (typeof raw !== "string") throw new Error(`expected a string body, got ${typeof raw}`);
+      delivered.push({ url: String(url), body: JSON.parse(raw) });
       return new Response(null, { status: 204 });
     }
     // A monitor check: pretend the target is down (503).

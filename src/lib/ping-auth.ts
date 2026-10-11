@@ -184,7 +184,8 @@ export function clientIp(req: NextRequest): string {
 /** Drops IPs whose every attempt is expired — one cheap pass over the Map. */
 function sweepExpired(now: number) {
   for (const [ip, list] of attempts) {
-    if (list.length === 0 || list.every((t) => now - t >= WINDOW_MS)) {
+    // `every` is vacuously true on an empty list, so it already covers length 0.
+    if (list.every((t) => now - t >= WINDOW_MS)) {
       attempts.delete(ip);
     }
   }
