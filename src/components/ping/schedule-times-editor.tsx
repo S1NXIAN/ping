@@ -11,7 +11,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Label } from "@/components/ui/label";
-import { MAX_SCHEDULE_TIMES, IANA_TIMEZONES } from "@/lib/schedule";
+import { MAX_SCHEDULE_TIMES, IANA_TIMEZONES, hasTimeAt } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 
 /** "HH:MM" (24h) -> the "h:mm AM/PM" a person reads. */
@@ -42,23 +42,40 @@ export function ScheduleTimesEditor({
 }) {
   const atCap = times.length >= MAX_SCHEDULE_TIMES;
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Set when an edit is refused because that clock time is already on the
+  // list — shown next to the field so the reverted value isn't a mystery.
+  const [duplicate, setDuplicate] = useState<string | null>(null);
 
   const setAt = (index: number, value: string) => {
-    const next = [...times];
     // The native picker yields "HH:MM" or "" while being edited.
-    if (value) next[index] = value;
+    if (!value) return;
+    if (hasTimeAt(times, value, index)) {
+      // Refuse the edit. State is left untouched, so the controlled input
+      // re-renders with its previous value and the chip visibly springs back.
+      setDuplicate(timeLabel(value));
+      return;
+    }
+    setDuplicate(null);
+    const next = [...times];
+    next[index] = value;
     onChange(next);
   };
 
-  const removeAt = (index: number) => onChange(times.filter((_, i) => i !== index));
+  const removeAt = (index: number) => {
+    setDuplicate(null);
+    onChange(times.filter((_, i) => i !== index));
+  };
 
   const add = () => {
+    // Guard the cap here rather than relying on the button being hidden: the
+    // invariant belongs to the list, not to one control's visibility.
+    if (atCap) return;
     // A new row defaults to 9:00 AM — a plausible time, and valid on save.
-    const used = new Set(times);
     let candidate = "09:00";
-    for (let h = 9; h < 9 + 24 && used.has(candidate); h++) {
+    for (let h = 9; h < 9 + 24 && hasTimeAt(times, candidate); h++) {
       candidate = `${String(h % 24).padStart(2, "0")}:00`;
     }
+    setDuplicate(null);
     onChange([...times, candidate]);
   };
 
@@ -71,7 +88,11 @@ export function ScheduleTimesEditor({
             where the times are rather than on a row of its own. */}
         <div className="flex flex-wrap items-center gap-2">
           {times.map((t, i) => (
-            <div key={`${t}-${i}`} className="relative h-11 w-[5.75rem] sm:h-9">
+            // Keyed by index alone, never by the time value: a value-based key
+            // remounts the input the moment the picker writes a new time, which
+            // orphans the open picker and drops the selection. The node must
+            // outlive its own value.
+            <div key={i} className="relative h-11 w-[5.75rem] sm:h-9">
               {/* The real control, stretched over the chip and fully
                   transparent. opacity:0 hides the ENTIRE native widget —
                   including Firefox's clock icon, which lives inside the
@@ -133,6 +154,11 @@ export function ScheduleTimesEditor({
             Add time
           </Button>
         </div>
+        {duplicate && (
+          <p role="alert" className="text-xs text-down">
+            {duplicate} is already on the list.
+          </p>
+        )}
         {atCap && (
           <p className="text-xs text-muted-foreground">
             {MAX_SCHEDULE_TIMES} times is the maximum — remove one to add another.

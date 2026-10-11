@@ -9,6 +9,7 @@ import { expect, test } from "bun:test";
 import {
   MAX_SCHEDULE_TIMES,
   formatTimes,
+  hasTimeAt,
   isTimesDue,
   mostRecentScheduledInstant,
   nextScheduledInstant,
@@ -169,4 +170,24 @@ test("nominalPeriodSec ignores the zone (times are wall clock)", () => {
   // The gap between clock times is zone-independent — a times-of-day monitor's
   // nominal period never changes when its timezone does.
   expect(nominalPeriodSec(["01:00", "23:00"])).toBe(22 * 3600);
+});
+
+test("hasTimeAt detects a duplicate, ignoring the entry being edited", () => {
+  const times = ["09:00", "10:00", "11:00"];
+  // Editing index 2 to "09:00" collides with index 0.
+  expect(hasTimeAt(times, "09:00", 2)).toBe(true);
+  // Editing an entry to its OWN value is not a duplicate.
+  expect(hasTimeAt(times, "11:00", 2)).toBe(false);
+  // A value nobody uses is fine.
+  expect(hasTimeAt(times, "12:00", 2)).toBe(false);
+  // Without an index, any occurrence counts (used when adding).
+  expect(hasTimeAt(times, "09:00")).toBe(true);
+  expect(hasTimeAt(times, "12:00")).toBe(false);
+  expect(hasTimeAt([], "09:00")).toBe(false);
+});
+
+test("a duplicate can never reach storage, so the list stays unique", () => {
+  // parseTimes is the storage boundary and is the reason a UI duplicate is
+  // worse than a no-op: it silently drops the entry on save.
+  expect(parseTimes("09:00,09:00,10:00")).toEqual(["09:00", "10:00"]);
 });

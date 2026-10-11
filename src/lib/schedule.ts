@@ -24,7 +24,7 @@ export const IANA_TIMEZONES: string[] = (() => {
 const MS_PER_MIN = 60_000;
 const MIN_PER_DAY = 1440;
 
-/** One or two sentence description of a timezone-independent instant. */
+/** The wall-clock parts of an instant, as read in some timezone. */
 type Parts = { year: number; month: number; day: number; hour: number; minute: number; second: number };
 
 /** The wall-clock parts of `ts` as seen in `timeZone`. */
@@ -203,6 +203,19 @@ export function nominalPeriodSec(times: string[]): number {
   // Wrap past midnight back to the first time of the next day.
   largest = Math.max(largest, MIN_PER_DAY - mins[mins.length - 1] + mins[0]);
   return largest * 60;
+}
+
+/**
+ * True when `time` is already taken by another entry in `times`.
+ *
+ * Pass `exceptIndex` when editing an existing chip so an entry does not
+ * collide with itself. Duplicates must be rejected at the point of editing:
+ * parseTimes drops them at the storage boundary, so a UI duplicate silently
+ * disappears on save — and it also inflates the list past MAX_SCHEDULE_TIMES,
+ * hiding the Add control at a cap the user has not really reached.
+ */
+export function hasTimeAt(times: string[], time: string, exceptIndex?: number): boolean {
+  return times.some((t, i) => t === time && i !== exceptIndex);
 }
 
 /**

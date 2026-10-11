@@ -267,9 +267,11 @@ export function AddMonitorDialog({
     if (keywordMode !== "off" && trimmedKeyword === "") next.keyword = "Enter a keyword, or set it Off";
 
     // Custom interval: parse the H/M text to the seconds the API stores.
-    // A preset value is already seconds, so it needs no parsing.
+    // A preset value is already seconds, so it needs no parsing. Gated on the
+    // mode: in Times of day the interval field is not rendered, so validating
+    // it would set an error no one can see and block Save with no message.
     let intervalSeconds = Number(intervalSec);
-    if (intervalCustom) {
+    if (scheduleMode === "interval" && intervalCustom) {
       const parsed = parseInterval(intervalSec);
       if ("error" in parsed) next.interval = parsed.error;
       else intervalSeconds = parsed.seconds;
@@ -294,7 +296,6 @@ export function AddMonitorDialog({
 
     const body: Record<string, unknown> = {
       url: normalized,
-      intervalSec: intervalSeconds,
       scheduleMode,
       scheduleTimes: scheduleMode === "times" ? times.join(",") : null,
       timezone: scheduleMode === "times" ? timezone : null,
@@ -308,6 +309,10 @@ export function AddMonitorDialog({
     };
     const trimmedName = name.trim();
     if (trimmedName) body.name = trimmedName;
+    // A times monitor has no interval, and the field is not even rendered in
+    // that mode — so send it only for interval monitors. (An unparsed custom
+    // string would otherwise serialise to null and 400 as a non-number.)
+    if (scheduleMode === "interval") body.intervalSec = intervalSeconds;
 
     setBusy(true);
     (async () => {
