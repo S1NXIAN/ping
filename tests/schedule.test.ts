@@ -16,8 +16,6 @@ import {
   zonedWallClockToUtc,
 } from "@/lib/schedule";
 
-const MIN = 60_000;
-const HOUR = 3_600_000;
 const at = (iso: string) => Date.parse(iso);
 
 test("parseTimes sorts, dedupes and drops malformed entries", () => {

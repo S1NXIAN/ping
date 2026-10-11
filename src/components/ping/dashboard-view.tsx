@@ -51,7 +51,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useOverview } from "@/hooks/use-overview";
-import { api, ApiError, formatUptime, timeAgo, uptimeTone } from "@/lib/ping-client";
+import { api, formatUptime, timeAgo, uptimeTone } from "@/lib/ping-client";
 import type {
   AdminIncidentDTO,
   FolderDTO,

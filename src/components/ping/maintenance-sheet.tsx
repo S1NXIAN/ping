@@ -12,7 +12,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
-import { api, formatDateTime, formatDuration } from "@/lib/ping-client";
+import { formatDateTime, formatDuration } from "@/lib/ping-client";
 import type { MaintenanceWindowDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { StatusPill } from "./status-pill";

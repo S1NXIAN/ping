@@ -14,6 +14,9 @@ jobs:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
       - run: bunx prisma generate
+      # Lint first — fastest signal. oxlint runs type-aware rules via
+      # oxlint-tsgolint; warnings don't fail the build, errors do.
+      - run: bun run lint
       # Type-check + production build (next build fails on type errors, since
       # next.config.ts sets ignoreBuildErrors: false).
       - run: bun run build

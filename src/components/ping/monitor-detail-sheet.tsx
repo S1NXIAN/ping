@@ -54,7 +54,7 @@ import { formatTimesForDisplay } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { HistoryChart } from "./history-chart";
 import { StatusDot, statusLabel } from "./status-dot";
-import { StatusPill, type PillTone } from "./status-pill";
+import { StatusPill } from "./status-pill";
 import { dailyToSegments, UptimeBars } from "./uptime-bars";
 
 function Stat({

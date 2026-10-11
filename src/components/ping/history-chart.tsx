@@ -156,11 +156,9 @@ export function HistoryChart({
     const m = /M ([\d.]+) ([\d.]+)/.exec(line);
     const lastXY = /L ([\d.]+) ([\d.]+)/g;
     let lx = padL;
-    let ly = padT + plotH;
     let m2: RegExpExecArray | null;
     while ((m2 = lastXY.exec(line))) {
       lx = parseFloat(m2[1]);
-      ly = parseFloat(m2[2]);
     }
     const sx = m ? parseFloat(m[1]) : padL;
     const sy = m ? parseFloat(m[2]) : padT + plotH;

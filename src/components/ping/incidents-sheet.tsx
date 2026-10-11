@@ -10,7 +10,6 @@ import {
   Plus,
   ShieldQuestion,
   Trash2,
-  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -23,7 +22,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { api, ApiError, formatDateTime, formatDuration } from "@/lib/ping-client";
+import { api, formatDateTime, formatDuration } from "@/lib/ping-client";
 import type { AdminIncidentDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { StatusPill } from "./status-pill";

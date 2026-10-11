@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "nextjs", "typescript", "import", "jsx-a11y", "promise", "node", "unicorn"],
+  "env": { "browser": true, "node": true, "builtin": true },
+  "options": { "typeAware": true },
+  "ignorePatterns": [
+    "node_modules/**",
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+    "skills/**",
+    ".pi/**"
+  ],
+  "rules": {
+    "no-unused-vars": "warn",
+    "no-explicit-any": "off",
+    "react/jsx-no-target-blank": "off",
+    "react/react-in-jsx-scope": "off",
+    "react/no-unknown-property": "off",
+    "react/set-state-in-effect": "off",
+    "react/purity": "off",
+    "react/immutability": "off",
+    "react/refs": "off",
+    "react-hooks/exhaustive-deps": "off",
+    "typescript/no-floating-promises": "warn",
+    "typescript/no-misused-promises": "off"
+  }
+}
