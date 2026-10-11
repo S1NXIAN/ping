@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Loader2, LockKeyhole, ShieldCheck } from "lucide-react";
 import { api } from "@/lib/ping-client";
+import { InlineAlert } from "./inline-alert";
 
 /**
  * Admin gate for the Settings area. PING's dashboard stays signed in for up
@@ -104,11 +105,7 @@ export function UnlockDialog({
             </div>
           </div>
 
-          {error && (
-            <p className="rounded-md bg-down/10 px-3 py-2 text-xs leading-relaxed text-down">
-              {error}
-            </p>
-          )}
+          {error && <InlineAlert className="leading-relaxed">{error}</InlineAlert>}
 
           <DialogFooter className="gap-2">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

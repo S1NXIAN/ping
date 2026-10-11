@@ -26,6 +26,9 @@ import { api, formatDateTime, formatDuration } from "@/lib/ping-client";
 import type { AdminIncidentDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { StatusPill } from "./status-pill";
+import { EmptyState } from "./empty-state";
+import { InlineAlert } from "./inline-alert";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * Admin view of the last 30 days of incidents (derived from real checks)
@@ -120,31 +123,22 @@ export function IncidentsSheet({
 
         {error && (
           <div className="px-4 pt-3">
-            <p className="rounded-md border border-down/30 bg-down/10 px-3 py-2 text-xs text-down">
-              {error}
-            </p>
+            <InlineAlert bordered>{error}</InlineAlert>
           </div>
         )}
 
         {incidents == null && !error ? (
           <div className="space-y-2.5 px-4 py-4">
-            <div className="h-20 animate-pulse rounded-lg border bg-muted/30" />
-            <div className="h-20 animate-pulse rounded-lg border bg-muted/30" />
-            <div className="h-20 animate-pulse rounded-lg border bg-muted/30" />
+            <Skeleton className="h-20" />
+            <Skeleton className="h-20" />
+            <Skeleton className="h-20" />
           </div>
         ) : incidents != null && incidents.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 py-16 text-center">
-            <div className="grid size-12 place-items-center rounded-none border border-dashed border-border">
-              <ShieldQuestion className="size-5 text-muted-foreground" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-foreground">No incidents in the last 30 days</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                When a monitor fails consecutive checks, the down period shows up here — and on the
-                public status page.
-              </p>
-            </div>
-          </div>
+          <EmptyState
+            icon={ShieldQuestion}
+            title="No incidents in the last 30 days"
+            description="When a monitor fails consecutive checks, the down period shows up here — and on the public status page."
+          />
         ) : (
           <ScrollArea className="flex-1">
             <div className="space-y-2.5 px-4 py-4">

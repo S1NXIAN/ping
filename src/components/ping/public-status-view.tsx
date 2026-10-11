@@ -26,6 +26,8 @@ import { PingLogo, PingWordmark } from "./ping-logo";
 import { ResponseSparkline } from "./response-sparkline";
 import { StatusDot } from "./status-dot";
 import { StatusPill } from "./status-pill";
+import { InlineAlert } from "./inline-alert";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const REFRESH_MS = 30_000;
 
@@ -132,16 +134,16 @@ export function PublicStatusView({ token }: { token: string }) {
 
       <main className="mx-auto w-full max-w-2xl flex-1 space-y-4 px-4 py-6">
         {error && (
-          <div className="rounded-lg border border-down/30 bg-down/10 px-4 py-3 text-sm text-down">
+          <InlineAlert bordered className="px-4 py-3 text-sm">
             {error}
-          </div>
+          </InlineAlert>
         )}
 
         {!data && !error && (
           <div className="space-y-3">
-            <div className="h-28 animate-pulse rounded-xl border bg-card" />
-            <div className="h-36 animate-pulse rounded-xl border bg-card" />
-            <div className="h-36 animate-pulse rounded-xl border bg-card" />
+            <Skeleton className="h-28 bg-card" />
+            <Skeleton className="h-36 bg-card" />
+            <Skeleton className="h-36 bg-card" />
           </div>
         )}
 

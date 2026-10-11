@@ -26,6 +26,7 @@ import { api, ApiError, formatInterval, normalizeUrl, parseInterval } from "@/li
 import type { FolderDTO, MonitorDTO, ScheduleMode } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { ScheduleTimesEditor } from "./schedule-times-editor";
+import { InlineAlert } from "./inline-alert";
 
 // Nine flat choices were decision residue (critique 2026-09-16 P2); three
 // cadence chunks carry the same values with one decision instead of nine —
@@ -760,12 +761,9 @@ export function AddMonitorDialog({
           </div>
 
           {error && (
-            <p
-              role="alert"
-              className="mx-4 mb-2 rounded-md bg-down/10 px-3 py-2 text-xs leading-relaxed text-down sm:mx-5"
-            >
+            <InlineAlert role="alert" className="mx-4 mb-2 leading-relaxed sm:mx-5">
               {error}
-            </p>
+            </InlineAlert>
           )}
 
           {/* sticky footer — always visible, primary full-width on mobile */}

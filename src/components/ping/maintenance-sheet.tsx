@@ -16,6 +16,8 @@ import { formatDateTime, formatDuration } from "@/lib/ping-client";
 import type { MaintenanceWindowDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { StatusPill } from "./status-pill";
+import { EmptyState } from "./empty-state";
+import { SectionLabel } from "./section-label";
 
 /**
  * All maintenance windows: active first (ends-soonest), then upcoming, then
@@ -66,28 +68,25 @@ export function MaintenanceSheet({
         </SheetHeader>
 
         {empty ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 py-16 text-center">
-            <div className="grid size-12 place-items-center rounded-none border border-dashed border-border">
-              <Wrench className="size-5 text-muted-foreground" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-foreground">No maintenance windows</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+          <EmptyState
+            icon={Wrench}
+            title="No maintenance windows"
+            description={
+              <>
                 Open a monitor&rsquo;s <span className="text-foreground/80">⋮ menu → Schedule
                 maintenance…</span>{" "}
                 before a deploy to silence alerts and show an honest maintenance state.
-              </p>
-            </div>
-          </div>
+              </>
+            }
+          />
         ) : (
           <ScrollArea className="flex-1">
             <div className="space-y-5 px-4 py-4">
               {active.length > 0 && (
                 <section aria-label="Active maintenance windows">
-                  <h3 className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-warn">
-                    <Hammer className="size-3" aria-hidden="true" />
+                  <SectionLabel icon={Hammer} tone="warn" size="sm" className="mb-2">
                     Active now
-                  </h3>
+                  </SectionLabel>
                   <div className="space-y-1.5">
                     {active.map((w) => (
                       <WindowRow key={w.id} w={w} now={now} tone="active" onCancel={onCancel} />
@@ -98,9 +97,9 @@ export function MaintenanceSheet({
 
               {upcoming.length > 0 && (
                 <section aria-label="Upcoming maintenance windows">
-                  <h3 className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <SectionLabel size="sm" className="mb-2">
                     Upcoming
-                  </h3>
+                  </SectionLabel>
                   <div className="space-y-1.5">
                     {upcoming.map((w) => (
                       <WindowRow key={w.id} w={w} now={now} tone="upcoming" onCancel={onCancel} />
@@ -111,9 +110,9 @@ export function MaintenanceSheet({
 
               {ended.length > 0 && (
                 <section aria-label="Recently ended maintenance windows">
-                  <h3 className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <SectionLabel size="sm" className="mb-2">
                     Recently ended
-                  </h3>
+                  </SectionLabel>
                   <div className="space-y-1.5">
                     {ended.map((w) => (
                       <WindowRow key={w.id} w={w} now={now} tone="ended" onCancel={onCancel} />

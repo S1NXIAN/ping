@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Loader2, LockKeyhole, ShieldCheck } from "lucide-react";
 import { api, ApiError } from "@/lib/ping-client";
 import { PingLogo, PingWordmark } from "./ping-logo";
+import { InlineAlert } from "./inline-alert";
 
 export function LoginView({
   initialized,
@@ -123,11 +124,7 @@ export function LoginView({
               </div>
             )}
 
-            {error && (
-              <p className="rounded-md bg-down/10 px-3 py-2 text-xs leading-relaxed text-down">
-                {error}
-              </p>
-            )}
+            {error && <InlineAlert className="leading-relaxed">{error}</InlineAlert>}
 
             {/* Render-style primary CTA: white button, black text */}
             <Button

@@ -41,6 +41,9 @@ import { cn } from "@/lib/utils";
 import { NotificationsSection } from "./notifications-section";
 import { RenderStatusCard } from "./render-status-card";
 import { StatusBadgeSection } from "./status-badge-section";
+import { InlineAlert } from "./inline-alert";
+import { StatTile } from "./stat-tile";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const GH_ACTIONS_YAML = `name: PING keep-alive
 # Free on public repositories. Set the PING_URL repository secret
@@ -454,9 +457,7 @@ export function AdminView({
                   />
                 </div>
               </div>
-              {pwError && (
-                <p className="rounded-md bg-down/10 px-3 py-2 text-xs text-down">{pwError}</p>
-              )}
+              {pwError && <InlineAlert>{pwError}</InlineAlert>}
               <Button type="submit" disabled={pwBusy} className="bg-white font-semibold text-black hover:bg-zinc-200">
                 {pwBusy ? (
                   <>
@@ -555,7 +556,7 @@ export function AdminView({
             description="Share a read-only link that shows monitor names, live statuses, and 30-day uptime — no login required. URLs, accounts, and folders are never exposed; monitors can be excluded individually from their ⋮ menu."
           >
             {statusPage == null ? (
-              <div className="h-16 animate-pulse rounded-lg border bg-muted/30" />
+              <Skeleton className="h-16" />
             ) : statusPage.enabled ? (
               <>
                 <div className="flex items-center gap-2 rounded-lg border border-up/25 bg-up/10 px-3 py-2.5 text-sm text-up">
@@ -773,38 +774,24 @@ export function AdminView({
             description="Everything below is measured from this running instance — no estimates."
           >
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div className="rounded-lg border bg-card/60 px-3 py-2.5">
-                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Process uptime
-                </div>
-                <div className="mt-1 text-base font-semibold tabular-nums">
-                  {info ? formatDuration(info.processUptimeSec) : "—"}
-                </div>
-              </div>
-              <div className="rounded-lg border bg-card/60 px-3 py-2.5">
-                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Checks stored
-                </div>
-                <div className="mt-1 text-base font-semibold tabular-nums">
-                  {info ? info.storage.checksStored.toLocaleString() : "—"}
-                </div>
-              </div>
-              <div className="rounded-lg border bg-card/60 px-3 py-2.5">
-                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Last tick
-                </div>
-                <div className="mt-1 text-sm font-semibold tabular-nums">
-                  {info ? (info.scheduler.lastTickAt ? timeAgo(info.scheduler.lastTickAt) : "—") : "—"}
-                </div>
-              </div>
-              <div className="rounded-lg border bg-card/60 px-3 py-2.5">
-                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Tick took
-                </div>
-                <div className="mt-1 text-sm font-semibold tabular-nums">
-                  {info ? formatMs(info.scheduler.lastTickDurationMs) : "—"}
-                </div>
-              </div>
+              <StatTile
+                label="Process uptime"
+                value={info ? formatDuration(info.processUptimeSec) : "—"}
+              />
+              <StatTile
+                label="Checks stored"
+                value={info ? info.storage.checksStored.toLocaleString() : "—"}
+              />
+              <StatTile
+                label="Last tick"
+                value={info ? (info.scheduler.lastTickAt ? timeAgo(info.scheduler.lastTickAt) : "—") : "—"}
+                valueClassName="text-sm"
+              />
+              <StatTile
+                label="Tick took"
+                value={info ? formatMs(info.scheduler.lastTickDurationMs) : "—"}
+                valueClassName="text-sm"
+              />
             </div>
 
             {/* configurable check-history retention */}

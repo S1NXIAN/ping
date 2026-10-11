@@ -30,6 +30,7 @@ import { api, ApiError, timeAgo } from "@/lib/ping-client";
 import type { MonitorDTO, WebhookChannelDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { StatusPill, pillToneClass } from "./status-pill";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * Webhook notification channels — POST to Slack/Discord/generic receivers
@@ -192,7 +193,7 @@ export function NotificationsSection({
 
       <div className="mt-3.5 space-y-3.5">
         {channels == null ? (
-          <div className="h-20 animate-pulse rounded-lg border bg-muted/30" />
+          <Skeleton className="h-20" />
         ) : channels.length === 0 ? (
           <div className="flex items-center gap-2 rounded-lg border border-dashed bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
             <MessageSquareWarning className="size-4 shrink-0" aria-hidden="true" />

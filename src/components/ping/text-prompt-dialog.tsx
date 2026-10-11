@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { InlineAlert } from "./inline-alert";
 
 /** Small generic dialog that asks for a single text value (names, folders…). */
 export function TextPromptDialog({
@@ -90,7 +91,7 @@ export function TextPromptDialog({
               autoFocus
             />
           </div>
-          {error && <p className="rounded-md bg-down/10 px-3 py-2 text-xs text-down">{error}</p>}
+          {error && <InlineAlert>{error}</InlineAlert>}
           <DialogFooter className="gap-2">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel

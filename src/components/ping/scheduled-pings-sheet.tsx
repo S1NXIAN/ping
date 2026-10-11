@@ -16,6 +16,8 @@ import { formatCountdown, formatDateTime, formatMs, timeAgo } from "@/lib/ping-c
 import type { ScheduledPingDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { StatusPill } from "./status-pill";
+import { EmptyState } from "./empty-state";
+import { SectionLabel } from "./section-label";
 
 /**
  * Full list of scheduled pings: upcoming first (soonest), then recent real
@@ -63,27 +65,24 @@ export function ScheduledPingsSheet({
         </SheetHeader>
 
         {empty ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 py-16 text-center">
-            <div className="grid size-12 place-items-center rounded-none border border-dashed border-border">
-              <CalendarClock className="size-5 text-muted-foreground" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-foreground">No scheduled pings yet</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+          <EmptyState
+            icon={CalendarClock}
+            title="No scheduled pings yet"
+            description={
+              <>
                 Open a monitor&rsquo;s <span className="text-foreground/80">⋮ menu → Schedule ping…</span>{" "}
                 to run one real check at an exact time — handy right after a deploy.
-              </p>
-            </div>
-          </div>
+              </>
+            }
+          />
         ) : (
           <ScrollArea className="flex-1">
             <div className="space-y-5 px-4 py-4">
               {upcoming.length > 0 && (
                 <section aria-label="Upcoming scheduled pings">
-                  <h3 className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    <Clock className="size-3" aria-hidden="true" />
+                  <SectionLabel icon={Clock} size="sm" className="mb-2">
                     Upcoming
-                  </h3>
+                  </SectionLabel>
                   <div className="space-y-1.5">
                     {upcoming.map((p) => (
                       <UpcomingRow key={p.id} ping={p} now={now} onCancel={onCancel} />
@@ -94,9 +93,9 @@ export function ScheduledPingsSheet({
 
               {recent.length > 0 && (
                 <section aria-label="Recent scheduled ping results">
-                  <h3 className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <SectionLabel size="sm" className="mb-2">
                     Recent results
-                  </h3>
+                  </SectionLabel>
                   <div className="space-y-1.5">
                     {recent.map((p) => (
                       <DoneRow key={p.id} ping={p} now={now} />

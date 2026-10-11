@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { api, ApiError, formatCountdown, formatDateTime, toLocalInputValue } from "@/lib/ping-client";
 import type { MonitorDTO, ScheduledPingDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
+import { InlineAlert } from "./inline-alert";
 
 export function SchedulePingDialog({
   open,
@@ -253,7 +254,7 @@ export function SchedulePingDialog({
             </div>
           )}
 
-          {error && <p className="rounded-md bg-down/10 px-3 py-2 text-xs text-down">{error}</p>}
+          {error && <InlineAlert>{error}</InlineAlert>}
 
           <DialogFooter className="gap-2">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

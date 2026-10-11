@@ -56,27 +56,8 @@ import { HistoryChart } from "./history-chart";
 import { StatusDot, statusLabel } from "./status-dot";
 import { StatusPill } from "./status-pill";
 import { dailyToSegments, UptimeBars } from "./uptime-bars";
-
-function Stat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: React.ReactNode;
-  tone?: string;
-}) {
-  return (
-    <div className="rounded-lg border bg-card/60 px-3 py-2.5">
-      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div className={cn("mt-1 text-base font-semibold tabular-nums leading-tight", tone)}>
-        {value}
-      </div>
-    </div>
-  );
-}
+import { SectionLabel } from "./section-label";
+import { StatTile } from "./stat-tile";
 
 export function MonitorDetailSheet({
   open,
@@ -326,27 +307,27 @@ export function MonitorDetailSheet({
 
           {/* Availability — from genuinely recorded checks only */}
           <section aria-label="Availability">
-            <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              <BarChart3 className="size-3.5" aria-hidden="true" /> Availability (recorded checks)
-            </h3>
+            <SectionLabel icon={BarChart3} className="mb-2">
+              Availability (recorded checks)
+            </SectionLabel>
             <div className="grid grid-cols-3 gap-2">
               {/* Band ink is shared (uptimeTone): 24h keeps its existing
                   semantics; 7d/30d spoke the same language from now on —
                   one percentage, one color, everywhere. */}
-              <Stat
+              <StatTile
                 label="24h uptime"
                 value={formatUptime(stats?.uptime24h)}
-                tone={uptimeToneClass(uptimeTone(stats?.uptime24h))}
+                valueClassName={uptimeToneClass(uptimeTone(stats?.uptime24h))}
               />
-              <Stat
+              <StatTile
                 label="7d uptime"
                 value={formatUptime(stats?.uptime7d)}
-                tone={uptimeToneClass(uptimeTone(stats?.uptime7d))}
+                valueClassName={uptimeToneClass(uptimeTone(stats?.uptime7d))}
               />
-              <Stat
+              <StatTile
                 label="30d uptime"
                 value={formatUptime(stats?.uptime30d)}
-                tone={uptimeToneClass(uptimeTone(stats?.uptime30d))}
+                valueClassName={uptimeToneClass(uptimeTone(stats?.uptime30d))}
               />
             </div>
             <p className="mt-1.5 text-[11px] text-muted-foreground">
@@ -358,9 +339,7 @@ export function MonitorDetailSheet({
 
           {/* 30-day daily bars */}
           <section aria-label="Daily history">
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Last 30 days
-            </h3>
+            <SectionLabel className="mb-2">Last 30 days</SectionLabel>
             <UptimeBars
               segments={dailyToSegments(detail?.daily ?? [])}
               barClassName="h-9"
@@ -384,14 +363,14 @@ export function MonitorDetailSheet({
 
           {/* Response times */}
           <section aria-label="Response times">
-            <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              <Activity className="size-3.5" aria-hidden="true" /> Response time
-            </h3>
+            <SectionLabel icon={Activity} className="mb-2">
+              Response time
+            </SectionLabel>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Stat label="avg (24h)" value={formatMs(stats?.avgMs24h)} />
-              <Stat label="p95 (24h)" value={formatMs(detail?.p95Ms24h ?? null)} />
-              <Stat label="min (24h)" value={formatMs(stats?.minMs24h)} />
-              <Stat label="max (24h)" value={formatMs(stats?.maxMs24h)} />
+              <StatTile label="avg (24h)" value={formatMs(stats?.avgMs24h)} />
+              <StatTile label="p95 (24h)" value={formatMs(detail?.p95Ms24h ?? null)} />
+              <StatTile label="min (24h)" value={formatMs(stats?.minMs24h)} />
+              <StatTile label="max (24h)" value={formatMs(stats?.maxMs24h)} />
             </div>
             <div className="mt-2">
               {id && m && (
@@ -407,17 +386,15 @@ export function MonitorDetailSheet({
 
           {/* Extra stats */}
           <section aria-label="More stats" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Stat label="avg (7d)" value={formatMs(stats?.avgMs7d)} />
-            <Stat label="checks (24h)" value={stats?.checks24h ?? 0} />
-            <Stat label="last failure" value={timeAgo(stats?.lastDownAt)} />
-            <Stat label="total checks" value={(stats?.totalChecks ?? 0).toLocaleString()} />
+            <StatTile label="avg (7d)" value={formatMs(stats?.avgMs7d)} />
+            <StatTile label="checks (24h)" value={stats?.checks24h ?? 0} />
+            <StatTile label="last failure" value={timeAgo(stats?.lastDownAt)} />
+            <StatTile label="total checks" value={(stats?.totalChecks ?? 0).toLocaleString()} />
           </section>
 
           {/* History table */}
           <section aria-label="Check history">
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Recent checks
-            </h3>
+            <SectionLabel className="mb-2">Recent checks</SectionLabel>
             {/* Radix gotcha: the viewport's height:100% collapses to auto
                 when the root's height is content-driven (auto + max-h), so the
                 table would spill past the root's border box and never scroll.

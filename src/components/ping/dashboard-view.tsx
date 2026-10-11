@@ -72,6 +72,8 @@ import { TextPromptDialog } from "./text-prompt-dialog";
 import { StatCard } from "./stat-card";
 import { CommandPalette } from "./command-palette";
 import { StatusPill, type PillTone } from "./status-pill";
+import { InlineAlert } from "./inline-alert";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export type SortMode = "manual" | "az" | "status" | "slowest";
 const SORT_STORAGE_KEY = "ping.sort";
@@ -1003,9 +1005,10 @@ export function DashboardView({
 
           {/* error — announced, and never a dead end: recovery is inline */}
           {error && (
-            <div
+            <InlineAlert
+              bordered
               role="alert"
-              className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-down/30 bg-down/10 px-4 py-3 text-sm text-down"
+              className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 text-sm"
             >
               <span className="min-w-0 flex-1">{error}</span>
               <button
@@ -1023,14 +1026,14 @@ export function DashboardView({
                   sign in again
                 </button>
               )}
-            </div>
+            </InlineAlert>
           )}
 
           {/* list */}
           {loading ? (
             <div className="space-y-2.5">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="h-24 animate-pulse rounded-lg border bg-card" />
+                <Skeleton key={i} className="h-24 bg-card" />
               ))}
             </div>
           ) : monitors.length === 0 ? (
