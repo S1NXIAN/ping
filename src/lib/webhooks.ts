@@ -281,8 +281,9 @@ export async function fireWebhooks(
   }
 }
 
-/** True when a status change should raise an event. */
-export function isTransition(previous: string | null | undefined, next: "up" | "down"): WebhookEvent | null {
+/** True when a status change should raise an event. Only ever a down/up
+ *  transition — never "slow" or "test", which are not status changes. */
+export function isTransition(previous: string | null | undefined, next: "up" | "down"): "down" | "up" | null {
   if (next === "down" && previous !== "down") return "down";
   if (next === "up" && previous === "down") return "up";
   return null;

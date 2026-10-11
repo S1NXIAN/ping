@@ -2,7 +2,8 @@
 // Nothing here simulates or estimates anything.
 import type { Check, Monitor } from "@prisma/client";
 import { db } from "./db";
-import { fireWebhooks, isTransition } from "./webhooks";
+import { fireWebhooks } from "./webhooks";
+import { decideNotification } from "./notifications";
 import { isTimesDue, parseTimes } from "./schedule";
 
 export const CHECK_TIMEOUT_MS = 15_000;
@@ -236,51 +237,50 @@ async function runCheckInner(monitor: Monitor): Promise<Check> {
   // and is reset by any success.
   const consecutiveDowns = status === "down" ? (monitor.consecutiveDowns ?? 0) + 1 : 0;
 
-  // Notification logic — maintenance- and delay-aware. lastNotifiedStatus is
-  // the last status a webhook was actually sent for. It diverges from
-  // lastStatus while a maintenance window suppresses events or an alert
-  // delay is still confirming, so a service that went down during either
-  // still raises "down" on the first check after it ends. Downtime itself is
-  // always recorded honestly.
-  const effectivePrevious = monitor.lastNotifiedStatus ?? previousStatus;
-  let event = isTransition(effectivePrevious, status);
-  let lastNotifiedStatus: string | undefined;
-  if (
-    event === "down" &&
-    monitor.alertDelay > 0 &&
-    consecutiveDowns <= monitor.alertDelay
-  ) {
-    // Hold the down event until enough consecutive failures confirm it.
-    // Persist the last NOTIFIED state (which can never be "down" here — a
-    // transition only exists when it differs), so the pending event is
-    // re-evaluated on every later check — deferred, never lost.
+  // Notification decision — pure and maintenance/delay-aware. See
+  // lib/notifications.ts for the contract; this function only performs the
+  // effects it decides on. Downtime itself is always recorded honestly above.
+  const inMaintenance = await isUnderMaintenance(monitor.id);
+  const decision = decideNotification({
+    previousStatus,
+    lastNotifiedStatus: monitor.lastNotifiedStatus,
+    status,
+    consecutiveDowns,
+    alertDelay: monitor.alertDelay,
+    slowThresholdMs: monitor.slowThresholdMs,
+    lastResponseMs: monitor.lastResponseMs,
+    responseMs,
+    inMaintenance,
+  });
+
+  if (decision.outcome === "held") {
     console.log(
       `[PING] down event for "${monitor.name}" held — alert delay ${consecutiveDowns}/${monitor.alertDelay + 1} confirmations`,
     );
-    lastNotifiedStatus = monitor.lastNotifiedStatus ?? previousStatus ?? "unknown";
-    event = null;
-  }
-  if (event) {
-    const inMaintenance = await isUnderMaintenance(monitor.id);
-    if (inMaintenance) {
-      // Suppress: keep the old lastNotifiedStatus so the divergence is
-      // remembered and the event re-fires once the window is over. "unknown"
-      // is the sentinel for "no notification has ever been sent" — it keeps
-      // a first-check event alive through a window that started before it.
-      lastNotifiedStatus = monitor.lastNotifiedStatus ?? previousStatus ?? "unknown";
-      console.log(
-        `[PING] ${event} transition for "${monitor.name}" suppressed — active maintenance window`,
-      );
-    } else {
-      void fireWebhooks(event, monitor, {
-        status,
-        statusCode,
-        responseMs,
-        error: error ? error.slice(0, 200) : null,
-        checkedAt: check.checkedAt.toISOString(),
-      });
-      lastNotifiedStatus = status;
-    }
+  } else if (decision.outcome === "suppressed") {
+    console.log(
+      `[PING] ${status} transition for "${monitor.name}" suppressed — active maintenance window`,
+    );
+  } else if (decision.outcome === "slow-suppressed") {
+    console.log(
+      `[PING] slow transition for "${monitor.name}" suppressed — active maintenance window`,
+    );
+  } else if (decision.event === "slow") {
+    void fireWebhooks("slow", monitor, {
+      status,
+      statusCode,
+      responseMs,
+      error: null,
+      checkedAt: check.checkedAt.toISOString(),
+    });
+  } else if (decision.event) {
+    void fireWebhooks(decision.event, monitor, {
+      status,
+      statusCode,
+      responseMs,
+      error: error ? error.slice(0, 200) : null,
+      checkedAt: check.checkedAt.toISOString(),
+    });
   }
 
   await db.monitor.update({
@@ -292,38 +292,11 @@ async function runCheckInner(monitor: Monitor): Promise<Check> {
       lastResponseMs: responseMs,
       lastError: error ? error.slice(0, 200) : null,
       consecutiveDowns,
-      ...(lastNotifiedStatus !== undefined ? { lastNotifiedStatus } : {}),
+      ...(decision.lastNotifiedStatus !== undefined
+        ? { lastNotifiedStatus: decision.lastNotifiedStatus }
+        : {}),
     },
   });
-
-  // Latency alerting (optional per-monitor threshold): a "slow" event fires
-  // when an UP check exceeds the threshold and the previous check didn't.
-  // It is skipped when an up/down event already fired this check (a recovery
-  // message already carries the response time) and suppressed during active
-  // maintenance — a missed slow alert during planned work is acceptable,
-  // unlike a missed down alert.
-  if (monitor.slowThresholdMs != null && status === "up" && responseMs > monitor.slowThresholdMs) {
-    const wasSlow =
-      previousStatus === "up" &&
-      monitor.lastResponseMs != null &&
-      monitor.lastResponseMs > monitor.slowThresholdMs;
-    if (!wasSlow && !event) {
-      const inMaintenance = await isUnderMaintenance(monitor.id);
-      if (inMaintenance) {
-        console.log(
-          `[PING] slow transition for "${monitor.name}" suppressed — active maintenance window`,
-        );
-      } else {
-        void fireWebhooks("slow", monitor, {
-          status,
-          statusCode,
-          responseMs,
-          error: null,
-          checkedAt: check.checkedAt.toISOString(),
-        });
-      }
-    }
-  }
 
   return check;
 }
