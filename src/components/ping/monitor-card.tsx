@@ -64,6 +64,7 @@ import type { FolderDTO, MaintenanceWindowDTO, MonitorDTO } from "@/lib/ping-typ
 import { formatTimesForDisplay } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { StatusDot, statusLabel } from "./status-dot";
+import { monitorStatus, type MonitorStatus } from "@/lib/monitor-status";
 import { StatusPill, type PillTone } from "./status-pill";
 import { TextPromptDialog } from "./text-prompt-dialog";
 import { checksToSegments, UptimeBars } from "./uptime-bars";
@@ -147,13 +148,7 @@ export function MonitorCard({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [dragArmed, setDragArmed] = useState(false);
 
-  const status: "up" | "down" | "paused" | "pending" = !monitor.enabled
-    ? "paused"
-    : monitor.lastStatus === "up"
-      ? "up"
-      : monitor.lastStatus === "down"
-        ? "down"
-        : "pending";
+  const status: MonitorStatus = monitorStatus(monitor);
 
   // Up but above the admin's latency threshold — an honest middle state.
   const degraded = status === "up" && monitor.degraded;

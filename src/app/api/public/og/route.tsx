@@ -3,7 +3,7 @@ import { ImageResponse } from "next/og";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { matchesStatusToken } from "@/lib/ping-auth";
-import { isDegraded } from "@/lib/ping-stats";
+import { fleetStatus } from "@/lib/monitor-status";
 
 /**
  * Dynamic Open-Graph share card (1200×630 PNG).
@@ -142,10 +142,7 @@ export async function GET(req: NextRequest) {
     bars = days.map((d) => dayColor(d));
 
     const total = monitors.length;
-    const up = monitors.filter((m) => m.enabled && m.lastStatus === "up").length;
-    const down = monitors.filter((m) => m.enabled && m.lastStatus === "down").length;
-    const paused = monitors.filter((m) => !m.enabled).length;
-    const degraded = monitors.filter((m) => m.enabled && m.lastStatus === "up" && isDegraded(m)).length;
+    const { up, down, paused, degraded } = fleetStatus(monitors);
     const lastCheckAt = monitors.reduce<Date | null>(
       (acc, m) => (!m.lastCheckAt ? acc : !acc || m.lastCheckAt > acc ? m.lastCheckAt : acc),
       null,

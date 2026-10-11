@@ -1,6 +1,8 @@
 import { cn } from "@/lib/utils";
+import type { MonitorStatus } from "@/lib/monitor-status";
 
-type DotStatus = "up" | "down" | "paused" | "pending" | "checking";
+/** The four measured/configuration statuses plus the UI-only transient "checking". */
+type DotStatus = MonitorStatus | "checking";
 
 const colors: Record<DotStatus, string> = {
   up: "bg-up",

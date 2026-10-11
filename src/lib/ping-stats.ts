@@ -5,6 +5,7 @@ import type { Check, Folder, Monitor } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { db } from "./db";
 import { parseTimes } from "./schedule";
+import { isDegraded } from "./monitor-status";
 import type { CheckDTO, DailyBucket, MaintenanceWindowDTO, MonitorDTO, MonitorStatsDTO, ScheduledPingDTO, WebhookChannelDTO } from "./ping-types";
 
 const H24 = 24 * 60 * 60 * 1000;
@@ -262,20 +263,6 @@ export async function collectMonitorStats(): Promise<StatsBundle> {
   }
 
   return { statsByMonitor, recentByMonitor };
-}
-
-/** True when the monitor's last check was UP but above its slow threshold. */
-export function isDegraded(monitor: {
-  lastStatus: string | null;
-  lastResponseMs: number | null;
-  slowThresholdMs: number | null;
-}): boolean {
-  return (
-    monitor.slowThresholdMs != null &&
-    monitor.lastStatus === "up" &&
-    monitor.lastResponseMs != null &&
-    monitor.lastResponseMs > monitor.slowThresholdMs
-  );
 }
 
 export function toMonitorDTO(

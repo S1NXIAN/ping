@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
 import { collectMonitorStats, toMaintenanceDTO, toMonitorDTO, toScheduledPingDTO } from "@/lib/ping-stats";
+import { fleetStatus } from "@/lib/monitor-status";
 import type { OverviewResponse, ScheduledPingDTO } from "@/lib/ping-types";
 
 export async function GET(req: NextRequest) {
@@ -52,11 +53,7 @@ export async function GET(req: NextRequest) {
     .filter((w) => monitorNameById.has(w.monitorId))
     .map((w) => toMaintenanceDTO(w, monitorNameById.get(w.monitorId) ?? "?"));
 
-  const up = dtos.filter((m) => m.enabled && m.lastStatus === "up").length;
-  const down = dtos.filter((m) => m.enabled && m.lastStatus === "down").length;
-  const degraded = dtos.filter((m) => m.enabled && m.degraded).length;
-  const paused = dtos.filter((m) => !m.enabled).length;
-  const pending = dtos.filter((m) => m.enabled && m.lastStatus === null).length;
+  const { up, down, degraded, paused, pending } = fleetStatus(dtos);
 
   const uptimes = dtos.map((m) => m.stats.uptime24h).filter((u): u is number => u != null);
   const checks24h = dtos.reduce((acc, m) => acc + m.stats.checks24h, 0);

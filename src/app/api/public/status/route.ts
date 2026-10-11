@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { matchesStatusToken } from "@/lib/ping-auth";
-import { collectMonitorStats, dailyBucketsByMonitor, isDegraded } from "@/lib/ping-stats";
+import { collectMonitorStats, dailyBucketsByMonitor } from "@/lib/ping-stats";
+import { fleetStatus, isDegraded, monitorStatus } from "@/lib/monitor-status";
 import { deriveIncidents } from "@/lib/incidents";
 import { createTtlCache } from "@/lib/ttl-cache";
 import type {
@@ -76,13 +77,7 @@ async function buildBody(statusTitle: string | null): Promise<PublicStatusRespon
     return {
       id: m.id,
       name: m.name,
-      status: !m.enabled
-        ? "paused"
-        : m.lastStatus === "up"
-          ? "up"
-          : m.lastStatus === "down"
-            ? "down"
-            : "pending",
+      status: monitorStatus(m),
       degraded: m.enabled && up ? isDegraded(m) || null : null,
       uptime24h: stats?.uptime24h ?? null,
       uptime7d: stats?.uptime7d ?? null,
@@ -129,11 +124,7 @@ async function buildBody(statusTitle: string | null): Promise<PublicStatusRespon
     monitors: rows,
     summary: {
       total: rows.length,
-      up: rows.filter((r) => r.status === "up").length,
-      down: rows.filter((r) => r.status === "down").length,
-      degraded: rows.filter((r) => r.degraded === true).length,
-      paused: rows.filter((r) => r.status === "paused").length,
-      pending: rows.filter((r) => r.status === "pending").length,
+      ...fleetStatus(monitors),
       lastCheckAt: lastCheckAts.length ? new Date(Math.max(...lastCheckAts)).toISOString() : null,
     },
     title: statusTitle,

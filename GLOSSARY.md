@@ -14,6 +14,13 @@ One real HTTP request PING sent, and the status, response time and error it
 recorded. The only source of truth about a monitor's health.
 _Avoid_: probe, ping, sample
 
+**Monitor status**:
+The four-value summary a surface shows for a monitor: `up`, `down`, `paused`
+or `pending`. Only `up` and `down` are measured health, from the latest Check.
+`paused` is a configuration state (checks are off, not failing) and `pending`
+is the absence of any Check yet — neither is a health verdict.
+_Avoid_: state, condition (and do not read `paused`/`pending` as health)
+
 **Interval schedule**:
 A monitor checks every N seconds, N between 1 minute and 24 hours. Set as a
 preset or as a custom `H`/`M` value.

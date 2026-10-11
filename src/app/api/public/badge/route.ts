@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { matchesStatusToken } from "@/lib/ping-auth";
-import { collectMonitorStats, isDegraded } from "@/lib/ping-stats";
+import { collectMonitorStats } from "@/lib/ping-stats";
+import { isDegraded } from "@/lib/monitor-status";
 
 /**
  * Public shields.io-style status badge — NO session required, gated by the

@@ -36,6 +36,7 @@ import { hostOf, formatMs } from "@/lib/ping-client";
 import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { StatusDot } from "./status-dot";
+import { monitorStatus } from "@/lib/monitor-status";
 import type { SortMode } from "./dashboard-view";
 
 const SORT_OPTIONS: { value: SortMode; label: string; icon: typeof MoveVertical }[] = [
@@ -44,11 +45,6 @@ const SORT_OPTIONS: { value: SortMode; label: string; icon: typeof MoveVertical 
   { value: "status", label: "Sort by status", icon: Activity },
   { value: "slowest", label: "Sort by slowest", icon: Gauge },
 ];
-
-function monitorStatus(m: MonitorDTO): "up" | "down" | "paused" | "pending" {
-  if (!m.enabled) return "paused";
-  return m.lastStatus ?? "pending";
-}
 
 /**
  * ⌘K / Ctrl+K command palette — fuzzy jump to any monitor plus quick

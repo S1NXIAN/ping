@@ -54,6 +54,7 @@ import { formatTimesForDisplay } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { HistoryChart } from "./history-chart";
 import { StatusDot, statusLabel } from "./status-dot";
+import { monitorStatus, type MonitorStatus } from "@/lib/monitor-status";
 import { StatusPill } from "./status-pill";
 import { dailyToSegments, UptimeBars } from "./uptime-bars";
 import { SectionLabel } from "./section-label";
@@ -174,13 +175,10 @@ export function MonitorDetailSheet({
 
   const m = detail?.monitor ?? monitor;
   const stats = m?.stats;
-  const status: "up" | "down" | "paused" | "pending" = !m?.enabled
-    ? "paused"
-    : m?.lastStatus === "up"
-      ? "up"
-      : m?.lastStatus === "down"
-        ? "down"
-        : "pending";
+  const status: MonitorStatus = monitorStatus({
+    enabled: m?.enabled ?? false,
+    lastStatus: m?.lastStatus ?? null,
+  });
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

@@ -61,6 +61,7 @@ import type {
 import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
 import { MonitorCard, type CardDnd } from "./monitor-card";
+import { monitorStatus, type MonitorStatus } from "@/lib/monitor-status";
 import { MonitorDetailSheet } from "./monitor-detail-sheet";
 import { AddMonitorDialog } from "./add-monitor-dialog";
 import { SchedulePingDialog } from "./schedule-ping-dialog";
@@ -286,9 +287,10 @@ export function DashboardView({
     }
 
     if (sortMode === "status") {
-      // down first, then pending, then up, then paused; pinned wins within a rank
-      const rank = (m: MonitorDTO) =>
-        !m.enabled ? 3 : m.lastStatus === "down" ? 0 : m.lastStatus === null ? 1 : 2;
+      // down first, then pending, then up, then paused; pinned wins within a rank.
+      // Presentation ordering only — the status itself comes from the shared module.
+      const STATUS_RANK: Record<MonitorStatus, number> = { down: 0, pending: 1, up: 2, paused: 3 };
+      const rank = (m: MonitorDTO) => STATUS_RANK[monitorStatus(m)];
       return [...list].sort(
         (a, b) => rank(a) - rank(b) || Number(b.pinned) - Number(a.pinned) || a.position - b.position,
       );
@@ -378,7 +380,7 @@ export function DashboardView({
       const s = map.get(m.folderId);
       if (!s) continue;
       s.total += 1;
-      if (m.enabled && m.lastStatus === "down") s.down += 1;
+      if (monitorStatus(m) === "down") s.down += 1;
     }
     return map;
   }, [monitors, folders]);
