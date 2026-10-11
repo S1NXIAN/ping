@@ -195,11 +195,13 @@ export function formatDuration(seconds: number): string {
 export function normalizeUrl(input: string): string | null {
   let candidate = input.trim();
   if (!candidate) return null;
-  if (!/^https?:\/\//i.test(candidate)) candidate = `https://${candidate}`;
+  // Only prepend when there is no explicit `scheme://` — otherwise a
+  // non-http scheme (ftp://, file://) would be mangled into a bogus https
+  // host instead of being rejected below.
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(candidate)) candidate = `https://${candidate}`;
   try {
     const u = new URL(candidate);
     if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-    if (!u.hostname.includes(".")) return null;
     return u.toString();
   } catch {
     return null;
@@ -246,6 +248,16 @@ export function formatClock(iso: string | null | undefined): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+/**
+ * Date → the value `<input type="datetime-local">` expects (device-local, no
+ * timezone). Shared by the schedule-ping and maintenance dialogs, which both
+ * seed their date fields from it.
+ */
+export function toLocalInputValue(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 /** Future ISO → "in 45s" / "in 4m" / "in 2h 10m" / "in 3d". */

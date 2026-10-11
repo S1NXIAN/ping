@@ -4,6 +4,7 @@
 // Delivery is best-effort: 10s timeout, no retries, honest last-attempt
 // stats stored on each channel row. Nothing here ever throws.
 import type { Monitor } from "@prisma/client";
+import { lookup } from "node:dns/promises";
 import { db } from "./db";
 
 export const WEBHOOK_TIMEOUT_MS = 10_000;
@@ -87,15 +88,68 @@ export function isPrivateWebhookUrl(raw: string): boolean {
     if (h === "localhost" || h.endsWith(".localhost") || h === "metadata.google.internal") {
       return true;
     }
-    if (/^(127\.|10\.|192\.168\.|169\.254\.)/.test(h) || h === "0.0.0.0") return true;
-    if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
-    if (h === "::1" || h === "::" || h.startsWith("fc") || h.startsWith("fd")) return true;
+    // IP literals (v4 or v6) share the range rules with the resolved-address check.
+    if (isPrivateIp(h)) return true;
     if (!h.includes(".")) return true; // bare/internal hostname
     return false;
   } catch {
     return true;
   }
 }
+
+/** True when an IPv4 literal is loopback/private/link-local/unspecified. */
+function isPrivateV4(h: string): boolean {
+  if (/^(127\.|10\.|192\.168\.|169\.254\.)/.test(h) || h === "0.0.0.0") return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
+  return false;
+}
+
+/** True when an IPv6 literal (lowercase, brackets stripped) is loopback/ULA/link-local. */
+function isPrivateV6(h: string): boolean {
+  if (h === "::1" || h === "::") return true;
+  if (/^f[cd]/.test(h)) return true; // fc00::/7 unique-local
+  if (/^fe[89ab]/.test(h)) return true; // fe80::/10 link-local
+  return false;
+}
+
+/** True when an IP literal is loopback/private/link-local/ULA (or unspecified). */
+export function isPrivateIp(address: string): boolean {
+  const a = address.toLowerCase().replace(/^\[|\]$/g, "");
+  // IPv4-mapped IPv6 can be written dotted (::ffff:127.0.0.1) or hex
+  // (::ffff:7f00:1); unwrap both to the IPv4 form before classifying.
+  const dotted = a.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (dotted) return isPrivateV4(dotted[1]);
+  const hexMapped = a.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (hexMapped) {
+    const hi = parseInt(hexMapped[1], 16);
+    const lo = parseInt(hexMapped[2], 16);
+    const v4 = `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`;
+    return isPrivateV4(v4);
+  }
+  if (a.includes(".")) return isPrivateV4(a);
+  return isPrivateV6(a);
+}
+
+/**
+ * Resolves `hostname` and reports whether any answer is a private/internal
+ * address. The literal hostname checks in isPrivateWebhookUrl cannot see this:
+ * a public-looking name (localtest.me, *.nip.io) can resolve to 127.0.0.1.
+ * A name that does not resolve is refused — a webhook must reach a real host.
+ *
+ * Shortcut: the resolved IP is re-resolved by fetch at connect time, so a DNS
+ * rebind between this check and the request is not caught. Acceptable for a
+ * single-admin hobby tool; upgrade with a pinned-IP dispatcher if PING is ever
+ * exposed to untrusted users.
+ */
+export async function resolvesToPrivate(hostname: string): Promise<boolean> {
+  try {
+    const addrs = await lookup(hostname, { all: true });
+    return addrs.some((a) => isPrivateIp(a.address));
+  } catch {
+    return true; // unresolvable -> refuse
+  }
+}
+
 /** Sends one payload to one URL. Never throws. Private targets are refused. */
 export async function deliverWebhook(url: string, payload: WebhookPayload): Promise<DeliveryResult> {
   if (isPrivateWebhookUrl(url)) {
@@ -105,6 +159,20 @@ export async function deliverWebhook(url: string, payload: WebhookPayload): Prom
       error: "Blocked: webhook URL points at a private/internal address",
       ms: 0,
     };
+  }
+  // A public-looking name can still resolve to an internal address.
+  try {
+    const host = new URL(url).hostname;
+    if (await resolvesToPrivate(host)) {
+      return {
+        ok: false,
+        statusCode: null,
+        error: "Blocked: webhook URL resolves to a private/internal address",
+        ms: 0,
+      };
+    }
+  } catch {
+    return { ok: false, statusCode: null, error: "Blocked: invalid webhook URL", ms: 0 };
   }
   const started = performance.now();
   try {

@@ -3,35 +3,10 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { adminGuard } from "@/lib/ping-auth";
 import { urlSchema } from "../route";
-import type { WebhookChannelDTO } from "@/lib/ping-types";
+import { resolvesToPrivate } from "@/lib/webhooks";
+import { toWebhookChannelDTO } from "@/lib/ping-stats";
 
 type Params = { params: Promise<{ id: string }> };
-
-function toDTO(
-  ch: {
-    id: string;
-    name: string;
-    url: string;
-    monitorId: string | null;
-    notifyDown: boolean;
-    notifyUp: boolean;
-    notifySlow: boolean;
-    enabled: boolean;
-    createdAt: Date;
-    deliveries: number;
-    lastDeliveryAt: Date | null;
-    lastOk: boolean | null;
-    lastError: string | null;
-  },
-  monitorName: string | null,
-): WebhookChannelDTO {
-  return {
-    ...ch,
-    monitorName,
-    createdAt: ch.createdAt.toISOString(),
-    lastDeliveryAt: ch.lastDeliveryAt?.toISOString() ?? null,
-  };
-}
 
 const patchSchema = z.object({
   name: z.string().trim().min(1, "Name cannot be empty").max(60, "Name is too long (60 chars max)").optional(),
@@ -82,6 +57,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     data.monitorId = monitorId ?? null;
   }
 
+  // A changed URL must not point at (or resolve to) an internal address.
+  if (url !== undefined && (await resolvesToPrivate(new URL(url).hostname))) {
+    return NextResponse.json(
+      { error: "Webhook URL resolves to a private/internal address — not allowed" },
+      { status: 400 },
+    );
+  }
+
   const merged = {
     notifyDown: (data.notifyDown as boolean | undefined) ?? channel.notifyDown,
     notifyUp: (data.notifyUp as boolean | undefined) ?? channel.notifyUp,
@@ -103,7 +86,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     data,
     include: { monitor: { select: { name: true } } },
   });
-  return NextResponse.json(toDTO(updated, updated.monitor?.name ?? null));
+  return NextResponse.json(toWebhookChannelDTO(updated, updated.monitor?.name ?? null));
 }
 
 /** Deletes a notification channel (admin unlock required). */

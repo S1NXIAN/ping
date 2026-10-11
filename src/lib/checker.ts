@@ -564,8 +564,11 @@ export async function runDueScheduledPings(): Promise<{ ran: number }> {
   }
 }
 
-/** Next free manual-order position for a new monitor (appends at the end). */
-export async function nextMonitorPosition(): Promise<number> {
-  const agg = await db.monitor.aggregate({ _max: { position: true } });
+/** Next free manual-order position for a new monitor (appends at the end).
+ *  Accepts a transaction client so an import can compute it inside its tx. */
+export async function nextMonitorPosition(
+  client: Pick<typeof db, "monitor"> = db,
+): Promise<number> {
+  const agg = await client.monitor.aggregate({ _max: { position: true } });
   return (agg._max.position ?? -1) + 1;
 }

@@ -5,7 +5,7 @@ import type { Check, Folder, Monitor } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { db } from "./db";
 import { parseTimes } from "./schedule";
-import type { CheckDTO, DailyBucket, MaintenanceWindowDTO, MonitorDTO, MonitorStatsDTO, ScheduledPingDTO } from "./ping-types";
+import type { CheckDTO, DailyBucket, MaintenanceWindowDTO, MonitorDTO, MonitorStatsDTO, ScheduledPingDTO, WebhookChannelDTO } from "./ping-types";
 
 const H24 = 24 * 60 * 60 * 1000;
 
@@ -70,6 +70,33 @@ export function toScheduledPingDTO(
     statusCode: p.statusCode ?? null,
     responseMs: p.responseMs ?? null,
     error: p.error ?? null,
+  };
+}
+
+/** Maps a WebhookChannel row (+ its monitor's name) to its DTO. */
+export function toWebhookChannelDTO(
+  ch: {
+    id: string;
+    name: string;
+    url: string;
+    monitorId: string | null;
+    notifyDown: boolean;
+    notifyUp: boolean;
+    notifySlow: boolean;
+    enabled: boolean;
+    createdAt: Date;
+    deliveries: number;
+    lastDeliveryAt: Date | null;
+    lastOk: boolean | null;
+    lastError: string | null;
+  },
+  monitorName: string | null,
+): WebhookChannelDTO {
+  return {
+    ...ch,
+    monitorName,
+    createdAt: ch.createdAt.toISOString(),
+    lastDeliveryAt: ch.lastDeliveryAt?.toISOString() ?? null,
   };
 }
 

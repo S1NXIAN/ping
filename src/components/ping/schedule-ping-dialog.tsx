@@ -14,18 +14,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { api, ApiError, formatCountdown, formatDateTime } from "@/lib/ping-client";
+import { api, ApiError, formatCountdown, formatDateTime, toLocalInputValue } from "@/lib/ping-client";
 import type { MonitorDTO, ScheduledPingDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
-
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-/** Date → value accepted by <input type="datetime-local"> (device-local). */
-function toLocalInputValue(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 export function SchedulePingDialog({
   open,

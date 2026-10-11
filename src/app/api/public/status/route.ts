@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
 import { db } from "@/lib/db";
+import { matchesStatusToken } from "@/lib/ping-auth";
 import { collectMonitorStats, dailyBucketsByMonitor, isDegraded } from "@/lib/ping-stats";
 import { deriveIncidents } from "@/lib/incidents";
 import { createTtlCache } from "@/lib/ttl-cache";
@@ -28,10 +28,7 @@ export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token") ?? "";
   const settings = await db.settings.findUnique({ where: { id: "main" } });
 
-  const valid =
-    !!settings?.statusToken &&
-    token.length === settings.statusToken.length &&
-    timingSafeEqual(Buffer.from(token), Buffer.from(settings.statusToken));
+  const valid = matchesStatusToken(token, settings?.statusToken);
 
   if (!valid) {
     // Same answer for "disabled" and "wrong token" — reveals nothing.

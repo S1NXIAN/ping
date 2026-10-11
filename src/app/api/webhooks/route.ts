@@ -2,34 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { adminGuard } from "@/lib/ping-auth";
-import { MAX_WEBHOOK_CHANNELS, isPrivateWebhookUrl } from "@/lib/webhooks";
-import type { WebhookChannelDTO } from "@/lib/ping-types";
-
-function toDTO(
-  ch: {
-    id: string;
-    name: string;
-    url: string;
-    monitorId: string | null;
-    notifyDown: boolean;
-    notifyUp: boolean;
-    notifySlow: boolean;
-    enabled: boolean;
-    createdAt: Date;
-    deliveries: number;
-    lastDeliveryAt: Date | null;
-    lastOk: boolean | null;
-    lastError: string | null;
-  },
-  monitorName: string | null,
-): WebhookChannelDTO {
-  return {
-    ...ch,
-    monitorName,
-    createdAt: ch.createdAt.toISOString(),
-    lastDeliveryAt: ch.lastDeliveryAt?.toISOString() ?? null,
-  };
-}
+import { MAX_WEBHOOK_CHANNELS, isPrivateWebhookUrl, resolvesToPrivate } from "@/lib/webhooks";
+import { toWebhookChannelDTO } from "@/lib/ping-stats";
 
 export const urlSchema = z
   .string()
@@ -58,7 +32,7 @@ export async function GET(req: NextRequest) {
     include: { monitor: { select: { name: true } } },
   });
   return NextResponse.json(
-    channels.map((ch) => toDTO(ch, ch.monitor?.name ?? null)),
+    channels.map((ch) => toWebhookChannelDTO(ch, ch.monitor?.name ?? null)),
     { headers: { "Cache-Control": "no-store" } },
   );
 }
@@ -103,6 +77,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // A public-looking name can still resolve to an internal address — refuse
+  // it here as well as at delivery time.
+  if (await resolvesToPrivate(new URL(url).hostname)) {
+    return NextResponse.json(
+      { error: "Webhook URL resolves to a private/internal address — not allowed" },
+      { status: 400 },
+    );
+  }
+
   if (monitorId) {
     const monitor = await db.monitor.findUnique({ where: { id: monitorId }, select: { id: true, name: true } });
     if (!monitor) {
@@ -111,11 +94,11 @@ export async function POST(req: NextRequest) {
     const channel = await db.webhookChannel.create({
       data: { name, url, notifyDown, notifyUp, notifySlow, monitorId },
     });
-    return NextResponse.json(toDTO(channel, monitor.name), { status: 201 });
+    return NextResponse.json(toWebhookChannelDTO(channel, monitor.name), { status: 201 });
   }
 
   const channel = await db.webhookChannel.create({
     data: { name, url, notifyDown, notifyUp, notifySlow, monitorId: null },
   });
-  return NextResponse.json(toDTO(channel, null), { status: 201 });
+  return NextResponse.json(toWebhookChannelDTO(channel, null), { status: 201 });
 }

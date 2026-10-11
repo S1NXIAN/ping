@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
 import { db } from "@/lib/db";
+import { matchesStatusToken } from "@/lib/ping-auth";
 import { collectMonitorStats, isDegraded } from "@/lib/ping-stats";
 
 /**
@@ -124,10 +124,7 @@ export async function GET(req: NextRequest) {
   const token = q.get("token") ?? "";
   const settings = await db.settings.findUnique({ where: { id: "main" } });
 
-  const valid =
-    !!settings?.statusToken &&
-    token.length === settings.statusToken.length &&
-    timingSafeEqual(Buffer.from(token), Buffer.from(settings.statusToken));
+  const valid = matchesStatusToken(token, settings?.statusToken);
 
   if (!valid) {
     // One gray badge for every failure mode — reveals nothing.

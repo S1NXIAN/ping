@@ -4,10 +4,10 @@
 // (.next/standalone/node_modules/.prisma/client) — so `file:./db/x.db` pointed
 // at two different files and the server failed with SQLite error 14.
 import { expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { resolveDatabaseUrl } from "@/lib/db-url";
+import { resolveDatabaseUrl, databaseFileSize } from "@/lib/db-url";
 
 const projectRoot = process.cwd(); // has prisma/schema.prisma
 
@@ -59,4 +59,21 @@ test("skips a schema copy inside build output (.next/standalone)", () => {
   );
   expect(fromStandalone).toBe(fromDev);
   expect(fromStandalone).not.toContain(".next");
+});
+
+test("databaseFileSize reads the real file the app opens", () => {
+  // Hermetic: build a throwaway tree with prisma/schema.prisma (the anchor
+  // resolveDatabaseUrl looks for) and a db file, so the size readout must
+  // stat THAT file — the one the app opens — not a path under the cwd.
+  const root = mkdtempSync(join(tmpdir(), "ping-size-"));
+  mkdirSync(join(root, "prisma", "db"), { recursive: true });
+  writeFileSync(join(root, "prisma", "schema.prisma"), "// anchor");
+  writeFileSync(join(root, "prisma", "db", "x.db"), "hello");
+  expect(databaseFileSize("file:./db/x.db", root)).toBe(5);
+});
+
+test("databaseFileSize returns null for a missing file or non-file URL", () => {
+  expect(databaseFileSize(undefined)).toBeNull();
+  expect(databaseFileSize("postgresql://user:pw@host/db")).toBeNull();
+  expect(databaseFileSize("file:/no/such/ping.db")).toBeNull();
 });

@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { adminGuard } from "@/lib/ping-auth";
-import { nextMonitorPosition, KEYWORD_MAX_LENGTH } from "@/lib/checker";
+import { nextMonitorPosition, KEYWORD_MAX_LENGTH, MAX_MONITORS, MAX_WINDOWS_PER_MONITOR, MAX_WINDOWS_TOTAL } from "@/lib/checker";
 import { monitorUrlSchema, intervalSecSchema, scheduleModeSchema, scheduleTimesSchema, timezoneSchema, scheduleError } from "@/lib/validation";
-import { MAX_WEBHOOK_CHANNELS } from "@/lib/webhooks";
+import { MAX_WEBHOOK_CHANNELS, isPrivateWebhookUrl, resolvesToPrivate } from "@/lib/webhooks";
+import { urlSchema } from "@/app/api/webhooks/route";
 import type { ImportResult } from "@/lib/ping-types";
 
 const schema = z.object({
@@ -49,7 +50,7 @@ const schema = z.object({
     .array(
       z.object({
         name: z.string().trim().min(1).max(60),
-        url: z.string().trim().min(8).max(500),
+        url: urlSchema,
         notifyDown: z.boolean().default(true),
         notifyUp: z.boolean().default(true),
         notifySlow: z.boolean().default(true),
@@ -72,6 +73,9 @@ const schema = z.object({
     .optional(),
 });
 
+/** Thrown inside the import transaction for a user-facing 400 (rolls back). */
+class ImportError extends Error {}
+
 /** Restores monitors/folders, webhook channels and future maintenance windows
  *  from a PING export. Duplicated URLs and channel names are skipped. */
 export async function POST(req: NextRequest) {
@@ -88,148 +92,215 @@ export async function POST(req: NextRequest) {
   }
 
   const { folders, monitors, webhookChannels, maintenanceWindows } = parsed.data;
-  const existingFolders = await db.folder.findMany();
-  const folderIds = new Map(existingFolders.map((f) => [f.name, f.id]));
-  let foldersCreated = 0;
 
-  const wantedFolderNames = new Set(
-    monitors.map((m) => m.folder).filter((f): f is string => !!f && f.length > 0),
-  );
-  for (const name of wantedFolderNames) {
-    if (folderIds.has(name)) continue;
-    const created = await db.folder.create({ data: { name } });
-    folderIds.set(name, created.id);
-    foldersCreated += 1;
-  }
-  if (folders) {
-    for (const f of folders) {
-      if (folderIds.has(f.name)) continue;
-      const created = await db.folder.create({ data: { name: f.name } });
-      folderIds.set(f.name, created.id);
-      foldersCreated += 1;
+  // Validate every webhook URL up front — the same SSRF rule create/patch and
+  // delivery enforce, including what the hostname RESOLVES to (imported
+  // channels skip the route guard otherwise).
+  if (webhookChannels) {
+    for (const ch of webhookChannels) {
+      if (isPrivateWebhookUrl(ch.url) || (await resolvesToPrivate(new URL(ch.url).hostname))) {
+        return NextResponse.json(
+          { error: `Webhook “${ch.name}” points at a private/internal address` },
+          { status: 400 },
+        );
+      }
     }
   }
 
-  const existingUrls = new Set(
-    (await db.monitor.findMany({ select: { url: true } })).map((m) => m.url),
-  );
-
-  let created = 0;
-  let skipped = 0;
-  let channelsCreated = 0;
-  let windowsCreated = 0;
-  let nextPosition = await nextMonitorPosition();
-  const monitorIdByUrl = new Map<string, string>();
-  const monitorIdByName = new Map<string, string>();
+  // Validate every monitor's schedule up front (pure) — a bad monitor rejects
+  // the whole file before anything is written, the same invariant create and
+  // patch enforce.
   for (const m of monitors) {
-    if (existingUrls.has(m.url)) {
-      skipped += 1;
-      continue;
-    }
-    // A times monitor without a time list or a zone would never run (or would
-    // run in the wrong zone). Reject it here rather than persist a dead
-    // monitor — the same invariant create and patch enforce.
     const schedErr = scheduleError({
       scheduleMode: m.scheduleMode,
       scheduleTimes: m.scheduleTimes,
       timezone: m.timezone,
     });
-    if (schedErr) {
-      return NextResponse.json({ error: `${m.name}: ${schedErr}` }, { status: 400 });
-    }
-    const row = await db.monitor.create({
-      data: {
-        name: m.name,
-        url: m.url,
-        method: m.method,
-        intervalSec: m.intervalSec,
-        enabled: m.enabled,
-        account: m.account ?? null,
-        keyword: m.keyword ?? null,
-        keywordMode: m.keywordMode,
-        slowThresholdMs: m.slowThresholdMs ?? null,
-        alertDelay: m.alertDelay ?? 0,
-        scheduleMode: m.scheduleMode === "times" ? "times" : "interval",
-        scheduleTimes: m.scheduleMode === "times" ? (m.scheduleTimes ?? null) : null,
-        timezone: m.scheduleMode === "times" ? (m.timezone ?? null) : null,
-        folderId: m.folder ? (folderIds.get(m.folder) ?? null) : null,
-        position: nextPosition,
+    if (schedErr) return NextResponse.json({ error: `${m.name}: ${schedErr}` }, { status: 400 });
+  }
+
+  // Everything below is one transaction: the monitor cap and the window caps
+  // are checked inside it against the totals the writes themselves see, so two
+  // concurrent imports cannot both pass — and any late validation failure rolls
+  // the whole import back, leaving the DB untouched rather than half-imported.
+  try {
+    const result = await db.$transaction(
+      async (tx) => {
+        // Enforce the create route's monitor cap against the CURRENT total, not
+        // just the size of the incoming file: an import must never push the
+        // fleet past MAX_MONITORS (the free-tier tick/DB budget). Duplicates are
+        // skipped, so only genuinely new URLs count.
+        const existingUrls = new Set(
+          (await tx.monitor.findMany({ select: { url: true } })).map((m) => m.url),
+        );
+        const newUrls = new Set<string>();
+        for (const m of monitors) if (!existingUrls.has(m.url)) newUrls.add(m.url);
+        const existingMonitors = await tx.monitor.count();
+        if (existingMonitors + newUrls.size > MAX_MONITORS) {
+          throw new ImportError(
+            `Monitor limit reached (${MAX_MONITORS}) — ${existingMonitors} exist and this file adds ${newUrls.size}`,
+          );
+        }
+
+        const existingFolders = await tx.folder.findMany();
+        const folderIds = new Map(existingFolders.map((f) => [f.name, f.id]));
+        let foldersCreated = 0;
+
+        const wantedFolderNames = new Set(
+          monitors.map((m) => m.folder).filter((f): f is string => !!f && f.length > 0),
+        );
+        for (const name of wantedFolderNames) {
+          if (folderIds.has(name)) continue;
+          const created = await tx.folder.create({ data: { name } });
+          folderIds.set(name, created.id);
+          foldersCreated += 1;
+        }
+        if (folders) {
+          for (const f of folders) {
+            if (folderIds.has(f.name)) continue;
+            const created = await tx.folder.create({ data: { name: f.name } });
+            folderIds.set(f.name, created.id);
+            foldersCreated += 1;
+          }
+        }
+
+        let created = 0;
+        let skipped = 0;
+        let nextPosition = await nextMonitorPosition(tx);
+        const monitorIdByUrl = new Map<string, string>();
+        const monitorIdByName = new Map<string, string>();
+        for (const m of monitors) {
+          if (existingUrls.has(m.url)) {
+            skipped += 1;
+            continue;
+          }
+          const row = await tx.monitor.create({
+            data: {
+              name: m.name,
+              url: m.url,
+              method: m.method,
+              intervalSec: m.intervalSec,
+              enabled: m.enabled,
+              account: m.account ?? null,
+              keyword: m.keyword ?? null,
+              keywordMode: m.keywordMode,
+              slowThresholdMs: m.slowThresholdMs ?? null,
+              alertDelay: m.alertDelay ?? 0,
+              scheduleMode: m.scheduleMode === "times" ? "times" : "interval",
+              scheduleTimes: m.scheduleMode === "times" ? (m.scheduleTimes ?? null) : null,
+              timezone: m.scheduleMode === "times" ? (m.timezone ?? null) : null,
+              folderId: m.folder ? (folderIds.get(m.folder) ?? null) : null,
+              position: nextPosition,
+            },
+          });
+          monitorIdByUrl.set(m.url, row.id);
+          monitorIdByName.set(m.name, row.id);
+          nextPosition += 1;
+          existingUrls.add(m.url);
+          created += 1;
+        }
+
+        // Existing monitors (not just imported ones) can be routing targets too.
+        for (const m of await tx.monitor.findMany({ select: { id: true, name: true, url: true } })) {
+          if (!monitorIdByUrl.has(m.url)) monitorIdByUrl.set(m.url, m.id);
+          if (!monitorIdByName.has(m.name)) monitorIdByName.set(m.name, m.id);
+        }
+
+        // Webhook channels — skip ones whose URL already exists.
+        let channelsCreated = 0;
+        if (webhookChannels) {
+          const existingChannelUrls = new Set(
+            (await tx.webhookChannel.findMany({ select: { url: true } })).map((c) => c.url),
+          );
+          let channelCount = await tx.webhookChannel.count();
+          for (const ch of webhookChannels) {
+            if (channelCount >= MAX_WEBHOOK_CHANNELS) break;
+            if (existingChannelUrls.has(ch.url)) continue;
+            await tx.webhookChannel.create({
+              data: {
+                name: ch.name,
+                url: ch.url,
+                notifyDown: ch.notifyDown,
+                notifyUp: ch.notifyUp,
+                notifySlow: ch.notifySlow,
+                enabled: ch.enabled,
+                monitorId: ch.monitor ? (monitorIdByName.get(ch.monitor) ?? null) : null,
+              },
+            });
+            existingChannelUrls.add(ch.url);
+            channelCount += 1;
+            channelsCreated += 1;
+          }
+        }
+
+        // Maintenance windows — only future ones, attached to monitors that exist
+        // by name (imported or pre-existing). Re-importing the same file skips
+        // windows that already exist (same monitor + start time). The caps are
+        // checked against the resulting totals; exceeding one throws so the
+        // transaction rolls back.
+        let windowsCreated = 0;
+        if (maintenanceWindows) {
+          const now = Date.now();
+          const existingWindows = new Set(
+            (
+              await tx.maintenanceWindow.findMany({
+                where: { endsAt: { gte: new Date(now) } },
+                select: { monitorId: true, startsAt: true },
+              })
+            ).map((w) => `${w.monitorId}:${w.startsAt.getTime()}`),
+          );
+          const existingTotal = await tx.maintenanceWindow.count();
+          const perMonitor = new Map<string, number>(
+            (
+              await tx.maintenanceWindow.groupBy({ by: ["monitorId"], _count: { _all: true } })
+            ).map((r) => [r.monitorId, r._count._all] as const),
+          );
+
+          const pending: { monitorId: string; startsAt: Date; endsAt: Date; note: string | null }[] = [];
+          for (const w of maintenanceWindows) {
+            const startsAt = new Date(w.startsAt);
+            const endsAt = new Date(w.endsAt);
+            if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) continue;
+            if (endsAt.getTime() <= now || endsAt.getTime() <= startsAt.getTime()) continue;
+            const monitorId = monitorIdByName.get(w.monitor);
+            if (!monitorId) continue;
+            if (existingWindows.has(`${monitorId}:${startsAt.getTime()}`)) continue;
+            existingWindows.add(`${monitorId}:${startsAt.getTime()}`);
+            pending.push({ monitorId, startsAt, endsAt, note: w.note ?? null });
+          }
+
+          if (existingTotal + pending.length > MAX_WINDOWS_TOTAL) {
+            throw new ImportError(`Total maintenance-window limit reached (${MAX_WINDOWS_TOTAL})`);
+          }
+          for (const w of pending) {
+            const count = (perMonitor.get(w.monitorId) ?? 0) + 1;
+            if (count > MAX_WINDOWS_PER_MONITOR) {
+              throw new ImportError(
+                `A monitor would exceed ${MAX_WINDOWS_PER_MONITOR} maintenance windows`,
+              );
+            }
+            perMonitor.set(w.monitorId, count);
+          }
+
+          for (const w of pending) {
+            await tx.maintenanceWindow.create({ data: w });
+            windowsCreated += 1;
+          }
+        }
+
+        return { created, skipped, foldersCreated, channelsCreated, windowsCreated };
       },
-    });
-    monitorIdByUrl.set(m.url, row.id);
-    monitorIdByName.set(m.name, row.id);
-    nextPosition += 1;
-    existingUrls.add(m.url);
-    created += 1;
-  }
-
-  // Existing monitors (not just imported ones) can be routing targets too.
-  for (const m of await db.monitor.findMany({ select: { id: true, name: true, url: true } })) {
-    if (!monitorIdByUrl.has(m.url)) monitorIdByUrl.set(m.url, m.id);
-    if (!monitorIdByName.has(m.name)) monitorIdByName.set(m.name, m.id);
-  }
-
-  // Webhook channels — skip ones whose URL already exists.
-  if (webhookChannels) {
-    const existingChannelUrls = new Set(
-      (await db.webhookChannel.findMany({ select: { url: true } })).map((c) => c.url),
+      // A max-size import writes hundreds of rows; Prisma's 5s default could
+      // abort a valid import with P2028 on a slow SQLite instance.
+      { timeout: 30_000 },
     );
-    let channelCount = await db.webhookChannel.count();
-    for (const ch of webhookChannels) {
-      if (channelCount >= MAX_WEBHOOK_CHANNELS) break;
-      if (existingChannelUrls.has(ch.url)) continue;
-      await db.webhookChannel.create({
-        data: {
-          name: ch.name,
-          url: ch.url,
-          notifyDown: ch.notifyDown,
-          notifyUp: ch.notifyUp,
-          notifySlow: ch.notifySlow,
-          enabled: ch.enabled,
-          monitorId: ch.monitor ? (monitorIdByName.get(ch.monitor) ?? null) : null,
-        },
-      });
-      existingChannelUrls.add(ch.url);
-      channelCount += 1;
-      channelsCreated += 1;
-    }
-  }
 
-  // Maintenance windows — only future ones, attached to monitors that exist
-  // by name (imported or pre-existing). Re-importing the same file skips
-  // windows that already exist (same monitor + start time).
-  if (maintenanceWindows) {
-    const now = Date.now();
-    const existingWindows = new Set(
-      (
-        await db.maintenanceWindow.findMany({
-          where: { endsAt: { gte: new Date(now) } },
-          select: { monitorId: true, startsAt: true },
-        })
-      ).map((w) => `${w.monitorId}:${w.startsAt.getTime()}`),
-    );
-    for (const w of maintenanceWindows) {
-      const startsAt = new Date(w.startsAt);
-      const endsAt = new Date(w.endsAt);
-      if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) continue;
-      if (endsAt.getTime() <= now || endsAt.getTime() <= startsAt.getTime()) continue;
-      const monitorId = monitorIdByName.get(w.monitor);
-      if (!monitorId) continue;
-      if (existingWindows.has(`${monitorId}:${startsAt.getTime()}`)) continue;
-      await db.maintenanceWindow.create({
-        data: { monitorId, startsAt, endsAt, note: w.note ?? null },
-      });
-      existingWindows.add(`${monitorId}:${startsAt.getTime()}`);
-      windowsCreated += 1;
+    const body: ImportResult & { channelsCreated: number; windowsCreated: number } = result;
+    return NextResponse.json(body);
+  } catch (e) {
+    if (e instanceof ImportError) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
     }
+    throw e;
   }
-
-  const result: ImportResult & { channelsCreated: number; windowsCreated: number } = {
-    created,
-    skipped,
-    foldersCreated,
-    channelsCreated,
-    windowsCreated,
-  };
-  return NextResponse.json(result);
 }

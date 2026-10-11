@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
 import { db } from "@/lib/db";
+import { matchesStatusToken } from "@/lib/ping-auth";
 import { deriveIncidents } from "@/lib/incidents";
+import { createTtlCache } from "@/lib/ttl-cache";
 
 /**
  * Public RSS 2.0 feed for the status page — NO session required, gated by
@@ -14,20 +15,41 @@ import { deriveIncidents } from "@/lib/incidents";
  * status page already shows publicly — names, timestamps and notes only,
  * never URLs, accounts or raw history. A wrong or missing token gets the
  * same 404 as a disabled page (reveals nothing).
+ *
+ * The XML is cached for a short TTL (same idea as the status page): a feed
+ * reader polling this endpoint must not re-run incident derivation on every
+ * hit. Keyed by token so a rotated/disabled link never serves a stale body.
  */
+const feedCache = createTtlCache<string>(30_000);
+
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token") ?? "";
-  const settings = await db.settings.findUnique({ where: { id: "main" } });
+  const settings = await db.settings.findUnique({
+    where: { id: "main" },
+    select: { statusToken: true, statusTitle: true },
+  });
 
-  const valid =
-    !!settings?.statusToken &&
-    token.length === settings.statusToken.length &&
-    timingSafeEqual(Buffer.from(token), Buffer.from(settings.statusToken));
+  const valid = matchesStatusToken(token, settings?.statusToken);
 
   if (!valid) {
     return NextResponse.json({ error: "Status page not found" }, { status: 404 });
   }
 
+  const xml = await feedCache.get(token, () =>
+    buildFeed(req.nextUrl.origin, token, settings?.statusTitle ?? null),
+  );
+
+  return new NextResponse(xml, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/rss+xml; charset=utf-8",
+      "Cache-Control": "public, max-age=300, stale-while-revalidate=600",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
+
+async function buildFeed(origin: string, token: string, statusTitle: string | null): Promise<string> {
   const monitors = await db.monitor.findMany({
     where: { statusHidden: false },
     select: { id: true, name: true, intervalSec: true, scheduleMode: true, scheduleTimes: true },
@@ -97,9 +119,9 @@ export async function GET(req: NextRequest) {
   const esc = (s: string) =>
     s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
-  const title = settings?.statusTitle || "PING status";
-  const selfUrl = `${req.nextUrl.origin}/api/public/feed?token=${token}`;
-  const siteUrl = `${req.nextUrl.origin}/?status=${token}`;
+  const title = statusTitle || "PING status";
+  const selfUrl = `${origin}/api/public/feed?token=${token}`;
+  const siteUrl = `${origin}/?status=${token}`;
 
   const xml =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
@@ -129,12 +151,5 @@ export async function GET(req: NextRequest) {
     `</channel>\n` +
     `</rss>\n`;
 
-  return new NextResponse(xml, {
-    status: 200,
-    headers: {
-      "Content-Type": "application/rss+xml; charset=utf-8",
-      "Cache-Control": "public, max-age=300, stale-while-revalidate=600",
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
+  return xml;
 }

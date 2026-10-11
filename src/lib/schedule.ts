@@ -143,19 +143,6 @@ function instantsOnLocalDay(times: string[], timeZone: string, ts: number, dayOf
 }
 
 /**
- * The next instant strictly after `nowMs`, searching today then tomorrow.
- * Returns null when no times are configured.
- */
-export function nextScheduledInstant(times: string[], timeZone: string, nowMs: number): number | null {
-  if (times.length === 0) return null;
-  const candidates = [
-    ...instantsOnLocalDay(times, timeZone, nowMs, 0),
-    ...instantsOnLocalDay(times, timeZone, nowMs, 1),
-  ].sort((a, b) => a - b);
-  return candidates.find((ts) => ts > nowMs) ?? null;
-}
-
-/**
  * The latest instant at or before `nowMs`, searching today then yesterday.
  * This is the scheduled instant a bounded catch-up would run. Null when no times.
  */
@@ -230,12 +217,6 @@ export function parseTimes(input: string | null | undefined): string[] {
     .map((s) => s.trim())
     .filter((s) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s));
   return [...new Set(valid)].sort().slice(0, MAX_SCHEDULE_TIMES);
-}
-
-/** Serialises clock times for storage; null when there are none. */
-export function formatTimes(times: string[]): string | null {
-  const clean = parseTimes(times.join(","));
-  return clean.length > 0 ? clean.join(",") : null;
 }
 
 /** A human list of the times in the given zone: "1:00 PM, 3:00 AM". */

@@ -12,7 +12,7 @@
 // working directory that has `prisma/schema.prisma`, skipping build output
 // (`.next`) — makes both resolve identically. Absolute paths and non-`file:`
 // URLs are returned unchanged.
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 
 const FILE_PREFIX = "file:";
@@ -41,5 +41,24 @@ export function resolveDatabaseUrl(
     const parent = dirname(dir);
     if (parent === dir) return raw; // no source schema ancestor — leave as-is
     dir = parent;
+  }
+}
+
+/**
+ * Size in bytes of the SQLite file the app actually opens, or null when the
+ * URL is not a local file / the file cannot be read. Resolves the path the
+ * same way the server does, so the Settings readout measures the real file
+ * (a raw `file:./db/x.db` stats the wrong path under the process cwd in dev).
+ */
+export function databaseFileSize(
+  raw: string | undefined,
+  cwd: string = process.cwd(),
+): number | null {
+  const url = resolveDatabaseUrl(raw, cwd);
+  if (!url || !url.startsWith(FILE_PREFIX)) return null;
+  try {
+    return statSync(url.slice(FILE_PREFIX.length)).size;
+  } catch {
+    return null;
   }
 }

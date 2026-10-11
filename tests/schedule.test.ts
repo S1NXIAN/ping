@@ -8,11 +8,9 @@
 import { expect, test } from "bun:test";
 import {
   MAX_SCHEDULE_TIMES,
-  formatTimes,
   hasTimeAt,
   isTimesDue,
   mostRecentScheduledInstant,
-  nextScheduledInstant,
   nominalPeriodSec,
   parseTimes,
   zonedWallClockToUtc,
@@ -38,13 +36,6 @@ test("parseTimes caps the list at MAX_SCHEDULE_TIMES", () => {
   expect(parseTimes(many)).toHaveLength(MAX_SCHEDULE_TIMES);
 });
 
-test("formatTimes round-trips and is empty for no times", () => {
-  // Storage is canonical: sorted, so the same set always serialises alike.
-  expect(formatTimes(["13:00", "03:00"])).toBe("03:00,13:00");
-  expect(formatTimes([])).toBeNull();
-  expect(parseTimes(formatTimes(["13:00", "03:00"]))).toEqual(["03:00", "13:00"]);
-});
-
 test("zonedWallClockToUtc converts a wall clock in a fixed-offset zone", () => {
   // Asia/Manila is UTC+8 year-round (no DST), so this is pure arithmetic.
   // 2026-03-10 13:00 Manila == 2026-03-10 05:00 UTC.
@@ -57,27 +48,6 @@ test("zonedWallClockToUtc respects a DST offset change", () => {
   // America/New_York: EST (UTC-5) before 2026-03-08, EDT (UTC-4) after.
   expect(zonedWallClockToUtc(2026, 3, 1, 13, 0, "America/New_York")).toBe(at("2026-03-01T18:00:00Z"));
   expect(zonedWallClockToUtc(2026, 3, 20, 13, 0, "America/New_York")).toBe(at("2026-03-20T17:00:00Z"));
-});
-
-test("nextScheduledInstant finds the next time later today", () => {
-  // Now = 2026-03-10 04:00 UTC = 12:00 Manila. Times 13:00 & 03:00 Manila.
-  // Next is 13:00 Manila today = 05:00 UTC.
-  const now = at("2026-03-10T04:00:00Z");
-  expect(nextScheduledInstant(["13:00", "03:00"], "Asia/Manila", now)).toBe(at("2026-03-10T05:00:00Z"));
-});
-
-test("nextScheduledInstant wraps to tomorrow past the last time of day", () => {
-  // Now = 2026-03-10 06:00 UTC = 14:00 Manila — both times are past.
-  // Next is 03:00 Manila tomorrow = 2026-03-10 19:00 UTC.
-  const now = at("2026-03-10T06:00:00Z");
-  expect(nextScheduledInstant(["13:00", "03:00"], "Asia/Manila", now)).toBe(at("2026-03-10T19:00:00Z"));
-});
-
-test("nextScheduledInstant is strictly after now", () => {
-  // Exactly on a scheduled instant: the next one is the following slot, so a
-  // check that just ran is not immediately due again.
-  const now = at("2026-03-10T05:00:00Z"); // == 13:00 Manila
-  expect(nextScheduledInstant(["13:00", "03:00"], "Asia/Manila", now)).toBe(at("2026-03-10T19:00:00Z"));
 });
 
 test("mostRecentScheduledInstant finds the latest time at or before now", () => {

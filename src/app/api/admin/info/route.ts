@@ -1,21 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { statSync } from "node:fs";
 import { adminGuard } from "@/lib/ping-auth";
 import { db } from "@/lib/db";
+import { databaseFileSize } from "@/lib/db-url";
 import { MAX_CHECKS_PER_MONITOR, runtimeState } from "@/lib/checker";
 import { TICK_INTERVAL_SEC } from "@/lib/scheduler";
 import type { AdminInfoResponse } from "@/lib/ping-types";
-
-function dbBytes(): number | null {
-  try {
-    const url = process.env.DATABASE_URL ?? "";
-    const path = url.startsWith("file:") ? url.slice(5) : url;
-    if (!path) return null;
-    return statSync(path).size;
-  } catch {
-    return null;
-  }
-}
 
 export async function GET(req: NextRequest) {
   const unauthorized = await adminGuard(req);
@@ -44,7 +33,7 @@ export async function GET(req: NextRequest) {
       monitors,
       folders,
       oldestCheckAt: oldest?.checkedAt.toISOString() ?? null,
-      dbBytes: dbBytes(),
+      dbBytes: databaseFileSize(process.env.DATABASE_URL),
       retentionDays: settings?.retentionDays ?? null,
       maxChecksPerMonitor: MAX_CHECKS_PER_MONITOR,
       lastPrunedAt: runtimeState.lastPrunedAt,

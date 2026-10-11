@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { timingSafeEqual } from "node:crypto";
 import { db } from "@/lib/db";
+import { matchesStatusToken } from "@/lib/ping-auth";
 import { PingApp } from "@/components/ping/ping-app";
 
 /**
@@ -36,10 +36,7 @@ export async function generateMetadata({
       where: { id: "main" },
       select: { statusToken: true, statusTitle: true },
     });
-    valid =
-      !!settings?.statusToken &&
-      token.length === settings.statusToken.length &&
-      timingSafeEqual(Buffer.from(token), Buffer.from(settings.statusToken));
+    valid = matchesStatusToken(token, settings?.statusToken);
     statusTitle = settings?.statusTitle ?? null;
   }
 

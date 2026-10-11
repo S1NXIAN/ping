@@ -127,8 +127,10 @@ monitor. Two consequences follow, and they are deliberate:
   as the only thing standing between a stranger and your internal network.
 - **Webhook URLs are the untrusted path** (they leave PING and can be
   influenced by a compromised account), so they are held to a stricter rule:
-  no loopback/private/link-local targets, and redirects are never followed —
-  a public URL that 302s to an internal host is refused.
+  no loopback/private/link-local targets — checked both on the hostname and
+  on what it resolves to, so a public name pointing at an internal address is
+  refused — and redirects are never followed: a public URL that 302s to an
+  internal host is refused.
 
 ## Run locally
 
@@ -144,8 +146,8 @@ Optional env: `CRON_SECRET` — when set, `/api/cron/tick` requires `?token=<sec
 ## Deploy on Render
 
 Use **render.yaml** (New → Blueprint) or create a Node web service manually
-with build `npm ci && npx prisma generate && npm run build` and start
-`npx prisma db push --accept-data-loss && npm run start`.
+with build `bun install && bunx prisma generate && bun run build` and start
+`bunx prisma db push --accept-data-loss && bun run start`.
 
 **Honest caveats** (see render.yaml comments too):
 

@@ -2,8 +2,6 @@
 // These describe REAL data only — anything the backend cannot measure
 // is `null`, never a fabricated number.
 
-export type MonitorStatus = "up" | "down" | "paused" | "pending";
-
 /** How a monitor's check cadence is defined. */
 export type ScheduleMode = "interval" | "times";
 

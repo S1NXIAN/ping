@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { ImageResponse } from "next/og";
-import { timingSafeEqual } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { matchesStatusToken } from "@/lib/ping-auth";
 import { isDegraded } from "@/lib/ping-stats";
 
 /**
@@ -76,10 +76,7 @@ export async function GET(req: NextRequest) {
     select: { statusToken: true, statusTitle: true },
   });
 
-  const valid =
-    !!settings?.statusToken &&
-    token.length === settings.statusToken.length &&
-    timingSafeEqual(Buffer.from(token), Buffer.from(settings.statusToken));
+  const valid = matchesStatusToken(token, settings?.statusToken);
 
   const host = (req.headers.get("host") ?? "").replace(/:\d+$/, "").slice(0, 40);
 
