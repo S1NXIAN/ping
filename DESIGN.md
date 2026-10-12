@@ -267,7 +267,7 @@ Sharp corners are the system's signature: every radius token is forced to 0px (`
 - **Behavior:** live states emit a sonar ripple — `box-shadow` ring expanding 0→6px in 2.4s `cubic-bezier(0.4, 0, 0.6, 1)`, infinite, tinted per state at 55% alpha.
 
 ### SVG Instruments (signature)
-Hand-rolled, no chart library: **sparkline** (Chalk 1.6px stroke + soft white area fill, emerald latest-point dot, gaps where data is missing); **uptime bars** (20 sharp segments — emerald full, rose empty, amber partial, dashed-outline gray for "no data", never faked); **response-time chart** (real time axis, dashed hairline gridlines, rose ticks for failed checks, amber dashed slow-threshold line, hover tooltip). Captions state exactly what was measured.
+Hand-rolled, no chart library: **sparkline** (Chalk 1.6px stroke + soft white area fill, emerald latest-point dot, gaps where data is missing); **uptime bars** (12 sharp segments — emerald full, rose empty, amber partial, dashed-outline gray for "no data", never faked); **response-time chart** (real time axis, dashed hairline gridlines, rose ticks for failed checks, amber dashed slow-threshold line, hover tooltip). Captions state exactly what was measured.
 
 ## Do's and Don'ts
 

@@ -21,8 +21,8 @@ Nothing will tell you a service went down except opening the dashboard.
   into **folders**, rename anything, pause or resume individual monitors, and
   tag each with the **account used** (optional label for whichever account runs
   the service — searchable).
-- **Ordering** — pin monitors to the top, drag to reorder (desktop) or move
-  up/down from the menu (works on touch), and switch the list between manual,
+- **Ordering** — pin monitors to the top, drag the handle to reorder
+  (desktop), and switch the list between manual,
   A–Z, and status-first sorting. Pinned monitors float to the top in every sort
   mode; dropping a card into the pinned zone pins it automatically. Your sort
   choice is remembered per device, and `/` (Gmail-style) jumps to the search box.
@@ -35,9 +35,10 @@ Nothing will tell you a service went down except opening the dashboard.
   the response body, so a 200 from a broken page still counts as down. Set in
   the monitor form (“Keyword check”: body must contain / must not contain,
   case-insensitive, first 256 KB of the body, ≤200 chars). A keyword needs a
-  response body, so it can't be combined with a HEAD check: PING rejects that
-  pairing (create, edit and import all refuse it) rather than silently
-  switching the method. A failed keyword match is recorded as a real down
+  response body, so it can't be combined with a HEAD check: create, edit and
+  import all refuse that pairing rather than storing a monitor that would
+  never pass. (Monitors saved before this rule existed are switched to GET
+  once, on boot.) A failed keyword match is recorded as a real down
   check (error message, incidents and uptime math all follow).
 - **Slow (degraded) state** — optional per-monitor threshold (50–30000 ms, set
   in the monitor form). A monitor is **slow** when the average response time of
