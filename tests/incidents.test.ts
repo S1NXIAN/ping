@@ -109,14 +109,6 @@ async function seedIncidents(
   return m;
 }
 
-test("an ongoing incident is listed first, above newer closed incidents", async () => {
-  const { deriveIncidents } = await import("@/lib/incidents");
-  const m = await seedIncidents(3, { ongoing: true });
-  const incidents = await deriveIncidents([m]);
-  expect(incidents.length).toBeGreaterThan(0);
-  expect(incidents[0].endedAt).toBeNull();
-});
-
 test("an ongoing incident survives when more than the cap of newer incidents exist", async () => {
   const { deriveIncidents, MAX_INCIDENTS } = await import("@/lib/incidents");
   // MAX_INCIDENTS + 5 closed incidents, plus the ongoing one.
@@ -124,21 +116,50 @@ test("an ongoing incident survives when more than the cap of newer incidents exi
   const incidents = await deriveIncidents([m]);
   const ongoing = incidents.filter((i) => i.endedAt == null);
   expect(ongoing.length).toBe(1);
+});
+
+test("the ongoing incident sorts above the closed ones", async () => {
+  const { deriveIncidents } = await import("@/lib/incidents");
+  const m = await seedIncidents(3, { ongoing: true });
+  const incidents = await deriveIncidents([m]);
   expect(incidents[0].endedAt).toBeNull();
 });
 
-test("closed incidents keep newest-first order and the cap bounds them", async () => {
+test("closed incidents are capped", async () => {
   const { deriveIncidents, MAX_INCIDENTS } = await import("@/lib/incidents");
   const m = await seedIncidents(MAX_INCIDENTS + 5);
   const incidents = await deriveIncidents([m]);
   expect(incidents.length).toBe(MAX_INCIDENTS);
   for (const i of incidents) expect(i.endedAt).not.toBeNull();
-  // Newest first.
+});
+
+test("closed incidents keep newest-first order", async () => {
+  const { deriveIncidents, MAX_INCIDENTS } = await import("@/lib/incidents");
+  const m = await seedIncidents(MAX_INCIDENTS + 5);
+  const incidents = await deriveIncidents([m]);
   for (let i = 1; i < incidents.length; i++) {
     expect(new Date(incidents[i - 1].startedAt).getTime()).toBeGreaterThanOrEqual(
       new Date(incidents[i].startedAt).getTime(),
     );
   }
+});
+
+test("multiple ongoing incidents are ordered newest-first among themselves", async () => {
+  const { deriveIncidents } = await import("@/lib/incidents");
+  const older = await db.monitor.create({
+    data: { name: "older", url: "https://older.example.com", intervalSec: 60 },
+  });
+  const newer = await db.monitor.create({
+    data: { name: "newer", url: "https://newer.example.com", intervalSec: 60 },
+  });
+  await db.check.create({
+    data: { monitorId: older.id, status: "down", checkedAt: new Date(Date.now() - 10 * 60_000) },
+  });
+  await db.check.create({
+    data: { monitorId: newer.id, status: "down", checkedAt: new Date(Date.now() - 60_000) },
+  });
+  const incidents = await deriveIncidents([older, newer]);
+  expect(incidents.map((i) => i.monitorName)).toEqual(["newer", "older"]);
 });
 
 test("the exempt ongoing set is bounded", async () => {
