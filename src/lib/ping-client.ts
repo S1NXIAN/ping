@@ -226,16 +226,3 @@ export function formatClock(iso: string | null | undefined): string {
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
-
-/** Milliseconds until sign-out → "4:59" under an hour, "1h 59m" above it.
- *  Shared by the dashboard header and the Settings header. */
-export function formatSessionLeft(ms: number): string {
-  const s = Math.max(0, Math.ceil(ms / 1000));
-  if (s >= 3600) {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    return m > 0 ? `${h}h ${m}m` : `${h}h`;
-  }
-  const m = Math.floor(s / 60);
-  return `${m}:${String(s % 60).padStart(2, "0")}`;
-}

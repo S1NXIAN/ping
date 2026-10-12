@@ -40,11 +40,13 @@ keeps creation idempotent so repeated boots never make a second one.
 _Avoid_: heartbeat, internal monitor
 
 **Session**:
-The single dashboard login, with an **absolute** expiry counted from login (no
-sliding, no idle detection). Its length is an admin setting (presets 5/15/30/
-60/120 minutes, default 15). Every authenticated request re-checks the expiry
-server-side; a request after it is unauthenticated and returns to the login
-screen. Any visit before expiry asks for no password.
+The single dashboard login, remembered for a **window counted from the last
+password entry** (no sliding, no idle detection). Its length is an admin
+setting (presets 5/15/30/60/120 minutes, default 15). Inside the window a
+fresh visit goes straight to the dashboard; once it has lapsed the next visit
+asks for the password again, and re-entering it starts a fresh window. The
+window is never enforced against an open tab — it is a re-prompt convenience,
+not a revocation.
 _Avoid_: token, cookie, unlock
 
 **Interval schedule**:

@@ -70,19 +70,3 @@ test("keep-forever (0) deletes no checks at all", async () => {
   expect(deleted).toBe(0);
   expect(await db.check.count({ where: { monitorId: m.id } })).toBe(2);
 });
-
-test("expired sessions are pruned regardless of the retention setting", async () => {
-  const { pruneChecks } = await import("@/lib/checker");
-  await db.session.create({
-    data: { token: "expired", expiresAt: new Date(Date.now() - 1000) },
-  });
-  await db.session.create({
-    data: { token: "live", expiresAt: new Date(Date.now() + 86_400_000) },
-  });
-  await setRetention(0); // keep forever still cleans operational rows
-
-  await pruneChecks();
-
-  const tokens = (await db.session.findMany()).map((s) => s.token);
-  expect(tokens).toEqual(["live"]);
-});

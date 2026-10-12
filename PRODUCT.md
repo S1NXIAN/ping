@@ -38,7 +38,7 @@ Capabilities (confirmed, shipping):
 - Self-monitor: created by default, checks PING's own health endpoint every 3 minutes; an ordinary monitor otherwise (visible, editable, deletable).
 - Incidents: derived from real check history (30-day window), with admin postmortem notes; ongoing incidents are pinned to the top and exempt from the list cap.
 - Import/export of configuration as JSON; Render platform status card; keep-alive workflow YAML in the README.
-- Auth: a single scrypt-hashed password and one dashboard Session whose absolute expiry is admin-configurable (presets 5/15/30/60/120 min, default 15), with a live countdown in the header; password change revokes all sessions.
+- Auth: a single scrypt-hashed password and one dashboard Session. The login is remembered for an admin-configurable window counted from the last password entry: inside it a fresh visit skips the password, after it the next visit asks again. An open tab is never interrupted — the window is a re-prompt convenience, not a revocation; the Session ends only on logout or a password change.
 
 Constraints (must be preserved by future work):
 

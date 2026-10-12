@@ -167,13 +167,14 @@ export interface RenderStatusResponse {
 
 export interface SessionResponse {
   initialized: boolean;
+  /** A valid token is present (identity). */
   authenticated: boolean;
-  /** Absolute session expiry (ISO) — the shell counts down to it. null when
-   *  unauthenticated. */
-  expiresAt: string | null;
+  /** The re-prompt window is still open — a fresh visit may skip the login
+   *  screen. Always false when unauthenticated. */
+  windowOpen: boolean;
 }
 
-/** GET/POST /api/admin/session — the absolute session-length setting. */
+/** GET/POST /api/admin/session — the re-prompt window setting. */
 export interface SessionSettingsResponse {
   sessionMinutes: number;
   /** The durations offered in Settings (minutes). */

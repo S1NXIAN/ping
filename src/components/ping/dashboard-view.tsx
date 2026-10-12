@@ -5,7 +5,6 @@ import {
   Activity,
   AlertTriangle,
   ArrowDownAZ,
-  Clock,
   FolderPlus,
   Folder,
   Gauge,
@@ -48,8 +47,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useOverview } from "@/hooks/use-overview";
-import { useSessionCountdown } from "@/hooks/use-session-countdown";
-import { api, formatSessionLeft, formatUptime, timeAgo, uptimeTone } from "@/lib/ping-client";
+import { api, formatUptime, timeAgo, uptimeTone } from "@/lib/ping-client";
 import type { AdminIncidentDTO, FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
@@ -69,21 +67,14 @@ export type SortMode = "manual" | "az" | "status" | "slowest";
 const SORT_STORAGE_KEY = "ping.sort";
 
 export function DashboardView({
-  sessionExpiresAt,
   onLogout,
   onOpenAdmin,
 }: {
-  /** Absolute session expiry (ISO) — the header counts down to it. */
-  sessionExpiresAt: string | null;
   onLogout: () => void;
   onOpenAdmin: () => void;
 }) {
   const { data, error, loading, refreshing, refresh } = useOverview(15000);
   const { toast } = useToast();
-
-  // Live countdown to the absolute session expiry (see ping-app). The header
-  // shows mm:ss until sign-out.
-  const sessionMsLeft = useSessionCountdown(sessionExpiresAt);
 
   // view state
   const [activeFolder, setActiveFolder] = useState<string>("all");
@@ -525,22 +516,6 @@ export function DashboardView({
                 {summary.paused > 0 && headerPill("paused", summary.paused, "neutral")}
                 </div>
               </>
-            )}
-            {sessionMsLeft != null && (
-              // Absolute-timeout countdown — the re-prompt is never a surprise.
-              <span
-                className={cn(
-                  "flex h-6 items-center gap-1 rounded-none border px-2 text-[11px] tabular-nums",
-                  sessionMsLeft < 60_000
-                    ? "border-warn/30 bg-warn/10 text-warn"
-                    : "border-border bg-muted/40 text-muted-foreground",
-                )}
-                title="Time left before this session signs you out"
-                aria-label={`Session expires in ${Math.max(0, Math.ceil(sessionMsLeft / 1000))} seconds`}
-              >
-                <Clock className="size-3" aria-hidden="true" />
-                {formatSessionLeft(sessionMsLeft)}
-              </span>
             )}
             <Button
               variant="ghost"

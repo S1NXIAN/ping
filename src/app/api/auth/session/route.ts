@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSettings, sessionFor } from "@/lib/ping-auth";
+import { getSessionMinutes, getSettings, sessionFor, windowOpen } from "@/lib/ping-auth";
 import { captureSelfMonitorOrigin, requestOrigin } from "@/lib/self-monitor";
 
 export async function GET(req: NextRequest) {
@@ -17,7 +17,9 @@ export async function GET(req: NextRequest) {
     {
       initialized: settings !== null,
       authenticated: session !== null,
-      expiresAt: session?.expiresAt.toISOString() ?? null,
+      // A closed window does not unauthenticate — the tab keeps working and
+      // only the next visit re-prompts for the password.
+      windowOpen: session !== null && windowOpen(session.createdAt, await getSessionMinutes()),
     },
     { headers: { "Cache-Control": "no-store" } },
   );

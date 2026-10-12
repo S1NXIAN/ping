@@ -67,10 +67,11 @@ Nothing will tell you a service went down except opening the dashboard.
   limits Render documents (with links), and honest guidance about free-tier
   sleep and instance-hour math.
 - **Auth** — a single password, hashed with scrypt, and one dashboard session.
-  The session signs you out on an **absolute** timeout counted from login
-  (no sliding, no idle detection); the header shows the time left. Choose the
-  timeout from presets (5/15/30/60/120 minutes; default 15) in Settings.
-  Changing the password signs out every other session.
+  The login is remembered for an admin-configurable **window counted from the
+  last password entry** (no sliding, no idle detection): inside it a fresh
+  visit skips the password, after it the next visit asks again. An open tab is
+  never interrupted. Choose the window in Settings. Changing the password
+  signs out every other session.
 - **Keep-awake strategy** — an external scheduler hits `/api/cron/tick`, which
   both wakes PING and runs every due check (see below).
 - **Import/export** — your monitor configuration as JSON.
@@ -172,8 +173,9 @@ jobs:
   `Settings`.
 - An in-process scheduler (via `instrumentation.ts`) wakes every 30 s and
   checks every enabled monitor whose interval elapsed (concurrency-capped).
-- Auth: scrypt password hash + opaque session tokens in httpOnly cookies, with
-  an absolute, admin-configurable expiry.
+- Auth: scrypt password hash + opaque session tokens in httpOnly cookies. The
+  login is remembered for an admin-configurable window counted from the last
+  password entry; the token itself lives until logout or a password change.
 - `GET /api/cron/tick` — external trigger for the same "due checks" routine.
 
 ## API (cookie-authenticated unless noted)
@@ -185,7 +187,7 @@ jobs:
 | `POST /api/monitors`, `GET/PATCH/DELETE /api/monitors/[id]` | manage monitors |
 | `POST /api/monitors/[id]/check` | run one check now |
 | `POST /api/folders`, `PATCH/DELETE /api/folders/[id]` | folders |
-| `POST /api/admin/password`, `GET/POST /api/admin/session` | password & session timeout |
+| `POST /api/admin/password`, `GET/POST /api/admin/session` | password & re-prompt window |
 | `GET /api/admin/info`, `GET/POST /api/admin/retention` | runtime info & data retention |
 | `GET/POST/DELETE /api/incidents` | incident list + postmortem notes |
 | `GET /api/render-status` | live status from status.render.com (5 min cache) |

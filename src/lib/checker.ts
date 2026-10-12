@@ -349,7 +349,6 @@ export async function pruneChecks(): Promise<{ deleted: number }> {
     where: { startedAt: { lt: new Date(Date.now() - (RETENTION_DAYS + 2) * 86400_000) } },
   });
 
-  await db.session.deleteMany({ where: { expiresAt: { lt: new Date() } } });
   runtimeState.lastPrunedAt = new Date().toISOString();
   runtimeState.lastPrunedCount = deleted;
   return { deleted };

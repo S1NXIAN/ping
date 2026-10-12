@@ -19,14 +19,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useSessionCountdown } from "@/hooks/use-session-countdown";
 import {
   api,
   ApiError,
   formatDateTime,
   formatDuration,
   formatMs,
-  formatSessionLeft,
   timeAgo,
 } from "@/lib/ping-client";
 import type { AdminInfoResponse, ImportResult, SessionSettingsResponse } from "@/lib/ping-types";
@@ -60,18 +58,12 @@ function Section({
 }
 
 export function AdminView({
-  expiresAt,
   onBack,
   onAuthLost,
-  onSessionRenewed,
 }: {
-  /** Absolute session expiry (ISO) — shown as a countdown. */
-  expiresAt: string | null;
   onBack: () => void;
   /** Session died — sign out. */
   onAuthLost: () => void;
-  /** Password change rotated the session — refresh the expiry. */
-  onSessionRenewed: () => void;
 }) {
   const { toast } = useToast();
 
@@ -97,9 +89,6 @@ export function AdminView({
   // --- import ---
   const [importing, setImporting] = useState(false);
   const [fileInput, setFileInput] = useState<HTMLInputElement | null>(null);
-
-  // --- session countdown (ticks every second while signed in) ---
-  const sessionMsLeft = useSessionCountdown(expiresAt);
 
   const loadInfo = useCallback(async () => {
     try {
@@ -144,7 +133,7 @@ export function AdminView({
         body: JSON.stringify({ sessionMinutes: minutes }),
       });
       setSessionSettings(r);
-      toast({ description: `Sign-out timeout set to ${minutes} minutes` });
+      toast({ description: `Login remembered for ${minutes} minutes` });
     } catch (err) {
       toast({
         description: err instanceof Error ? err.message : "Could not save the timeout",
@@ -219,7 +208,6 @@ export function AdminView({
         body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
       });
       toast({ description: "Password changed — all other sessions signed out" });
-      onSessionRenewed();
       setCurrentPw("");
       setNewPw("");
       setConfirmPw("");
@@ -271,23 +259,6 @@ export function AdminView({
           <div className="min-w-0">
             <h1 className="text-lg font-semibold leading-tight">Settings</h1>
             <p className="text-xs text-muted-foreground">Security, session &amp; data</p>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            {sessionMsLeft != null && (
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-none border px-2.5 py-1 text-xs font-medium tabular-nums",
-                  sessionMsLeft < 60_000
-                    ? "border-warn/30 bg-warn/10 text-warn"
-                    : "border-border bg-muted/40 text-muted-foreground",
-                )}
-                title={`Session signs out at ${formatDateTime(expiresAt ?? "")}`}
-              >
-                <Clock className="size-3" aria-hidden="true" />
-                {formatSessionLeft(sessionMsLeft)}
-                <span className="sr-only">until sign-out</span>
-              </span>
-            )}
           </div>
         </div>
 
@@ -350,8 +321,8 @@ export function AdminView({
           {/* Session timeout */}
           <Section
             icon={Timer}
-            title="Sign-out timeout"
-            description="The dashboard signs you out on an absolute timeout counted from login — no sliding, no idle detection. The header shows the time left."
+            title="Login remembered"
+            description="How long a login is remembered before a fresh visit asks for the password again. It never interrupts an open tab — only the next visit re-prompts."
           >
             {sessionSettings == null ? (
               <p className="text-xs text-muted-foreground">Loading…</p>
@@ -379,8 +350,8 @@ export function AdminView({
               </div>
             )}
             <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Applies to sessions created after you change it — your current session keeps its
-              original expiry.
+              Counted from the last time you entered the password. Changing it takes effect on
+              your next visit.
             </p>
           </Section>
 

@@ -1,7 +1,8 @@
 // PING single-password auth: scrypt-hashed password in the DB,
 // opaque random session tokens, httpOnly cookies.
-// One gate: a dashboard Session with an ABSOLUTE expiry counted from login
-// (no sliding, no idle detection). Duration is an admin setting.
+// Two clocks: a token proves identity until logout or a password change (it
+// never expires), and the re-prompt window — counted from the last password
+// entry — decides whether a fresh visit auto-enters or shows the login screen.
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "./db";
@@ -12,7 +13,11 @@ export const SESSION_COOKIE = "ping_session";
 export const SESSION_PRESETS = [5, 15, 30, 60, 120] as const;
 export const SESSION_DEFAULT_MINUTES = 15;
 
-/** The configured absolute session length in minutes (default 15). */
+/** Newest N sessions kept; older rows are pruned on login (tokens never
+ *  expire, so nothing else would ever remove them). */
+export const MAX_SESSIONS = 20;
+
+/** The configured re-prompt window in minutes (default 15). */
 export async function getSessionMinutes(): Promise<number> {
   const s = await db.settings.findUnique({
     where: { id: "main" },
@@ -39,33 +44,51 @@ export function verifyPassword(password: string, hash: string, salt: string): bo
 
 export async function createSession() {
   const token = randomBytes(32).toString("hex");
-  const minutes = await getSessionMinutes();
-  const expiresAt = new Date(Date.now() + minutes * 60_000);
-  await db.session.create({ data: { token, expiresAt } });
-  return { token, expiresAt };
+  await db.session.create({ data: { token } });
+  // Keep the table bounded: tokens never expire, so without this every login
+  // would leave a permanent row. The new token is always kept.
+  // shortcut: two logins within the same millisecond can prune each other's
+  // fresh token; logins are human-paced on single-admin software, so upgrade
+  // to a transaction only if PING ever serves concurrent admins.
+  const keep = await db.session.findMany({
+    where: { token: { not: token } },
+    orderBy: { createdAt: "desc" },
+    take: MAX_SESSIONS - 1,
+    select: { token: true },
+  });
+  await db.session.deleteMany({
+    where: { token: { notIn: [token, ...keep.map((s) => s.token)] } },
+  });
+  return { token };
 }
 
-export function setSessionCookie(res: NextResponse, token: string, expiresAt: Date) {
+/**
+ * Whether the re-prompt window is still open: true while fewer than
+ * `minutes` have passed since the last password entry (`createdAt`). A closed
+ * window shows the login screen on the next visit; it never breaks a live tab.
+ */
+export function windowOpen(createdAt: Date, minutes: number): boolean {
+  return Date.now() < createdAt.getTime() + minutes * 60_000;
+}
+
+/** Drops the session cookie. Long-lived (a year) so a revisit inside the
+ *  re-prompt window auto-enters even after a browser restart — the window, not
+ *  the cookie, is what re-prompts. */
+export function setSessionCookie(res: NextResponse, token: string) {
   res.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    expires: expiresAt,
+    maxAge: 60 * 60 * 24 * 365,
     secure: process.env.NODE_ENV === "production",
   });
 }
 
-/** The caller's unexpired session row, or null. Expired rows are dropped. */
+/** The caller's session row, or null. Tokens do not expire. */
 export async function sessionFor(req: NextRequest) {
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  const session = await db.session.findUnique({ where: { token } });
-  if (!session) return null;
-  if (session.expiresAt.getTime() < Date.now()) {
-    await db.session.delete({ where: { token } }).catch(() => undefined);
-    return null;
-  }
-  return session;
+  return db.session.findUnique({ where: { token } });
 }
 
 export async function requireAuth(req: NextRequest): Promise<boolean> {

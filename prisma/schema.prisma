@@ -101,10 +101,11 @@ model Check {
   @@index([monitorId, status, checkedAt])
 }
 
-// Server-side sessions for the single-password auth
+// Server-side sessions for the single-password auth. A token never expires:
+// it proves identity until logout or a password change, while `createdAt`
+// drives the re-prompt window (see ping-auth.ts).
 model Session {
   token     String   @id
-  expiresAt DateTime
   createdAt DateTime @default(now())
 }
 
@@ -118,8 +119,9 @@ model Settings {
   //   0    → keep forever (only operational hygiene rows get cleaned)
   //   N>0  → keep N days (no per-monitor cap; explicit user choice)
   retentionDays Int?
-  // Absolute dashboard-session length in minutes (counted from login, no
-  // sliding). null → default (15). Constrained to SESSION_PRESETS by the API.
+  // Dashboard re-prompt window in minutes, counted from the last password
+  // entry (no sliding). null → default (15). Constrained to SESSION_PRESETS
+  // by the API.
   sessionMinutes Int?
   // Set when the operator deletes the Self-monitor, so a later boot or
   // authenticated request never recreates it against their wishes.

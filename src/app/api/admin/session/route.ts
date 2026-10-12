@@ -38,7 +38,7 @@ const schema = z.object({
     }),
 });
 
-/** Sets the absolute session length. Applies to sessions created after this. */
+/** Sets the re-prompt window length. Applies from the next password entry. */
 export async function POST(req: NextRequest) {
   const unauthorized = await guard(req);
   if (unauthorized) return unauthorized;

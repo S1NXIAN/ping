@@ -13,7 +13,7 @@ async function importReq(body: unknown): Promise<NextRequest> {
     data: { id: "main", passwordHash: hash, passwordSalt: salt },
   });
   const session = await db.session.create({
-    data: { token: "sess", expiresAt: new Date(Date.now() + 60_000) },
+    data: { token: "sess" },
   });
   return new NextRequest("http://localhost/api/import", {
     method: "POST",

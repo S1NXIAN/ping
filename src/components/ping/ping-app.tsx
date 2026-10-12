@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/ping-client";
 import type { SessionResponse } from "@/lib/ping-types";
 import { PingLogo } from "./ping-logo";
@@ -12,13 +11,9 @@ import { AdminView } from "./admin-view";
 type Phase = "booting" | "login" | "app";
 
 export function PingApp() {
-  const { toast } = useToast();
   const [phase, setPhase] = useState<Phase>("booting");
   const [initialized, setInitialized] = useState(false);
   const [view, setView] = useState<"dashboard" | "admin">("dashboard");
-  // The session's absolute expiry (ISO), reported by the server. The header
-  // counts down to it; when it passes, the next request 401s and we sign out.
-  const [expiresAt, setExpiresAt] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -27,12 +22,13 @@ export function PingApp() {
         const s = await api<SessionResponse>("/api/auth/session");
         if (cancelled) return;
         setInitialized(s.initialized);
-        setExpiresAt(s.authenticated ? s.expiresAt : null);
-        setPhase(s.authenticated ? "app" : "login");
+        // A valid token inside the re-prompt window goes straight in; a valid
+        // token whose window has lapsed shows the login screen again. The tab
+        // is never interrupted once open — only a fresh visit re-prompts.
+        setPhase(s.authenticated && s.windowOpen ? "app" : "login");
       } catch {
         if (!cancelled) {
           setInitialized(false);
-          setExpiresAt(null);
           setPhase("login");
         }
       }
@@ -42,41 +38,13 @@ export function PingApp() {
     };
   }, []);
 
-  // When the absolute expiry passes, drop the client back to the login
-  // screen. The server is the authority (every request re-checks); this is
-  // only so an idle tab re-gates without waiting for its next request.
-  useEffect(() => {
-    if (!expiresAt) return;
-    const ms = new Date(expiresAt).getTime() - Date.now();
-    const t = setTimeout(
-      () => {
-        setExpiresAt(null);
-        setView("dashboard");
-        toast({ description: "Session expired — sign in again" });
-        setPhase("login");
-      },
-      Math.max(0, ms),
-    );
-    return () => clearTimeout(t);
-  }, [expiresAt, toast]);
-
   /** Session died server-side (401) — return to login. */
   const handleAuthLost = useCallback(() => {
-    setExpiresAt(null);
     setView("dashboard");
     setPhase("login");
   }, []);
 
-  /** Re-read the session's absolute expiry (after login or a password change
-   *  rotates the session server-side). */
-  const refreshSession = useCallback(() => {
-    void api<SessionResponse>("/api/auth/session")
-      .then((s) => setExpiresAt(s.expiresAt))
-      .catch(() => undefined);
-  }, []);
-
   function handleLogout() {
-    setExpiresAt(null);
     setView("dashboard");
     setPhase("login");
   }
@@ -97,7 +65,6 @@ export function PingApp() {
         onAuthenticated={() => {
           setPhase("app");
           setView("dashboard");
-          refreshSession();
         }}
       />
     );
@@ -105,14 +72,11 @@ export function PingApp() {
 
   return view === "admin" ? (
     <AdminView
-      expiresAt={expiresAt}
       onBack={() => setView("dashboard")}
       onAuthLost={handleAuthLost}
-      onSessionRenewed={refreshSession}
     />
   ) : (
     <DashboardView
-      sessionExpiresAt={expiresAt}
       onLogout={handleLogout}
       onOpenAdmin={() => setView("admin")}
     />

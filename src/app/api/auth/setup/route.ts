@@ -53,6 +53,6 @@ export async function POST(req: NextRequest) {
   const session = await createSession();
   clearAttempts(ip);
   const res = NextResponse.json({ ok: true });
-  setSessionCookie(res, session.token, session.expiresAt);
+  setSessionCookie(res, session.token);
   return res;
 }
