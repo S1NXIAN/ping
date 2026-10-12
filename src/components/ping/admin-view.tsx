@@ -33,7 +33,6 @@ import {
 } from "@/lib/ping-client";
 import type { AdminInfoResponse, ImportResult } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
-import { NotificationsSection } from "./notifications-section";
 import { RenderStatusCard } from "./render-status-card";
 import { InlineAlert } from "./inline-alert";
 import { StatTile } from "./stat-tile";
@@ -269,10 +268,6 @@ export function AdminView({
       toast({
         description: `Imported ${r.created} monitor${r.created === 1 ? "" : "s"}${
           r.skipped ? `, skipped ${r.skipped} duplicate${r.skipped === 1 ? "" : "s"}` : ""
-        }${
-          r.channelsCreated
-            ? `, ${r.channelsCreated} webhook channel${r.channelsCreated === 1 ? "" : "s"}`
-            : ""
         }`,
       });
       void loadInfo();
@@ -399,9 +394,6 @@ export function AdminView({
               </Button>
             </form>
           </Section>
-
-          {/* Notifications */}
-          <NotificationsSection onExpired={onExpired} onAuthLost={onAuthLost} />
 
           {/* Keep awake */}
           <Section

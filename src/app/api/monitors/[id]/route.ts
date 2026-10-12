@@ -142,13 +142,6 @@ const patchSchema = z.object({
     .min(50, "Threshold must be at least 50 ms")
     .max(30000, "Threshold must be at most 30000 ms")
     .nullish(),
-  /** Extra consecutive failed checks before a down webhook (0–10). */
-  alertDelay: z
-    .number()
-    .int()
-    .min(0, "Alert delay must be 0 or more")
-    .max(10, "Alert delay can be at most 10 extra checks")
-    .optional(),
   ...scheduleFields,
 });
 
@@ -172,7 +165,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const data: Record<string, unknown> = {};
-  const { name, url, folderId, intervalSec, enabled, method, pinned, account, keyword, keywordMode, slowThresholdMs, alertDelay, scheduleMode, scheduleTimes, timezone } = parsed.data;
+  const { name, url, folderId, intervalSec, enabled, method, pinned, account, keyword, keywordMode, slowThresholdMs, scheduleMode, scheduleTimes, timezone } = parsed.data;
   if (name !== undefined) data.name = name;
   if (url !== undefined) data.url = url;
   if (intervalSec !== undefined) data.intervalSec = intervalSec;
@@ -180,11 +173,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (method !== undefined) data.method = method;
   if (pinned !== undefined) data.pinned = pinned;
   if (slowThresholdMs !== undefined) data.slowThresholdMs = slowThresholdMs ?? null;
-  if (alertDelay !== undefined) {
-    data.alertDelay = alertDelay;
-    // A changed confirmation policy makes the old streak meaningless.
-    data.consecutiveDowns = 0;
-  }
   // Schedule: the mode decides which fields are meaningful. Switching to
   // interval clears the times/zone (an interval monitor has neither); switching
   // to times requires both. The cross-field rule is checked against the
@@ -203,20 +191,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     data.scheduleTimes = nextMode === "times" ? (nextTimes ?? null) : null;
     data.timezone = nextMode === "times" ? (nextZone ?? null) : null;
   }
-  // absent → untouched; null or "" → off; string → set. A changed keyword
-  // (or mode) re-targets the check semantics, so the failure streak resets —
-  // the same rule a URL change follows.
+  // absent → untouched; null or "" → off; string → set
   if (keyword !== undefined) {
     data.keyword = keyword === "" ? null : keyword ?? null;
-    if ((data.keyword ?? null) !== (monitor.keyword ?? null)) data.consecutiveDowns = 0;
   }
   if (keywordMode !== undefined) {
     data.keywordMode = keywordMode;
-    if (keywordMode !== monitor.keywordMode && monitor.keyword) data.consecutiveDowns = 0;
   }
-  // A new target is a fresh start — the old failure streak must not count
-  // against (or for) the new URL.
-  if (url !== undefined && url !== monitor.url) data.consecutiveDowns = 0;
   // absent → untouched; null or "" → cleared; string → set
   if (account !== undefined) data.account = account === "" ? null : account;
   if (folderId !== undefined) {

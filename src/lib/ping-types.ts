@@ -61,10 +61,6 @@ export interface MonitorDTO {
   keywordMode: KeywordMode;
   /** Latency-alert threshold in ms; null = off. */
   slowThresholdMs: number | null;
-  /** Extra consecutive failed checks required before a down webhook (0 = immediate). */
-  alertDelay: number;
-  /** Current consecutive failed-check streak (reset by any success). */
-  consecutiveDowns: number;
   /** True when the last check was UP but slower than slowThresholdMs. */
   degraded: boolean;
   createdAt: string;
@@ -152,25 +148,6 @@ export interface AdminIncidentDTO {
   note: string | null;
 }
 
-/** A webhook endpoint notified when a monitor goes down or recovers. */
-export interface WebhookChannelDTO {
-  id: string;
-  name: string;
-  url: string;
-  /** Routes events for this monitor only; null = every monitor. */
-  monitorId: string | null;
-  monitorName: string | null;
-  notifyDown: boolean;
-  notifyUp: boolean;
-  notifySlow: boolean;
-  enabled: boolean;
-  createdAt: string;
-  deliveries: number;
-  lastDeliveryAt: string | null;
-  lastOk: boolean | null;
-  lastError: string | null;
-}
-
 export interface RenderStatusResponse {
   ok: boolean;
   indicator: RenderIndicator;
@@ -232,6 +209,4 @@ export interface ImportResult {
   created: number;
   skipped: number;
   foldersCreated: number;
-  /** Webhook channels imported (0 for v1 exports without channel data). */
-  channelsCreated: number;
 }

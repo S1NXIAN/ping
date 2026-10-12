@@ -2,19 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { adminGuard } from "@/lib/ping-auth";
 
-/** Exports folders + monitor configuration and webhook channels (no check
- *  history) as JSON. */
+/** Exports folders + monitor configuration (no check history) as JSON. */
 export async function GET(req: NextRequest) {
   const unauthorized = await adminGuard(req);
   if (unauthorized) return unauthorized;
 
-  const [folders, monitors, channels] = await Promise.all([
+  const [folders, monitors] = await Promise.all([
     db.folder.findMany({ orderBy: { createdAt: "asc" } }),
     db.monitor.findMany({ orderBy: { createdAt: "asc" } }),
-    db.webhookChannel.findMany({ orderBy: { createdAt: "asc" } }),
   ]);
-
-  const monitorById = new Map(monitors.map((m) => [m.id, m]));
 
   const payload = {
     app: "PING",
@@ -31,20 +27,10 @@ export async function GET(req: NextRequest) {
       keyword: m.keyword,
       keywordMode: m.keywordMode,
       slowThresholdMs: m.slowThresholdMs,
-      alertDelay: m.alertDelay,
       scheduleMode: m.scheduleMode === "times" ? "times" : "interval",
       scheduleTimes: m.scheduleTimes,
       timezone: m.timezone,
       folder: folders.find((f) => f.id === m.folderId)?.name ?? null,
-    })),
-    webhookChannels: channels.map((ch) => ({
-      name: ch.name,
-      url: ch.url,
-      notifyDown: ch.notifyDown,
-      notifyUp: ch.notifyUp,
-      notifySlow: ch.notifySlow,
-      enabled: ch.enabled,
-      monitor: ch.monitorId ? (monitorById.get(ch.monitorId)?.name ?? null) : null,
     })),
   };
 

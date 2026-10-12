@@ -48,16 +48,9 @@ model Monitor {
   keyword     String?
   keywordMode String  @default("contains") // "contains" | "excludes"
   // Optional latency-alert threshold in ms. When an UP check takes longer
-  // than this, the monitor shows a "slow/degraded" state and (optionally)
-  // fires a "slow" webhook. null = latency alerting off for this monitor.
+  // than this, the monitor shows a "slow/degraded" state. null = latency
+  // alerting off for this monitor.
   slowThresholdMs Int?
-  // Alert delay: how many EXTRA consecutive failed checks must land before
-  // a "down" webhook fires (0 = notify on the very first failure). Downtime
-  // is always recorded honestly regardless of this setting — only the
-  // notification waits for confirmation.
-  alertDelay       Int       @default(0)
-  // Running count of consecutive failed checks (reset by any success).
-  consecutiveDowns Int       @default(0)
   incidentNotes  IncidentNote[]
   createdAt      DateTime  @default(now())
   lastCheckAt    DateTime?
@@ -65,12 +58,7 @@ model Monitor {
   lastStatusCode Int?
   lastResponseMs Int?
   lastError      String?
-  // Last status a webhook was actually sent for. Diverges from lastStatus
-  // while an alert delay is still confirming a down, so a service that went
-  // down during the delay still raises "down" once enough checks confirm it.
-  lastNotifiedStatus String?
   checks         Check[]
-  webhookChannels   WebhookChannel[]
 }
 
 // A postmortem/acknowledgment note the admin attaches to one derived
@@ -114,27 +102,6 @@ model Session {
   token     String   @id
   expiresAt DateTime
   createdAt DateTime @default(now())
-}
-
-// A webhook endpoint notified when a monitor goes down or recovers.
-// Each event is one fire-and-forget POST (10s timeout, no retries) —
-// lastDelivery* fields record the honest outcome of the latest attempt.
-// monitorId routes events for that monitor only; null = every monitor.
-model WebhookChannel {
-  id             String    @id @default(cuid())
-  name           String
-  url            String
-  monitorId      String?
-  monitor        Monitor?  @relation(fields: [monitorId], references: [id], onDelete: SetNull)
-  notifyDown     Boolean   @default(true)
-  notifyUp       Boolean   @default(true)
-  notifySlow     Boolean   @default(true) // "slow" events (latency threshold exceeded)
-  enabled        Boolean   @default(true)
-  createdAt      DateTime  @default(now())
-  deliveries     Int       @default(0)
-  lastDeliveryAt DateTime?
-  lastOk         Boolean?
-  lastError      String?
 }
 
 // Singleton row holding app settings (id = "main")

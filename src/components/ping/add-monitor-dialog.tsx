@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, ChevronRight, Folder, Gauge, Loader2, Plus, ScanSearch, X } from "lucide-react";
+import { ChevronRight, Folder, Gauge, Loader2, Plus, ScanSearch, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -51,15 +51,6 @@ const INTERVAL_GROUPS: { label: string; options: { value: string; label: string;
       { value: "86400", label: "24 hours" },
     ],
   },
-];
-
-/** value = extra confirmations; label = total failed checks needed. */
-const ALERT_DELAYS = [
-  { value: "0", label: "Immediately (1st failed check)" },
-  { value: "1", label: "After 2 failed checks" },
-  { value: "2", label: "After 3 failed checks" },
-  { value: "3", label: "After 4 failed checks" },
-  { value: "5", label: "After 6 failed checks" },
 ];
 
 const KEYWORD_MODES = [
@@ -152,7 +143,6 @@ export function AddMonitorDialog({
   const [keywordMode, setKeywordMode] = useState<"off" | "contains" | "excludes">("off");
   const [keyword, setKeyword] = useState("");
   const [slowThreshold, setSlowThreshold] = useState("");
-  const [alertDelay, setAlertDelay] = useState("0");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -187,13 +177,11 @@ export function AddMonitorDialog({
       setKeywordMode(initial.keyword ? initial.keywordMode : "off");
       setKeyword(initial.keyword ?? "");
       setSlowThreshold(initial.slowThresholdMs != null ? String(initial.slowThresholdMs) : "");
-      setAlertDelay(String(initial.alertDelay ?? 0));
       // editing something with advanced values set → start expanded
       setAdvancedOpen(
         !!(
           initial.keyword ||
-          initial.slowThresholdMs != null ||
-          (initial.alertDelay ?? 0) > 0
+          initial.slowThresholdMs != null
         ),
       );
     } else {
@@ -210,7 +198,6 @@ export function AddMonitorDialog({
       setKeywordMode("off");
       setKeyword("");
       setSlowThreshold("");
-      setAlertDelay("0");
       setAdvancedOpen(false);
     }
   }, [open, initial, defaultFolderId]);
@@ -248,8 +235,7 @@ export function AddMonitorDialog({
 
   const advCount =
     (keywordActive && keyword.trim() ? 1 : 0) +
-    (slowThreshold.trim() !== "" ? 1 : 0) +
-    (alertDelay !== "0" ? 1 : 0);
+    (slowThreshold.trim() !== "" ? 1 : 0);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -306,7 +292,6 @@ export function AddMonitorDialog({
       keyword: keywordMode === "off" ? null : trimmedKeyword,
       keywordMode: keywordMode === "off" ? "contains" : keywordMode,
       slowThresholdMs: thresholdNum,
-      alertDelay: Number(alertDelay),
     };
     const trimmedName = name.trim();
     if (trimmedName) body.name = trimmedName;
@@ -734,27 +719,6 @@ export function AddMonitorDialog({
                       {fieldErrors.slow}
                     </p>
                   )}
-                </div>
-
-                <div className="space-y-2">
-                  <FieldLabel htmlFor="m-alert-delay" hint="Failed checks in a row before a down webhook fires.">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Bell className="size-3.5 text-muted-foreground" aria-hidden="true" />
-                      Down-alert delay
-                    </span>
-                  </FieldLabel>
-                  <Select value={alertDelay} onValueChange={setAlertDelay}>
-                    <SelectTrigger id="m-alert-delay" className={fieldClass}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ALERT_DELAYS.map((d) => (
-                        <SelectItem key={d.value} value={d.value}>
-                          {d.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
             </details>

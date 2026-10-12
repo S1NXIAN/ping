@@ -10,7 +10,6 @@ import {
   FolderInput,
   Gauge,
   GripVertical,
-  Hourglass,
   Loader2,
   MoreVertical,
   Pencil,
@@ -369,18 +368,6 @@ export function MonitorCard({
                   </span>
                 </StatusPill>
               )}
-              {status === "down" &&
-                monitor.alertDelay > 0 &&
-                monitor.consecutiveDowns <= monitor.alertDelay && (
-                  <StatusPill
-                    tone="warn"
-                    icon={Hourglass}
-                    className="text-warn/90"
-                    title={`Down alerts fire after ${monitor.alertDelay + 1} consecutive failed checks — the status above is already honest downtime`}
-                  >
-                    confirming {monitor.consecutiveDowns}/{monitor.alertDelay + 1}
-                  </StatusPill>
-                )}
               {monitor.folderName && (
                 <StatusPill tone="neutral" icon={Folder}>
                   {monitor.folderName}

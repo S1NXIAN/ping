@@ -4,8 +4,6 @@ import { db } from "@/lib/db";
 import { adminGuard } from "@/lib/ping-auth";
 import { nextMonitorPosition, KEYWORD_MAX_LENGTH, MAX_MONITORS } from "@/lib/checker";
 import { monitorUrlSchema, intervalSecSchema, scheduleModeSchema, scheduleTimesSchema, timezoneSchema, scheduleError } from "@/lib/validation";
-import { MAX_WEBHOOK_CHANNELS, isPrivateWebhookUrl, resolvesToPrivate } from "@/lib/webhooks";
-import { urlSchema } from "@/app/api/webhooks/route";
 import type { ImportResult } from "@/lib/ping-types";
 
 const schema = z.object({
@@ -35,7 +33,6 @@ const schema = z.object({
           .max(30000)
           .nullish()
           .transform((v) => (v == null || Number.isNaN(v) ? null : v)),
-        alertDelay: z.number().int().min(0).max(10).optional(),
         folder: z.string().trim().max(40).nullish(),
         // Schedule mode. Absent in exports written before times-of-day existed,
         // so both are optional and default to the interval behaviour.
@@ -46,27 +43,12 @@ const schema = z.object({
     )
     .max(200),
   folders: z.array(z.object({ name: z.string().trim().min(1).max(40) })).max(50).optional(),
-  webhookChannels: z
-    .array(
-      z.object({
-        name: z.string().trim().min(1).max(60),
-        url: urlSchema,
-        notifyDown: z.boolean().default(true),
-        notifyUp: z.boolean().default(true),
-        notifySlow: z.boolean().default(true),
-        enabled: z.boolean().default(true),
-        monitor: z.string().trim().max(80).nullish(),
-      }),
-    )
-    .max(5)
-    .optional(),
 });
 
 /** Thrown inside the import transaction for a user-facing 400 (rolls back). */
 class ImportError extends Error {}
 
-/** Restores monitors/folders and webhook channels from a PING export.
- *  Duplicated URLs and channel names are skipped. */
+/** Restores monitors/folders from a PING export. Duplicated URLs are skipped. */
 export async function POST(req: NextRequest) {
   const unauthorized = await adminGuard(req);
   if (unauthorized) return unauthorized;
@@ -80,21 +62,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { folders, monitors, webhookChannels } = parsed.data;
-
-  // Validate every webhook URL up front — the same SSRF rule create/patch and
-  // delivery enforce, including what the hostname RESOLVES to (imported
-  // channels skip the route guard otherwise).
-  if (webhookChannels) {
-    for (const ch of webhookChannels) {
-      if (isPrivateWebhookUrl(ch.url) || (await resolvesToPrivate(new URL(ch.url).hostname))) {
-        return NextResponse.json(
-          { error: `Webhook “${ch.name}” points at a private/internal address` },
-          { status: 400 },
-        );
-      }
-    }
-  }
+  const { folders, monitors } = parsed.data;
 
   // Validate every monitor's schedule up front (pure) — a bad monitor rejects
   // the whole file before anything is written, the same invariant create and
@@ -156,14 +124,12 @@ export async function POST(req: NextRequest) {
         let created = 0;
         let skipped = 0;
         let nextPosition = await nextMonitorPosition(tx);
-        const monitorIdByUrl = new Map<string, string>();
-        const monitorIdByName = new Map<string, string>();
         for (const m of monitors) {
           if (existingUrls.has(m.url)) {
             skipped += 1;
             continue;
           }
-          const row = await tx.monitor.create({
+          await tx.monitor.create({
             data: {
               name: m.name,
               url: m.url,
@@ -174,7 +140,6 @@ export async function POST(req: NextRequest) {
               keyword: m.keyword ?? null,
               keywordMode: m.keywordMode,
               slowThresholdMs: m.slowThresholdMs ?? null,
-              alertDelay: m.alertDelay ?? 0,
               scheduleMode: m.scheduleMode === "times" ? "times" : "interval",
               scheduleTimes: m.scheduleMode === "times" ? (m.scheduleTimes ?? null) : null,
               timezone: m.scheduleMode === "times" ? (m.timezone ?? null) : null,
@@ -182,47 +147,12 @@ export async function POST(req: NextRequest) {
               position: nextPosition,
             },
           });
-          monitorIdByUrl.set(m.url, row.id);
-          monitorIdByName.set(m.name, row.id);
           nextPosition += 1;
           existingUrls.add(m.url);
           created += 1;
         }
 
-        // Existing monitors (not just imported ones) can be routing targets too.
-        for (const m of await tx.monitor.findMany({ select: { id: true, name: true, url: true } })) {
-          if (!monitorIdByUrl.has(m.url)) monitorIdByUrl.set(m.url, m.id);
-          if (!monitorIdByName.has(m.name)) monitorIdByName.set(m.name, m.id);
-        }
-
-        // Webhook channels — skip ones whose URL already exists.
-        let channelsCreated = 0;
-        if (webhookChannels) {
-          const existingChannelUrls = new Set(
-            (await tx.webhookChannel.findMany({ select: { url: true } })).map((c) => c.url),
-          );
-          let channelCount = await tx.webhookChannel.count();
-          for (const ch of webhookChannels) {
-            if (channelCount >= MAX_WEBHOOK_CHANNELS) break;
-            if (existingChannelUrls.has(ch.url)) continue;
-            await tx.webhookChannel.create({
-              data: {
-                name: ch.name,
-                url: ch.url,
-                notifyDown: ch.notifyDown,
-                notifyUp: ch.notifyUp,
-                notifySlow: ch.notifySlow,
-                enabled: ch.enabled,
-                monitorId: ch.monitor ? (monitorIdByName.get(ch.monitor) ?? null) : null,
-              },
-            });
-            existingChannelUrls.add(ch.url);
-            channelCount += 1;
-            channelsCreated += 1;
-          }
-        }
-
-        return { created, skipped, foldersCreated, channelsCreated };
+        return { created, skipped, foldersCreated };
       },
       // A max-size import writes hundreds of rows; Prisma's 5s default could
       // abort a valid import with P2028 on a slow SQLite instance.

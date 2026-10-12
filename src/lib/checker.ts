@@ -2,8 +2,6 @@
 // Nothing here simulates or estimates anything.
 import type { Check, Monitor } from "@prisma/client";
 import { db } from "./db";
-import { fireWebhooks } from "./webhooks";
-import { decideNotification } from "./notifications";
 import { isTimesDue, parseTimes } from "./schedule";
 
 export const CHECK_TIMEOUT_MS = 15_000;
@@ -141,8 +139,8 @@ function keywordFailure(
  * Monitor ids with a check currently executing in this process. Overlapping
  * triggers are normal (scheduler tick × manual "check now" × first check
  * after create), and without this guard they would write
- * duplicate Check rows, double-fire webhooks and clobber the consecutive-
- * downs streak via read-modify-write races. Returns null when skipped.
+ * duplicate Check rows and clobber the last-status fields via read-modify-
+ * write races. Returns null when skipped.
  */
 const inFlight = new Set<string>();
 
@@ -158,7 +156,6 @@ export async function runCheck(monitor: Monitor): Promise<Check | null> {
 }
 
 async function runCheckInner(monitor: Monitor): Promise<Check> {
-  const previousStatus = monitor.lastStatus; // captured BEFORE the check runs
   const started = performance.now();
   let status: "up" | "down" = "down";
   let statusCode: number | null = null;
@@ -220,46 +217,6 @@ async function runCheckInner(monitor: Monitor): Promise<Check> {
     },
   });
 
-  // Consecutive-failure streak, counting THIS check — powers the alert delay
-  // and is reset by any success.
-  const consecutiveDowns = status === "down" ? (monitor.consecutiveDowns ?? 0) + 1 : 0;
-
-  // Notification decision — pure. See lib/notifications.ts for the contract;
-  // this function only performs the effects it decides on. Downtime itself is
-  // always recorded honestly above.
-  const decision = decideNotification({
-    previousStatus,
-    lastNotifiedStatus: monitor.lastNotifiedStatus,
-    status,
-    consecutiveDowns,
-    alertDelay: monitor.alertDelay,
-    slowThresholdMs: monitor.slowThresholdMs,
-    lastResponseMs: monitor.lastResponseMs,
-    responseMs,
-  });
-
-  if (decision.outcome === "held") {
-    console.log(
-      `[PING] down event for "${monitor.name}" held — alert delay ${consecutiveDowns}/${monitor.alertDelay + 1} confirmations`,
-    );
-  } else if (decision.event === "slow") {
-    void fireWebhooks("slow", monitor, {
-      status,
-      statusCode,
-      responseMs,
-      error: null,
-      checkedAt: check.checkedAt.toISOString(),
-    });
-  } else if (decision.event) {
-    void fireWebhooks(decision.event, monitor, {
-      status,
-      statusCode,
-      responseMs,
-      error: error ? error.slice(0, 200) : null,
-      checkedAt: check.checkedAt.toISOString(),
-    });
-  }
-
   await db.monitor.update({
     where: { id: monitor.id },
     data: {
@@ -268,10 +225,6 @@ async function runCheckInner(monitor: Monitor): Promise<Check> {
       lastStatusCode: statusCode,
       lastResponseMs: responseMs,
       lastError: error ? error.slice(0, 200) : null,
-      consecutiveDowns,
-      ...(decision.lastNotifiedStatus !== undefined
-        ? { lastNotifiedStatus: decision.lastNotifiedStatus }
-        : {}),
     },
   });
 

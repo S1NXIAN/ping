@@ -7,7 +7,6 @@ import {
   ExternalLink,
   Folder,
   History,
-  Hourglass,
   Loader2,
   Pause,
   Pin,
@@ -228,23 +227,6 @@ export function MonitorDetailSheet({
             {m?.pinned && (
               <StatusPill tone="accent" size="sm" icon={Pin}>
                 pinned
-              </StatusPill>
-            )}
-            {m && m.alertDelay > 0 && (
-              <StatusPill
-                tone="warn"
-                size="sm"
-                icon={Hourglass}
-                className="text-warn/90"
-                title={
-                  m.lastStatus === "down" && m.consecutiveDowns <= m.alertDelay
-                    ? `Down alerts fire after ${m.alertDelay + 1} consecutive failed checks — this downtime is already recorded, only the notification is waiting`
-                    : `Down webhooks wait for ${m.alertDelay + 1} consecutive failed checks`
-                }
-              >
-                {m.lastStatus === "down" && m.consecutiveDowns <= m.alertDelay
-                  ? `confirming ${m.consecutiveDowns}/${m.alertDelay + 1}`
-                  : `alerts after ${m.alertDelay + 1} failed checks`}
               </StatusPill>
             )}
             <span>Last updated {timeAgo(m?.lastCheckAt)}</span>

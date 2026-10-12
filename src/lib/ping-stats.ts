@@ -6,7 +6,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "./db";
 import { parseTimes } from "./schedule";
 import { isDegraded } from "./monitor-status";
-import type { CheckDTO, DailyBucket, MonitorDTO, MonitorStatsDTO, WebhookChannelDTO } from "./ping-types";
+import type { CheckDTO, DailyBucket, MonitorDTO, MonitorStatsDTO } from "./ping-types";
 
 const H24 = 24 * 60 * 60 * 1000;
 
@@ -51,33 +51,6 @@ export function toCheckDTO(c: Check): CheckDTO {
     responseMs: c.responseMs ?? null,
     error: c.error ?? null,
     checkedAt: c.checkedAt.toISOString(),
-  };
-}
-
-/** Maps a WebhookChannel row (+ its monitor's name) to its DTO. */
-export function toWebhookChannelDTO(
-  ch: {
-    id: string;
-    name: string;
-    url: string;
-    monitorId: string | null;
-    notifyDown: boolean;
-    notifyUp: boolean;
-    notifySlow: boolean;
-    enabled: boolean;
-    createdAt: Date;
-    deliveries: number;
-    lastDeliveryAt: Date | null;
-    lastOk: boolean | null;
-    lastError: string | null;
-  },
-  monitorName: string | null,
-): WebhookChannelDTO {
-  return {
-    ...ch,
-    monitorName,
-    createdAt: ch.createdAt.toISOString(),
-    lastDeliveryAt: ch.lastDeliveryAt?.toISOString() ?? null,
   };
 }
 
@@ -253,8 +226,6 @@ export function toMonitorDTO(
     keyword: monitor.keyword ?? null,
     keywordMode: monitor.keywordMode === "excludes" ? "excludes" : "contains",
     slowThresholdMs: monitor.slowThresholdMs ?? null,
-    alertDelay: monitor.alertDelay ?? 0,
-    consecutiveDowns: monitor.consecutiveDowns ?? 0,
     degraded: isDegraded(monitor),
     createdAt: monitor.createdAt.toISOString(),
     lastCheckAt: monitor.lastCheckAt?.toISOString() ?? null,

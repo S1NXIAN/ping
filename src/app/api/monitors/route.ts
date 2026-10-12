@@ -35,13 +35,6 @@ const createSchema = z.object({
     .max(30000, "Threshold must be at most 30000 ms")
     .nullish()
     .transform((v) => (v == null || Number.isNaN(v) ? null : v)),
-  /** Extra consecutive failed checks before a down webhook (0–10). */
-  alertDelay: z
-    .number()
-    .int()
-    .min(0, "Alert delay must be 0 or more")
-    .max(10, "Alert delay can be at most 10 extra checks")
-    .optional(),
   ...scheduleFields,
 });
 
@@ -58,7 +51,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { name, url, folderId, intervalSec, method, account, keyword, keywordMode, slowThresholdMs, alertDelay, scheduleMode, scheduleTimes, timezone } = parsed.data;
+  const { name, url, folderId, intervalSec, method, account, keyword, keywordMode, slowThresholdMs, scheduleMode, scheduleTimes, timezone } = parsed.data;
 
   // A times-of-day monitor needs both a time list and a zone, or it would
   // silently never run.
@@ -103,7 +96,6 @@ export async function POST(req: NextRequest) {
       keyword,
       keywordMode: keywordMode ?? "contains",
       slowThresholdMs: slowThresholdMs ?? null,
-      alertDelay: alertDelay ?? 0,
       scheduleMode: scheduleMode ?? "interval",
       scheduleTimes: scheduleMode === "times" ? (scheduleTimes ?? null) : null,
       timezone: scheduleMode === "times" ? (timezone ?? null) : null,
