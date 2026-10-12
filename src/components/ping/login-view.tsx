@@ -146,7 +146,7 @@ export function LoginView({
       </div>
 
       <footer className="absolute bottom-4 left-0 right-0 z-10 text-center text-[11px] text-muted-foreground/70">
-        PING is an independent tool — not affiliated with render.com
+        PING is an independent tool — not affiliated with any hosting provider
       </footer>
     </main>
   );
