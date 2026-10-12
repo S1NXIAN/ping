@@ -241,7 +241,7 @@ Sharp corners are the system's signature: every radius token is forced to 0px (`
 
 ### Pills
 - **Style:** the recurring status chip — 10px/500 text, 2px×8px padding, sharp corners, a Hairline-strength colored border at ~25–40% alpha over a 6–15% alpha wash of the same hue (e.g. up-pill: `border-emerald/30 bg-emerald/10 text-emerald`).
-- **State:** tone encodes meaning — white (pinned/account), Beacon Emerald (up), Caution Amber (slow), chalk (keyword/intervals). Never larger than 11px text. Header count pills tint only when count > 0 — a zero is neutral, never a colored false alarm.
+- **State:** tone encodes meaning — white (keyword), Beacon Emerald (up), Caution Amber (slow), chalk (account). Never larger than 11px text. Header count pills tint only when count > 0 — a zero is neutral, never a colored false alarm.
 
 ### Cards / Containers
 - **Corner Style:** 0px, always.

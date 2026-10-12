@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
  *   up      Beacon Emerald — healthy
  *   down    Alarm Rose — failed
  *   warn    Caution Amber — slow
- *   accent  Signal White — pinned, keyword, account
- *   teal    Chalk — the soft-white working ink
+ *   accent  Signal White — keyword
+ *   teal    Chalk — the soft-white working ink (account)
  *   neutral Hairline/border — folders, paused, plain metadata
  */
 export type PillTone = "up" | "down" | "warn" | "accent" | "teal" | "neutral";
