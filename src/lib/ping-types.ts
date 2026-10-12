@@ -91,7 +91,6 @@ export interface OverviewResponse {
   folders: FolderDTO[];
   monitors: MonitorDTO[];
   summary: OverviewSummary;
-  serverTime: string;
 }
 
 export interface DailyBucket {

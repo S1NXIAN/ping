@@ -64,7 +64,6 @@ export async function GET(req: NextRequest) {
       monitorsWithFailures24h,
       lastCheckAt,
     },
-    serverTime: new Date().toISOString(),
   };
 
   return NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });
