@@ -27,11 +27,6 @@ const TONE_CLASS: Record<PillTone, string> = {
   neutral: "border-border bg-muted text-muted-foreground",
 };
 
-/** For the rare non-span consumer (e.g. a Select trigger) that needs the tone classes. */
-export function pillToneClass(tone: PillTone): string {
-  return TONE_CLASS[tone];
-}
-
 const SIZE_CLASS = {
   /** dense: public status, sheets, incident lists */
   sm: "gap-1 px-1.5 py-px text-[10px]",

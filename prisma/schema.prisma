@@ -47,9 +47,9 @@ model Monitor {
   // GET (a HEAD response has no body). null = keyword checking off.
   keyword     String?
   keywordMode String  @default("contains") // "contains" | "excludes"
-  // Optional latency-alert threshold in ms. When an UP check takes longer
-  // than this, the monitor shows a "slow/degraded" state. null = latency
-  // alerting off for this monitor.
+  // Optional latency threshold in ms. When an UP check takes longer than
+  // this, the monitor shows a "slow/degraded" state. null = off for this
+  // monitor.
   slowThresholdMs Int?
   incidentNotes  IncidentNote[]
   createdAt      DateTime  @default(now())

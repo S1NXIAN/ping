@@ -59,7 +59,7 @@ export interface MonitorDTO {
   /** Keyword check: body must contain (or must not contain) this string; null = off. */
   keyword: string | null;
   keywordMode: KeywordMode;
-  /** Latency-alert threshold in ms; null = off. */
+  /** Latency threshold in ms; null = off. */
   slowThresholdMs: number | null;
   /** True when the last check was UP but slower than slowThresholdMs. */
   degraded: boolean;

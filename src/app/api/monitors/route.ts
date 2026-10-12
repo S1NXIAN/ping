@@ -27,7 +27,7 @@ const createSchema = z.object({
     .nullish()
     .transform((v) => (v && v.length > 0 ? v : null)),
   keywordMode: z.enum(["contains", "excludes"]).optional(),
-  /** Latency-alert threshold in ms; null/absent = off. */
+  /** Latency threshold in ms; null/absent = off. */
   slowThresholdMs: z
     .number()
     .int()

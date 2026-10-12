@@ -135,7 +135,7 @@ const patchSchema = z.object({
     .max(KEYWORD_MAX_LENGTH, `Keyword is too long (${KEYWORD_MAX_LENGTH} chars max)`)
     .nullish(),
   keywordMode: z.enum(["contains", "excludes"]).optional(),
-  /** Latency-alert threshold in ms; null clears (off). */
+  /** Latency threshold in ms; null clears (off). */
   slowThresholdMs: z
     .number()
     .int()
