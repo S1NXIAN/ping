@@ -68,7 +68,7 @@ model Monitor {
 // A postmortem/acknowledgment note the admin attaches to one derived
 // incident (a down period). Matched to the incident by the exact timestamp
 // of its first failed check — the same key the incident derivation uses —
-// and shown on the public status page under that incident.
+// and shown in the admin incidents sheet under that incident.
 model IncidentNote {
   id        String   @id @default(cuid())
   monitorId String
@@ -121,5 +121,8 @@ model Settings {
   // Absolute dashboard-session length in minutes (counted from login, no
   // sliding). null → default (15). Constrained to SESSION_PRESETS by the API.
   sessionMinutes Int?
+  // Set when the operator deletes the Self-monitor, so a later boot or
+  // authenticated request never recreates it against their wishes.
+  selfMonitorDisabled Boolean @default(false)
   updatedAt    DateTime @updatedAt
 }

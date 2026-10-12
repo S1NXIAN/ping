@@ -4,6 +4,7 @@ import { beforeEach, expect, test } from "bun:test";
 import { db, resetDb } from "./helpers/test-db";
 import {
   captureSelfMonitorOrigin,
+  disableSelfMonitor,
   ensureSelfMonitor,
   ensureSelfMonitorOnBoot,
   SELF_MONITOR_INTERVAL_SEC,
@@ -42,10 +43,14 @@ test("an existing self-monitor is left alone (its URL is not rewritten)", async 
   expect(monitors[0].url).toBe("https://first.example.com/api/health");
 });
 
-test("the self-monitor is an ordinary monitor: it can be deleted", async () => {
+test("a deleted self-monitor is not resurrected once disabled", async () => {
+  await db.settings.create({ data: { id: "main", passwordHash: "h", passwordSalt: "s" } });
   await ensureSelfMonitor("https://ping.example.com");
   const m = await db.monitor.findFirstOrThrow({ where: { isSelfMonitor: true } });
   await db.monitor.delete({ where: { id: m.id } });
+  await disableSelfMonitor();
+  // A later boot or request must not recreate it.
+  await ensureSelfMonitor("https://ping.example.com");
   expect(await db.monitor.count()).toBe(0);
 });
 

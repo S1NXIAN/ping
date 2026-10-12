@@ -50,7 +50,6 @@ export async function POST(req: NextRequest) {
   // A fresh install: the setup request's own origin is the Self-monitor's
   // target (see self-monitor.ts). Best-effort — setup must not fail over it.
   await ensureSelfMonitor(requestOrigin(req)).catch(() => undefined);
-
   const session = await createSession();
   clearAttempts(ip);
   const res = NextResponse.json({ ok: true });

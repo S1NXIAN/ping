@@ -134,7 +134,7 @@ with build `bun install && bunx prisma generate && bun run build` and start
    Each tick runs **every monitor whose interval has elapsed** — one external
    scheduler drives everything.
 3. Scheduler options:
-   - **GitHub Actions** — `.github/workflows/keep-alive.yml` in any public repo
+   - **GitHub Actions** — `.github/workflows/ping.yml` in any public repo
      (free), with a `PING_URL` repository secret. See the YAML below.
    - **cron-job.org / UptimeRobot free tier** — hit the tick URL on a schedule.
    - **Plain cron** on any box: `*/10 * * * * curl -fsS https://…/api/cron/tick`.

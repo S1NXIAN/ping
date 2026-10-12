@@ -177,9 +177,10 @@ export async function deriveIncidents(
   );
 
   // Ongoing incidents (no end) pin to the top, newest-first among themselves,
-  // and are exempt from the size cap; closed incidents keep the existing
-  // newest-first order and cap. Both the ongoing set and the closed set are
-  // bounded, so the list can never grow without limit.
+  // and are exempt from the closed-incident size cap; closed incidents keep
+  // the existing newest-first order and cap. Both subsets are bounded, so the
+  // list can never grow without limit — at most MAX_ONGOING_INCIDENTS
+  // concurrent outages are listed.
   const byNewest = (a: DerivedIncident, b: DerivedIncident) =>
     new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
   const ongoing = incidents.filter((i) => i.endedAt == null).sort(byNewest);

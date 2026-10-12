@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useOverview } from "@/hooks/use-overview";
+import { useSessionCountdown } from "@/hooks/use-session-countdown";
 import { api, formatSessionLeft, formatUptime, timeAgo, uptimeTone } from "@/lib/ping-client";
 import type { AdminIncidentDTO, FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
@@ -80,17 +81,9 @@ export function DashboardView({
   const { data, error, loading, refreshing, refresh } = useOverview(15000);
   const { toast } = useToast();
 
-  // Live countdown to the absolute session expiry (see ping-app). One clock
-  // read per second; the header shows mm:ss until sign-out.
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  useEffect(() => {
-    if (!sessionExpiresAt) return;
-    const t = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [sessionExpiresAt]);
-  const sessionMsLeft = sessionExpiresAt
-    ? new Date(sessionExpiresAt).getTime() - nowMs
-    : null;
+  // Live countdown to the absolute session expiry (see ping-app). The header
+  // shows mm:ss until sign-out.
+  const sessionMsLeft = useSessionCountdown(sessionExpiresAt);
 
   // view state
   const [activeFolder, setActiveFolder] = useState<string>("all");

@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useSessionCountdown } from "@/hooks/use-session-countdown";
 import {
   api,
   ApiError,
@@ -98,15 +99,7 @@ export function AdminView({
   const [fileInput, setFileInput] = useState<HTMLInputElement | null>(null);
 
   // --- session countdown (ticks every second while signed in) ---
-  const [nowMs, setNowMs] = useState(() => Date.now());
-
-  const sessionMsLeft = expiresAt ? new Date(expiresAt).getTime() - nowMs : null;
-
-  useEffect(() => {
-    if (!expiresAt) return;
-    const t = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [expiresAt]);
+  const sessionMsLeft = useSessionCountdown(expiresAt);
 
   const loadInfo = useCallback(async () => {
     try {
@@ -456,10 +449,10 @@ export function AdminView({
             </p>
           </Section>
 
-          {/* Data & maintenance */}
+          {/* Data & storage */}
           <Section
             icon={Database}
-            title="Data & maintenance"
+            title="Data & storage"
             description="Everything below is measured from this running instance — no estimates."
           >
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

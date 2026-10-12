@@ -5,6 +5,7 @@ import { guard } from "@/lib/ping-auth";
 import { KEYWORD_MAX_LENGTH } from "@/lib/checker";
 import { monitorUrlSchema, intervalSecSchema, scheduleFields, scheduleError } from "@/lib/validation";
 import { dailyBuckets, toCheckDTO, toMonitorDTO, p95For, emptyStats } from "@/lib/ping-stats";
+import { disableSelfMonitor } from "@/lib/self-monitor";
 import type { MonitorDetailResponse } from "@/lib/ping-types";
 
 type Params = { params: Promise<{ id: string }> };
@@ -233,10 +234,16 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (unauthorized) return unauthorized;
 
   const { id } = await params;
-  const exists = await db.monitor.findUnique({ where: { id }, select: { id: true } });
+  const exists = await db.monitor.findUnique({
+    where: { id },
+    select: { id: true, isSelfMonitor: true },
+  });
   if (!exists) {
     return NextResponse.json({ error: "Monitor not found" }, { status: 404 });
   }
   await db.monitor.delete({ where: { id } }); // checks cascade
+  // Deleting the Self-monitor is the operator's choice — record it so a later
+  // boot or request never recreates it against their wishes.
+  if (exists.isSelfMonitor) await disableSelfMonitor();
   return NextResponse.json({ ok: true });
 }

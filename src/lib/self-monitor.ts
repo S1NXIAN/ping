@@ -1,7 +1,9 @@
 // The Self-monitor: one monitor PING creates to check its own health
 // endpoint. It is an ordinary monitor otherwise — visible, editable and
 // deletable — and a durable `isSelfMonitor` marker keeps creation idempotent
-// so repeated boots never make a second one.
+// so repeated boots never make a second one. Deleting it sets a durable
+// `selfMonitorDisabled` flag, so it is never recreated against the operator's
+// wishes.
 //
 // The origin is resolved in order: (1) the setup request's origin, when a
 // fresh install is being set up; (2) the platform's external-URL env var
@@ -31,12 +33,8 @@ export function selfMonitorUrl(origin: string | null | undefined): string | null
   return `${trimmed}/api/health`;
 }
 
-/** This request's deployment origin, or null when it carries no host. The
- *  platform env var wins when set, so a spoofed Host cannot pin the monitor
- *  to an attacker host on the first authenticated request. */
+/** This request's deployment origin, or null when it carries no host. */
 export function requestOrigin(req: NextRequest): string | null {
-  const envOrigin = process.env.RENDER_EXTERNAL_URL?.trim();
-  if (envOrigin) return envOrigin;
   const host = req.headers.get("host");
   if (!host) return null;
   const isLocal = host.startsWith("localhost") || host.startsWith("127.") || host.startsWith("[::1");
@@ -45,16 +43,21 @@ export function requestOrigin(req: NextRequest): string | null {
   return `${proto}://${host}`;
 }
 
+/** The platform's external-URL env var as an origin, or null when unset. */
+function envOrigin(): string | null {
+  return process.env.RENDER_EXTERNAL_URL?.trim() || null;
+}
+
 /**
- * Creates the Self-monitor for `origin` unless one already exists. Idempotent
- * two ways: the deterministic id makes a concurrent create fail on the
- * primary key (swallowed), and the `isSelfMonitor` check skips a create when
- * the operator's monitor is already there. Never resurrects a monitor the
- * operator deleted mid-run — callers gate this to boot / setup / first request.
+ * Creates the Self-monitor for `origin` unless one already exists or the
+ * operator disabled it. Idempotent two ways: the deterministic id makes a
+ * concurrent create fail on the primary key (swallowed), and the
+ * `isSelfMonitor` check skips a create when it is already there.
  */
 export async function ensureSelfMonitor(origin: string | null | undefined): Promise<void> {
   const url = selfMonitorUrl(origin);
   if (!url) return;
+  if (await selfMonitorDisabled()) return;
   const existing = await db.monitor.findFirst({
     where: { isSelfMonitor: true },
     select: { id: true },
@@ -78,6 +81,27 @@ export async function ensureSelfMonitor(origin: string | null | undefined): Prom
   }
 }
 
+/** True once the operator has deleted the Self-monitor (a durable marker). */
+async function selfMonitorDisabled(): Promise<boolean> {
+  const s = await db.settings.findUnique({
+    where: { id: "main" },
+    select: { selfMonitorDisabled: true },
+  });
+  return s?.selfMonitorDisabled ?? false;
+}
+
+/**
+ * Records that the operator deleted the Self-monitor, so it is never
+ * recreated against their wishes. Called by the monitor delete path when the
+ * deleted row was the Self-monitor.
+ */
+export async function disableSelfMonitor(): Promise<void> {
+  await db.settings.updateMany({
+    where: { id: "main" },
+    data: { selfMonitorDisabled: true },
+  });
+}
+
 function isUniqueViolation(e: unknown): boolean {
   return typeof e === "object" && e !== null && (e as { code?: string }).code === "P2002";
 }
@@ -91,9 +115,9 @@ function isUniqueViolation(e: unknown): boolean {
 export async function ensureSelfMonitorOnBoot(): Promise<void> {
   const settings = await db.settings.findUnique({ where: { id: "main" }, select: { id: true } });
   if (!settings) return; // fresh install — the setup request supplies the origin
-  const envOrigin = process.env.RENDER_EXTERNAL_URL?.trim();
-  if (envOrigin) {
-    await ensureSelfMonitor(envOrigin);
+  const origin = envOrigin();
+  if (origin) {
+    await ensureSelfMonitor(origin);
     return;
   }
   selfMonitorState().lazyCaptureArmed = true;

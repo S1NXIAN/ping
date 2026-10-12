@@ -145,18 +145,15 @@ export function uptimeTone(
 }
 
 /**
- * Uptime band -> ink class. One source for every surface; callers pass the
- * ink they want for the null (no-data) band, since it differs by context
- * (dashboard/sheet use quiet muted, public page a slightly brighter meta).
+ * Uptime band -> ink class. One source for every surface that shows an
+ * uptime percentage; no-data stays quiet muted (unknown must never read as
+ * healthy).
  */
-export function uptimeToneClass(
-  tone: ReturnType<typeof uptimeTone>,
-  nullClass = "text-muted-foreground",
-): string {
+export function uptimeToneClass(tone: ReturnType<typeof uptimeTone>): string {
   if (tone === "up") return "text-up";
   if (tone === "warn") return "text-warn";
   if (tone === "down") return "text-down";
-  return nullClass;
+  return "text-muted-foreground";
 }
 
 /** 0.9982 -> "99.8%" (null -> "—") */
@@ -207,28 +204,6 @@ export function normalizeUrl(input: string): string | null {
     return u.toString();
   } catch {
     return null;
-  }
-}
-
-/** Copies text and returns whether it succeeded (clipboard may be unavailable). */
-export async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      const ok = document.execCommand("copy");
-      document.body.removeChild(ta);
-      return ok;
-    } catch {
-      return false;
-    }
   }
 }
 
