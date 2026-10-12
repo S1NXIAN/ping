@@ -1,5 +1,5 @@
-// Incident derivation shared by the public status page and the admin
-// incidents view. Incidents are never stored as rows — they are stitched
+// Incident derivation for the admin incidents view. Incidents are never
+// stored as rows — they are stitched
 // from REAL recorded checks: a run of consecutive "down" checks for one
 // monitor, bounded by up checks (or still ongoing). Admin postmortem notes
 // (IncidentNote rows) are joined on by the exact timestamp of the first

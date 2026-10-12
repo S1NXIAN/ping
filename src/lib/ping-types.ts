@@ -56,8 +56,6 @@ export interface MonitorDTO {
   account: string | null;
   pinned: boolean;
   position: number;
-  /** Excluded from the public status page when true. */
-  statusHidden: boolean;
   /** Keyword check: body must contain (or must not contain) this string; null = off. */
   keyword: string | null;
   keywordMode: KeywordMode;
@@ -154,44 +152,6 @@ export interface MonitorHistoryResponse {
 
 export type RenderIndicator = "none" | "minor" | "major" | "critical" | "unknown";
 
-/** Monitor as it appears on the public status page (no URL, no account). */
-export interface PublicStatusMonitor {
-  id: string;
-  name: string;
-  status: "up" | "down" | "paused" | "pending";
-  /** Up but slower than the admin's latency threshold. */
-  degraded: boolean | null;
-  /** Truthy when an active maintenance window covers this monitor. */
-  maintenance: boolean | null;
-  uptime24h: number | null;
-  uptime7d: number | null;
-  uptime30d: number | null;
-  avgMs24h: number | null;
-  lastCheckAt: string | null;
-  lastStatusCode: number | null;
-  lastDownAt: string | null;
-  daily: DailyBucket[]; // days with recorded checks only
-  /** Response ms of the newest ≤20 checks (48h), chronological; null = failed check. */
-  spark: Array<number | null>;
-  /** Epoch ms for each spark point (same length) — the sparkline's time axis. */
-  sparkT: number[];
-}
-
-/** A down period on the public status page, derived from recorded checks. */
-export interface PublicIncident {
-  monitorId: string;
-  monitorName: string;
-  startedAt: string;
-  /** Null while the incident is still ongoing. */
-  endedAt: string | null;
-  downChecks: number;
-  lastStatusCode: number | null;
-  /** True when the down period overlaps a planned maintenance window. */
-  duringMaintenance: boolean;
-  /** Admin postmortem/acknowledgment note attached to this incident. */
-  note: string | null;
-}
-
 /** Incident + its admin note, as listed in the admin incidents view. */
 export interface AdminIncidentDTO {
   monitorId: string;
@@ -204,51 +164,6 @@ export interface AdminIncidentDTO {
   /** Non-null when a note is attached (this is its row id). */
   noteId: string | null;
   note: string | null;
-}
-
-/** Maintenance window as shown on the public status page (name + times only). */
-export interface PublicMaintenance {
-  monitorId: string;
-  monitorName: string;
-  startsAt: string;
-  endsAt: string;
-  note: string | null;
-}
-
-export interface PublicStatusResponse {
-  monitors: PublicStatusMonitor[];
-  summary: {
-    total: number;
-    up: number;
-    down: number;
-    degraded: number;
-    paused: number;
-    pending: number;
-    lastCheckAt: string | null;
-  };
-  /** Custom title set by the admin, null when unset. */
-  title: string | null;
-  /** Down periods in the last 30 days, newest first (derived from real checks). */
-  incidents: PublicIncident[];
-  /** Active + upcoming maintenance windows for visible monitors. */
-  maintenance: PublicMaintenance[];
-  serverTime: string;
-}
-
-/** One selectable monitor for the status-badge picker (admin only). */
-export interface StatusPageMonitorOption {
-  id: string;
-  name: string;
-}
-
-/** Admin-facing status-page state (token only shown to an unlocked admin). */
-export interface StatusPageInfoResponse {
-  enabled: boolean;
-  token: string | null;
-  /** Custom title shown on the public status page (null = default). */
-  title: string | null;
-  /** Visible (non-hidden) monitor names — options for per-monitor badges. */
-  monitors: StatusPageMonitorOption[];
 }
 
 /** A webhook endpoint notified when a monitor goes down or recovers. */

@@ -126,7 +126,6 @@ const patchSchema = z.object({
   enabled: z.boolean().optional(),
   method: z.enum(["GET", "HEAD"]).optional(),
   pinned: z.boolean().optional(),
-  statusHidden: z.boolean().optional(),
   account: z.string().trim().max(60, "Account label is too long (60 chars max)").nullish(),
   /** Keyword check: body must contain (or not contain) this string; null clears (off). */
   keyword: z
@@ -173,14 +172,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const data: Record<string, unknown> = {};
-  const { name, url, folderId, intervalSec, enabled, method, pinned, statusHidden, account, keyword, keywordMode, slowThresholdMs, alertDelay, scheduleMode, scheduleTimes, timezone } = parsed.data;
+  const { name, url, folderId, intervalSec, enabled, method, pinned, account, keyword, keywordMode, slowThresholdMs, alertDelay, scheduleMode, scheduleTimes, timezone } = parsed.data;
   if (name !== undefined) data.name = name;
   if (url !== undefined) data.url = url;
   if (intervalSec !== undefined) data.intervalSec = intervalSec;
   if (enabled !== undefined) data.enabled = enabled;
   if (method !== undefined) data.method = method;
   if (pinned !== undefined) data.pinned = pinned;
-  if (statusHidden !== undefined) data.statusHidden = statusHidden;
   if (slowThresholdMs !== undefined) data.slowThresholdMs = slowThresholdMs ?? null;
   if (alertDelay !== undefined) {
     data.alertDelay = alertDelay;

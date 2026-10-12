@@ -935,7 +935,7 @@ export function DashboardView({
                   "border-down/40 bg-down/10 text-down hover:bg-down/10 hover:text-down",
               )}
               aria-label={`Incidents and postmortem notes${incidentCount > 0 ? ` (${incidentCount} in the last 30 days)` : ""}`}
-              title="Incidents — down periods over the last 30 days, with postmortem notes shown on the public status page"
+              title="Incidents — down periods over the last 30 days, with postmortem notes"
             >
               <AlertTriangle className="size-4" aria-hidden="true" />
               <span>Incidents</span>

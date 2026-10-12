@@ -8,12 +8,9 @@ import {
   Database,
   Download,
   Eraser,
-  Eye,
   FileUp,
-  Globe,
   HeartPulse,
   KeyRound,
-  Link2,
   Loader2,
   LockKeyhole,
   LockOpen,
@@ -36,14 +33,12 @@ import {
   formatMs,
   timeAgo,
 } from "@/lib/ping-client";
-import type { AdminInfoResponse, ImportResult, StatusPageInfoResponse } from "@/lib/ping-types";
+import type { AdminInfoResponse, ImportResult } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { NotificationsSection } from "./notifications-section";
 import { RenderStatusCard } from "./render-status-card";
-import { StatusBadgeSection } from "./status-badge-section";
 import { InlineAlert } from "./inline-alert";
 import { StatTile } from "./stat-tile";
-import { Skeleton } from "@/components/ui/skeleton";
 
 const GH_ACTIONS_YAML = `name: PING keep-alive
 # Free on public repositories. Set the PING_URL repository secret
@@ -123,21 +118,10 @@ export function AdminView({
   // --- keep-awake URL (computed client-side to match this deployment) ---
   const [tickUrl, setTickUrl] = useState("");
 
-  // --- public status page ---
-  const [statusPage, setStatusPage] = useState<StatusPageInfoResponse | null>(null);
-  const [spBusy, setSpBusy] = useState<string | null>(null);
-  const [titleDraft, setTitleDraft] = useState("");
-  const [titleDirty, setTitleDirty] = useState(false);
-
   // --- data retention ---
   const [retentionDraft, setRetentionDraft] = useState("default");
   const [retentionDirty, setRetentionDirty] = useState(false);
   const [retentionBusy, setRetentionBusy] = useState<string | null>(null);
-
-  const statusUrl =
-    statusPage?.enabled && statusPage.token
-      ? `${typeof window !== "undefined" ? window.location.origin : ""}/?status=${statusPage.token}`
-      : "";
 
   // --- import ---
   const [importing, setImporting] = useState(false);
@@ -164,56 +148,6 @@ export function AdminView({
   useEffect(() => {
     if (unlockExpiresAt && unlockMsLeft <= 0) onExpired();
   }, [unlockExpiresAt, unlockMsLeft, onExpired]);
-
-  const loadStatusPage = useCallback(async () => {
-    try {
-      const r = await api<StatusPageInfoResponse>("/api/admin/status-page");
-      setStatusPage(r);
-      if (!titleDirty) setTitleDraft(r.title ?? "");
-    } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.message.startsWith("Admin locked")) onExpired();
-        else if (err.message === "Unauthorized") onAuthLost();
-      }
-    }
-  }, [onExpired, onAuthLost, titleDirty]);
-
-  useEffect(() => {
-    void loadStatusPage();
-  }, [loadStatusPage]);
-
-  async function statusPageAction(
-    action: "enable" | "disable" | "regenerate" | "title",
-    title?: string,
-  ) {
-    setSpBusy(action);
-    try {
-      const r = await api<StatusPageInfoResponse>("/api/admin/status-page", {
-        method: "POST",
-        body: JSON.stringify(action === "title" ? { action, title: title ?? null } : { action }),
-      });
-      setStatusPage(r);
-      toast({
-        description:
-          action === "disable"
-            ? "Status page disabled — the public link now returns “not found”"
-            : action === "regenerate"
-              ? "New link generated — old links no longer work"
-              : action === "title"
-                ? title
-                  ? "Custom title saved"
-                  : "Custom title cleared"
-                : "Status page enabled",
-      });
-    } catch (err) {
-      toast({
-        description: err instanceof Error ? err.message : "Action failed",
-        variant: "destructive",
-      });
-    } finally {
-      setSpBusy(null);
-    }
-  }
 
   const loadInfo = useCallback(async () => {
     try {
@@ -546,159 +480,6 @@ export function AdminView({
                 </li>
               </ul>
               {freeHours}
-            </div>
-          </Section>
-
-          {/* Public status page */}
-          <Section
-            icon={Globe}
-            title="Public status page"
-            description="Share a read-only link that shows monitor names, live statuses, and 30-day uptime — no login required. URLs, accounts, and folders are never exposed; monitors can be excluded individually from their ⋮ menu."
-          >
-            {statusPage == null ? (
-              <Skeleton className="h-16" />
-            ) : statusPage.enabled ? (
-              <>
-                <div className="flex items-center gap-2 rounded-lg border border-up/25 bg-up/10 px-3 py-2.5 text-sm text-up">
-                  <span className="relative flex size-2.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-up opacity-60" />
-                    <span className="relative inline-flex size-2.5 rounded-full bg-up" />
-                  </span>
-                  Status page is live
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="ml-auto h-8 bg-card"
-                    onClick={() => statusUrl && window.open(statusUrl, "_blank", "noopener")}
-                    aria-label="Open the public status page in a new tab"
-                  >
-                    <Eye className="size-3.5" /> Preview
-                  </Button>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                    Public link (share this)
-                  </Label>
-                  <div className="flex items-center gap-2">
-                    <code className="min-w-0 flex-1 truncate rounded-md border bg-muted/40 px-2.5 py-2 text-xs text-foreground/90">
-                      {statusUrl || "…"}
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="shrink-0"
-                      onClick={() => onCopy(statusUrl, "Status-page link")}
-                      aria-label="Copy status page link"
-                    >
-                      <Copy className="size-4" />
-                    </Button>
-                  </div>
-                  <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <Link2 className="size-3 shrink-0" aria-hidden="true" />
-                    Anyone with this link sees monitor names, statuses and uptime — nothing else.
-                    The token is 192-bit random and unguessable.
-                  </p>
-                </div>
-
-                {/* badge + RSS embeds (shares the same token) */}
-                <StatusBadgeSection
-                  token={statusPage.token ?? ""}
-                  monitors={statusPage.monitors ?? []}
-                />
-
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => statusPageAction("regenerate")}
-                    disabled={spBusy != null}
-                  >
-                    {spBusy === "regenerate" ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="size-3.5" />
-                    )}
-                    New link
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-down hover:text-down"
-                    onClick={() => statusPageAction("disable")}
-                    disabled={spBusy != null}
-                  >
-                    {spBusy === "disable" ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <LockKeyhole className="size-3.5" />
-                    )}
-                    Disable page
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
-                  <LockKeyhole className="size-4 shrink-0" aria-hidden="true" />
-                  The status page is off — no public link exists right now.
-                </div>
-                <Button
-                  size="sm"
-                  onClick={() => statusPageAction("enable")}
-                  disabled={spBusy != null}
-                  className="bg-white font-semibold text-black hover:bg-zinc-200"
-                >
-                  {spBusy === "enable" ? (
-                    <>
-                      <Loader2 className="size-3.5 animate-spin" /> Enabling…
-                    </>
-                  ) : (
-                    <>
-                      <Globe className="size-3.5" /> Enable public status page
-                    </>
-                  )}
-                </Button>
-              </>
-            )}
-
-            {/* custom title (works whether the page is on or off) */}
-            <div className="space-y-1.5 border-t pt-3.5">
-              <Label htmlFor="sp-title" className="text-xs">
-                Custom page title <span className="text-muted-foreground/70">(optional)</span>
-              </Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="sp-title"
-                  value={titleDraft}
-                  maxLength={60}
-                  placeholder="e.g. Acme Corp — service status"
-                  onChange={(e) => {
-                    setTitleDraft(e.target.value);
-                    setTitleDirty(true);
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 shrink-0"
-                  disabled={spBusy != null}
-                  onClick={() => {
-                    setTitleDirty(false);
-                    void statusPageAction("title", titleDraft.trim() || undefined);
-                  }}
-                >
-                  {spBusy === "title" ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    "Save"
-                  )}
-                </Button>
-              </div>
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Shown as a small label above the banner on the public page. Clear the field and save
-                to remove it.
-              </p>
             </div>
           </Section>
 

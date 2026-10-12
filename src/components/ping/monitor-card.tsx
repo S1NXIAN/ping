@@ -6,8 +6,6 @@ import {
   ArrowDown,
   ArrowUp,
   ExternalLink,
-  Eye,
-  EyeOff,
   Folder,
   FolderInput,
   Gauge,
@@ -648,26 +646,6 @@ export function MonitorCard({
                       ))}
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
-
-                  <DropdownMenuItem
-                    disabled={busyAction === "visibility"}
-                    onClick={() =>
-                      patch(
-                        { statusHidden: !monitor.statusHidden },
-                        monitor.statusHidden
-                          ? "Visible on the public status page"
-                          : "Hidden from the public status page",
-                        "visibility",
-                      )
-                    }
-                  >
-                    {monitor.statusHidden ? (
-                      <Eye className="size-4" />
-                    ) : (
-                      <EyeOff className="size-4" />
-                    )}
-                    {monitor.statusHidden ? "Show on status page" : "Hide from status page"}
-                  </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="text-[11px] text-muted-foreground">

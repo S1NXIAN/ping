@@ -20,24 +20,6 @@ export async function getSettings() {
   return db.settings.findUnique({ where: { id: "main" } });
 }
 
-/**
- * Constant-time compare of a caller-supplied status-page token against the
- * stored one. Compares BYTE lengths, never JavaScript string lengths:
- * timingSafeEqual measures bytes, so a multi-byte token whose character
- * count matches the stored 48-hex-char token would throw and turn the
- * intended "not found" answer into a 500. A missing stored token (page
- * disabled) never matches.
- */
-export function matchesStatusToken(
-  token: string,
-  stored: string | null | undefined,
-): boolean {
-  if (!stored || !token) return false;
-  const a = Buffer.from(token);
-  const b = Buffer.from(stored);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
 export function hashPassword(password: string, salt = randomBytes(16).toString("hex")) {
   const hash = scryptSync(password, salt, 64).toString("hex");
   return { hash, salt };

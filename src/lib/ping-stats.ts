@@ -266,7 +266,6 @@ export function toMonitorDTO(
     account: monitor.account ?? null,
     pinned: monitor.pinned,
     position: monitor.position,
-    statusHidden: monitor.statusHidden,
     keyword: monitor.keyword ?? null,
     keywordMode: monitor.keywordMode === "excludes" ? "excludes" : "contains",
     slowThresholdMs: monitor.slowThresholdMs ?? null,
@@ -314,8 +313,7 @@ export async function dailyBuckets(monitorId: string): Promise<DailyBucket[]> {
 
 /**
  * Daily up/down buckets for many monitors at once — ONE grouped query for
- * the whole fleet (the public status page needs a series per monitor; a
- * per-monitor loop was 200+ queries per page view at the monitor cap).
+ * the whole fleet (a per-monitor loop was 200+ queries at the monitor cap).
  * Monitors with no checks in the window simply have no map entry.
  */
 export async function dailyBucketsByMonitor(

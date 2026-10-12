@@ -32,8 +32,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * Admin view of the last 30 days of incidents (derived from real checks)
- * with postmortem-note editing. Notes attach to the incident's exact start
- * and are shown on the public status page — write them for an audience.
+ * with postmortem-note editing. Notes attach to the incident's exact start.
  */
 export function IncidentsSheet({
   open,
@@ -71,7 +70,7 @@ export function IncidentsSheet({
           i.monitorId === inc.monitorId && i.startedAt === inc.startedAt ? { ...i, note } : i,
         ),
       );
-      toast({ description: "Note saved — visible on the public status page" });
+      toast({ description: "Note saved" });
     } catch (e) {
       toast({
         description: e instanceof Error ? e.message : "Failed to save note",
@@ -117,7 +116,7 @@ export function IncidentsSheet({
           </SheetTitle>
           <SheetDescription>
             Down periods stitched from real checks over the last 30 days. Attach a postmortem note
-            to any incident and it appears on the public status page.
+            to any incident to record what happened for your own reference.
           </SheetDescription>
         </SheetHeader>
 
@@ -137,7 +136,7 @@ export function IncidentsSheet({
           <EmptyState
             icon={ShieldQuestion}
             title="No incidents in the last 30 days"
-            description="When a monitor fails consecutive checks, the down period shows up here — and on the public status page."
+            description="When a monitor fails consecutive checks, the down period shows up here."
           />
         ) : (
           <ScrollArea className="flex-1">
@@ -235,7 +234,7 @@ function IncidentRow({
             maxLength={500}
             rows={3}
             autoFocus
-            placeholder="What happened, why, and what fixed it — this text is shown publicly…"
+            placeholder="What happened, why, and what fixed it…"
             aria-label={`Postmortem note for ${inc.monitorName} incident`}
             className="text-xs"
           />
@@ -286,7 +285,7 @@ function IncidentRow({
               <Trash2 className="size-3" /> Remove
             </Button>
             <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-muted-foreground/70">
-              <FileText className="size-3" aria-hidden="true" /> on the status page
+              <FileText className="size-3" aria-hidden="true" /> your note
             </span>
           </div>
         </div>

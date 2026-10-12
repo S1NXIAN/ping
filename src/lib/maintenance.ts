@@ -5,12 +5,9 @@
 // import it (see GLOSSARY.md "Maintenance window"). A window is active from
 // its start instant (inclusive) to its end instant (exclusive). `checker.ts`
 // keeps its own DB predicate (endsAt >= now) as the alert-suppression
-// authority, so the two boundaries differ by design. The server routes in
-// api/public/{status,feed} also keep their own Prisma `where` clauses — they
-// filter at the database, not in JS, so they cannot call this.
+// authority, so the two boundaries differ by design.
 
-/** A window's instants, ISO-8601. Both MaintenanceWindowDTO and
- *  PublicMaintenance satisfy this, so no call site converts anything. */
+/** A window's instants, ISO-8601. */
 export interface WindowFields {
   startsAt: string;
   endsAt: string;
