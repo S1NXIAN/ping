@@ -11,6 +11,10 @@ import type { AdminIncidentDTO } from "./ping-types";
 
 export const INCIDENT_WINDOW_DAYS = 30;
 export const MAX_INCIDENTS = 15;
+/** Ongoing incidents are exempt from MAX_INCIDENTS so a long outage is never
+ *  dropped for newer ones — but the exempt set is itself capped so a
+ *  pathological fleet cannot make the list unbounded. */
+export const MAX_ONGOING_INCIDENTS = 5;
 /** Hard caps so a pathological (flapping) monitor can never make this unbounded. */
 const MAX_DOWN_ROWS_PER_MONITOR = 5000;
 const MAX_STREAKS_PER_MONITOR = 40;
@@ -172,8 +176,15 @@ export async function deriveIncidents(
     }),
   );
 
-  incidents.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
-  return incidents.slice(0, MAX_INCIDENTS);
+  // Ongoing incidents (no end) pin to the top, newest-first among themselves,
+  // and are exempt from the size cap; closed incidents keep the existing
+  // newest-first order and cap. Both the ongoing set and the closed set are
+  // bounded, so the list can never grow without limit.
+  const byNewest = (a: DerivedIncident, b: DerivedIncident) =>
+    new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
+  const ongoing = incidents.filter((i) => i.endedAt == null).sort(byNewest);
+  const closed = incidents.filter((i) => i.endedAt != null).sort(byNewest);
+  return [...ongoing.slice(0, MAX_ONGOING_INCIDENTS), ...closed.slice(0, MAX_INCIDENTS)];
 }
 
 /** Joins admin IncidentNote rows onto derived incidents (exact start match). */

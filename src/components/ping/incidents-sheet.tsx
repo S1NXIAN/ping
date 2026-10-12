@@ -139,7 +139,7 @@ export function IncidentsSheet({
             description="When a monitor fails consecutive checks, the down period shows up here."
           />
         ) : (
-          <ScrollArea className="flex-1">
+          <ScrollArea className="min-h-0 flex-1">
             <div className="space-y-2.5 px-4 py-4">
               {(incidents ?? []).map((inc, i) => (
                 <IncidentRow
