@@ -150,7 +150,7 @@ export function MonitorCard({
         { method: "POST" },
       );
       toast({
-        description: `Check finished — ${r.check.status === "up" ? "up" : "down"}${
+        description: `Check finished — ${r.check.status === "up" ? "live" : "down"}${
           r.check.statusCode != null ? ` (HTTP ${r.check.statusCode})` : ""
         }`,
       });

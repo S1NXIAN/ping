@@ -472,7 +472,7 @@ export function HistoryChart({
                 minute: "2-digit",
               })}
               {", "}
-              {hoverPoint.s === "down" ? "down, no response" : `up, ${formatMs(hoverPoint.ms)}`}
+              {hoverPoint.s === "down" ? "down, no response" : `live, ${formatMs(hoverPoint.ms)}`}
             </span>
           )}
 
@@ -502,7 +502,7 @@ export function HistoryChart({
                     hoverPoint.s === "down" ? "bg-down" : "bg-up",
                   )}
                 />
-                {hoverPoint.s === "down" ? "down" : "up"} ·{" "}
+                {hoverPoint.s === "down" ? "down" : "live"} ·{" "}
                 <span className="tabular-nums text-foreground">
                   {hoverPoint.s === "down" ? "no response" : formatMs(hoverPoint.ms)}
                 </span>

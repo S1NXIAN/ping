@@ -29,7 +29,7 @@ export function UptimeBars({
   const ariaLabel =
     segments.length === 0
       ? "Check history: no checks recorded yet"
-      : `Check history: ${up} up, ${down} down` +
+      : `Check history: ${up} live, ${down} down` +
         (partial ? `, ${partial} partial` : "") +
         (noData ? `, ${noData} with no data` : "");
 
@@ -79,7 +79,7 @@ export function checksToSegments(
     .reverse()
     .map((c) => ({
       ratio: c.status === "up" ? 1 : 0,
-      title: `${new Date(c.checkedAt).toLocaleString()} — ${c.status === "up" ? "up" : "down"}${
+      title: `${new Date(c.checkedAt).toLocaleString()} — ${c.status === "up" ? "live" : "down"}${
         c.statusCode != null ? ` (HTTP ${c.statusCode})` : ""
       }${c.responseMs != null ? ` · ${c.responseMs} ms` : ""}`,
     }));

@@ -328,7 +328,7 @@ export function MonitorDetailSheet({
                 {/* Legend keys mirror the bars exactly — the no-data key is the
                     same dashed outline the bars draw, at 3.3:1 (the old
                     bg-muted+opacity swatch measured 1.02:1: invisible). */}
-                <span className="inline-block size-2.5 rounded-none bg-up/90" /> up
+                <span className="inline-block size-2.5 rounded-none bg-up/90" /> live
                 <span className="inline-block size-2.5 rounded-none bg-warn/90" /> partial
                 <span className="inline-block size-2.5 rounded-none bg-down/90" /> down
                 <span className="inline-block size-2.5 rounded-none border border-dashed border-muted-foreground/60" />{" "}
@@ -401,7 +401,7 @@ export function MonitorDetailSheet({
                           )}
                         >
                           <StatusDot status={c.status === "up" ? "up" : "down"} pulse={false} />
-                          {c.status === "up" ? "up" : "down"}
+                          {c.status === "up" ? "live" : "down"}
                         </span>
                       </td>
                       <td className="px-3 py-1.5">
