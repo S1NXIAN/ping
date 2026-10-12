@@ -154,7 +154,7 @@ A charcoal drafting-paper scale with no hue tint, one white pencil, and three se
 - **Bright Chalk** (#f1f2f4): The `--accent-foreground` ink — text on Accent Charcoal hover fills (ghost/outline controls, sidebar hover). One step brighter than Ash White so hovered text lifts without going full white.
 
 ### Secondary (semantic status — data, not decoration)
-- **Beacon Emerald** (#10b981): "Up". Status dots, up-pills, uptime values, healthy bar segments, chart success line.
+- **Beacon Emerald** (#10b981): "Live". Status dots, up-pills, uptime values, healthy bar segments, chart success line.
 - **Alarm Rose** (#f43f5e): "Down". Failed ticks, downtime bars, destructive actions, outage counts. Solid rose fills take Soot ink (`--down-foreground`, 5.33:1 AA) — never white; hover keeps the fill constant (darkening pushes contrast to a 4.5 knife-edge), the 0.98 CTA press is the interaction cue.
 - **Caution Amber** (#f59e0b): "Slow". Slow-threshold lines on charts, slow pills, pending ripples.
 

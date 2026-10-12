@@ -51,7 +51,7 @@ import type { MonitorDetailResponse, MonitorDTO } from "@/lib/ping-types";
 import { formatTimesForDisplay } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { HistoryChart } from "./history-chart";
-import { StatusDot, statusLabel } from "./status-dot";
+import { StatusDot, statusLabel, statusWord } from "./status-dot";
 import { monitorStatus, type MonitorStatus } from "@/lib/monitor-status";
 import { StatusPill, monitorStatusTone } from "./status-pill";
 import { dailyToSegments, UptimeBars } from "./uptime-bars";
@@ -328,9 +328,9 @@ export function MonitorDetailSheet({
                 {/* Legend keys mirror the bars exactly — the no-data key is the
                     same dashed outline the bars draw, at 3.3:1 (the old
                     bg-muted+opacity swatch measured 1.02:1: invisible). */}
-                <span className="inline-block size-2.5 rounded-none bg-up/90" /> live
+                <span className="inline-block size-2.5 rounded-none bg-up/90" /> {statusWord("up")}
                 <span className="inline-block size-2.5 rounded-none bg-warn/90" /> partial
-                <span className="inline-block size-2.5 rounded-none bg-down/90" /> down
+                <span className="inline-block size-2.5 rounded-none bg-down/90" /> {statusWord("down")}
                 <span className="inline-block size-2.5 rounded-none border border-dashed border-muted-foreground/60" />{" "}
                 no data
               </span>
@@ -401,7 +401,7 @@ export function MonitorDetailSheet({
                           )}
                         >
                           <StatusDot status={c.status === "up" ? "up" : "down"} pulse={false} />
-                          {c.status === "up" ? "live" : "down"}
+                          {statusWord(c.status)}
                         </span>
                       </td>
                       <td className="px-3 py-1.5">

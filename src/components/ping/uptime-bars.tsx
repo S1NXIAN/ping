@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { statusWord } from "./status-dot";
 
 export interface BarSegment {
   /** 0..1 availability for the bucket; null = no data */
@@ -29,7 +30,7 @@ export function UptimeBars({
   const ariaLabel =
     segments.length === 0
       ? "Check history: no checks recorded yet"
-      : `Check history: ${up} live, ${down} down` +
+      : `Check history: ${up} ${statusWord("up")}, ${down} ${statusWord("down")}` +
         (partial ? `, ${partial} partial` : "") +
         (noData ? `, ${noData} with no data` : "");
 
@@ -72,14 +73,14 @@ export function UptimeBars({
 
 /** Converts recent checks (newest first) into card-level bar segments. */
 export function checksToSegments(
-  checks: { status: string; checkedAt: string; statusCode: number | null; responseMs: number | null }[],
+  checks: { status: "up" | "down"; checkedAt: string; statusCode: number | null; responseMs: number | null }[],
 ): BarSegment[] {
   // reverse to chronological order for display left→right
   return [...checks]
     .reverse()
     .map((c) => ({
       ratio: c.status === "up" ? 1 : 0,
-      title: `${new Date(c.checkedAt).toLocaleString()} — ${c.status === "up" ? "live" : "down"}${
+      title: `${new Date(c.checkedAt).toLocaleString()} — ${statusWord(c.status)}${
         c.statusCode != null ? ` (HTTP ${c.statusCode})` : ""
       }${c.responseMs != null ? ` · ${c.responseMs} ms` : ""}`,
     }));
@@ -108,7 +109,7 @@ export function dailyToSegments(
     const ratio = total > 0 ? bucket.up / total : null;
     segments.push({
       ratio,
-      title: `${key} (UTC) — ${bucket.up} up / ${bucket.down} down${ratio != null ? ` (${Math.round(ratio * 100)}%)` : ""}`,
+      title: `${key} (UTC) — ${bucket.up} ${statusWord("up")} / ${bucket.down} ${statusWord("down")}${ratio != null ? ` (${Math.round(ratio * 100)}%)` : ""}`,
     });
   }
   return segments;

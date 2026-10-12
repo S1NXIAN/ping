@@ -55,7 +55,7 @@ import {
 import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { formatTimesForDisplay } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
-import { StatusDot, statusLabel } from "./status-dot";
+import { StatusDot, statusLabel, statusWord } from "./status-dot";
 import { monitorStatus, averageUpResponseMs, type MonitorStatus } from "@/lib/monitor-status";
 import { StatusPill, monitorStatusTone } from "./status-pill";
 import { checksToSegments, UptimeBars } from "./uptime-bars";
@@ -145,12 +145,12 @@ export function MonitorCard({
     if (checking) return;
     setChecking(true);
     try {
-      const r = await api<{ check: { status: string; statusCode: number | null } }>(
+      const r = await api<{ check: { status: "up" | "down"; statusCode: number | null } }>(
         `/api/monitors/${monitor.id}/check`,
         { method: "POST" },
       );
       toast({
-        description: `Check finished — ${r.check.status === "up" ? "live" : "down"}${
+        description: `Check finished — ${statusWord(r.check.status)}${
           r.check.statusCode != null ? ` (HTTP ${r.check.statusCode})` : ""
         }`,
       });
@@ -250,7 +250,7 @@ export function MonitorCard({
           dnd?.isDragging && !dragArmed && "transition-transform",
         )}
         aria-label={`Monitor ${monitor.name}, status ${
-          degraded ? "slow" : statusLabel(status)
+          degraded ? "slow" : statusWord(status)
         }`}
       >
         {/* phone: stacked — full-width identity/meta rows, bars + actions share

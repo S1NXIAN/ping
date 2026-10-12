@@ -49,6 +49,7 @@ export function StatusDot({
   );
 }
 
+/** Headline status label, title-case ("Live") — pills and card headlines. */
 export function statusLabel(status: DotStatus): string {
   switch (status) {
     case "up":
@@ -62,4 +63,10 @@ export function statusLabel(status: DotStatus): string {
     default:
       return "Pending";
   }
+}
+
+/** Dense status word, lowercase ("live") — tooltips, tables, aria labels.
+ *  The one source of truth for the status vocabulary: never inline a literal. */
+export function statusWord(status: DotStatus): string {
+  return statusLabel(status).toLowerCase();
 }

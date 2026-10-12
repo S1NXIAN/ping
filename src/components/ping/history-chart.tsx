@@ -5,6 +5,7 @@ import { Download, Loader2 } from "lucide-react";
 import { api, formatMs } from "@/lib/ping-client";
 import type { HistoryPoint, HistoryRange, MonitorHistoryResponse } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
+import { statusWord } from "./status-dot";
 
 const RANGES: { value: HistoryRange; label: string }[] = [
   { value: "1h", label: "1h" },
@@ -472,7 +473,7 @@ export function HistoryChart({
                 minute: "2-digit",
               })}
               {", "}
-              {hoverPoint.s === "down" ? "down, no response" : `live, ${formatMs(hoverPoint.ms)}`}
+              {hoverPoint.s === "down" ? "down, no response" : `${statusWord("up")}, ${formatMs(hoverPoint.ms)}`}
             </span>
           )}
 
@@ -502,7 +503,7 @@ export function HistoryChart({
                     hoverPoint.s === "down" ? "bg-down" : "bg-up",
                   )}
                 />
-                {hoverPoint.s === "down" ? "down" : "live"} ·{" "}
+                {statusWord(hoverPoint.s)} ·{" "}
                 <span className="tabular-nums text-foreground">
                   {hoverPoint.s === "down" ? "no response" : formatMs(hoverPoint.ms)}
                 </span>

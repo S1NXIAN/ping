@@ -18,7 +18,10 @@ _Avoid_: probe, ping, sample
 The four-value summary a surface shows for a monitor: `up`, `down`, `paused`
 or `pending`. Only `up` and `down` are measured health, from the latest Check.
 `paused` is a configuration state (checks are off, not failing) and `pending`
-is the absence of any Check yet — neither is a health verdict.
+is the absence of any Check yet — neither is a health verdict. These are the
+stored values; the display word for `up` is **live** (title-case "Live" in
+headline pills, lowercase "live" in dense fragments — tooltips, tables, aria
+labels), from `statusLabel`/`statusWord` in `src/components/ping/status-dot.tsx`.
 _Avoid_: state, condition (and do not read `paused`/`pending` as health)
 
 **Slow (degraded)**:
