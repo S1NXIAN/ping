@@ -15,6 +15,10 @@ import { nextMonitorPosition } from "./checker";
 export const SELF_MONITOR_NAME = "PING self-monitor";
 /** 3 minutes — cheap, and frequent enough to count as inbound keep-alive. */
 export const SELF_MONITOR_INTERVAL_SEC = 180;
+/** Deterministic id: a second create with the same id fails on the primary
+ *  key, so concurrent creators (boot vs. setup vs. a duplicated instance)
+ *  can never insert two Self-monitors. */
+export const SELF_MONITOR_ID = "self-monitor";
 
 /**
  * The health URL for a deployment origin, or null when the origin is blank.
@@ -27,8 +31,12 @@ export function selfMonitorUrl(origin: string | null | undefined): string | null
   return `${trimmed}/api/health`;
 }
 
-/** This request's deployment origin, or null when it carries no host. */
+/** This request's deployment origin, or null when it carries no host. The
+ *  platform env var wins when set, so a spoofed Host cannot pin the monitor
+ *  to an attacker host on the first authenticated request. */
 export function requestOrigin(req: NextRequest): string | null {
+  const envOrigin = process.env.RENDER_EXTERNAL_URL?.trim();
+  if (envOrigin) return envOrigin;
   const host = req.headers.get("host");
   if (!host) return null;
   const isLocal = host.startsWith("localhost") || host.startsWith("127.") || host.startsWith("[::1");
@@ -38,8 +46,10 @@ export function requestOrigin(req: NextRequest): string | null {
 }
 
 /**
- * Creates the Self-monitor for `origin` unless one already exists (idempotent
- * on the marker) or the origin is unusable. Never resurrects a monitor the
+ * Creates the Self-monitor for `origin` unless one already exists. Idempotent
+ * two ways: the deterministic id makes a concurrent create fail on the
+ * primary key (swallowed), and the `isSelfMonitor` check skips a create when
+ * the operator's monitor is already there. Never resurrects a monitor the
  * operator deleted mid-run — callers gate this to boot / setup / first request.
  */
 export async function ensureSelfMonitor(origin: string | null | undefined): Promise<void> {
@@ -50,42 +60,65 @@ export async function ensureSelfMonitor(origin: string | null | undefined): Prom
     select: { id: true },
   });
   if (existing) return;
-  await db.monitor.create({
-    data: {
-      name: SELF_MONITOR_NAME,
-      url,
-      intervalSec: SELF_MONITOR_INTERVAL_SEC,
-      isSelfMonitor: true,
-      position: await nextMonitorPosition(),
-    },
-  });
+  try {
+    await db.monitor.create({
+      data: {
+        id: SELF_MONITOR_ID,
+        name: SELF_MONITOR_NAME,
+        url,
+        intervalSec: SELF_MONITOR_INTERVAL_SEC,
+        isSelfMonitor: true,
+        position: await nextMonitorPosition(),
+      },
+    });
+  } catch (e) {
+    // A concurrent creator won the primary-key race — that is the idempotent
+    // outcome, not an error. Anything else propagates.
+    if (!isUniqueViolation(e)) throw e;
+  }
 }
 
-// In-memory: the lazy path stays armed until the first authenticated request
-// supplies an origin, then disarms. A restart re-arms it — intended, since a
-// fresh boot is exactly when an install with no env var needs the capture.
-let lazyCaptureArmed = false;
+function isUniqueViolation(e: unknown): boolean {
+  return typeof e === "object" && e !== null && (e as { code?: string }).code === "P2002";
+}
 
 /**
  * Boot path: create the Self-monitor when the platform's external-URL env var
- * is present; otherwise arm lazy capture for the next authenticated request.
+ * is present. A fresh install (no Settings row yet) is left to the setup
+ * request, whose own origin is the higher-priority source — so this skips it.
+ * Otherwise it arms lazy capture for the next authenticated request.
  */
 export async function ensureSelfMonitorOnBoot(): Promise<void> {
+  const settings = await db.settings.findUnique({ where: { id: "main" }, select: { id: true } });
+  if (!settings) return; // fresh install — the setup request supplies the origin
   const envOrigin = process.env.RENDER_EXTERNAL_URL?.trim();
   if (envOrigin) {
     await ensureSelfMonitor(envOrigin);
     return;
   }
-  lazyCaptureArmed = true;
+  selfMonitorState().lazyCaptureArmed = true;
 }
 
 /**
  * Lazy path: create the Self-monitor from the first authenticated request's
- * origin, for an already-set-up install where the env var is absent. No-op
- * once disarmed or when a self-monitor already exists.
+ * origin, for an already-set-up install where the env var is absent. Disarms
+ * only on success, so a transient failure is retried on the next request.
  */
 export async function captureSelfMonitorOrigin(origin: string | null): Promise<void> {
-  if (!lazyCaptureArmed || !origin) return;
-  lazyCaptureArmed = false;
+  if (!selfMonitorState().lazyCaptureArmed || !origin) return;
   await ensureSelfMonitor(origin);
+  selfMonitorState().lazyCaptureArmed = false;
+}
+
+/**
+ * Lazy-capture flag, held on `globalThis`. Next compiles this module into
+ * separate chunks for the instrumentation hook and the route handlers, so a
+ * module-level `let` would be two instances and the boot-time arm would never
+ * reach the route. The scheduler uses the same globalThis pattern for the
+ * same reason.
+ */
+function selfMonitorState(): { lazyCaptureArmed: boolean } {
+  const g = globalThis as unknown as { __pingSelfMonitor?: { lazyCaptureArmed: boolean } };
+  g.__pingSelfMonitor ??= { lazyCaptureArmed: false };
+  return g.__pingSelfMonitor;
 }

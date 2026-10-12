@@ -2,7 +2,12 @@
 // Worked examples from real rows, in the style of the incidents tests.
 import { beforeEach, expect, test } from "bun:test";
 import { db, resetDb } from "./helpers/test-db";
-import { ensureSelfMonitor, SELF_MONITOR_INTERVAL_SEC } from "@/lib/self-monitor";
+import {
+  captureSelfMonitorOrigin,
+  ensureSelfMonitor,
+  ensureSelfMonitorOnBoot,
+  SELF_MONITOR_INTERVAL_SEC,
+} from "@/lib/self-monitor";
 
 beforeEach(async () => {
   await resetDb();
@@ -42,4 +47,62 @@ test("the self-monitor is an ordinary monitor: it can be deleted", async () => {
   const m = await db.monitor.findFirstOrThrow({ where: { isSelfMonitor: true } });
   await db.monitor.delete({ where: { id: m.id } });
   expect(await db.monitor.count()).toBe(0);
+});
+
+test("boot skips a fresh install, leaving the origin to the setup request", async () => {
+  // No Settings row yet, and the env var is set — the env var must NOT win.
+  const prev = process.env.RENDER_EXTERNAL_URL;
+  process.env.RENDER_EXTERNAL_URL = "https://env.example.com";
+  try {
+    await ensureSelfMonitorOnBoot();
+    expect(await db.monitor.count()).toBe(0);
+  } finally {
+    if (prev === undefined) delete process.env.RENDER_EXTERNAL_URL;
+    else process.env.RENDER_EXTERNAL_URL = prev;
+  }
+});
+
+test("boot on an existing install creates from the external-URL env var", async () => {
+  await db.settings.create({ data: { id: "main", passwordHash: "h", passwordSalt: "s" } });
+  const prev = process.env.RENDER_EXTERNAL_URL;
+  process.env.RENDER_EXTERNAL_URL = "https://env.example.com";
+  try {
+    await ensureSelfMonitorOnBoot();
+    const m = await db.monitor.findFirstOrThrow({ where: { isSelfMonitor: true } });
+    expect(m.url).toBe("https://env.example.com/api/health");
+  } finally {
+    if (prev === undefined) delete process.env.RENDER_EXTERNAL_URL;
+    else process.env.RENDER_EXTERNAL_URL = prev;
+  }
+});
+
+test("the lazy path is shared through globalThis, not module state", async () => {
+  // Next compiles this module into two chunks (instrumentation + routes); the
+  // arm must live on globalThis or the route never sees it. Simulate the boot
+  // arm here, then capture from a request origin.
+  await db.settings.create({ data: { id: "main", passwordHash: "h", passwordSalt: "s" } });
+  const g = globalThis as unknown as { __pingSelfMonitor?: { lazyCaptureArmed: boolean } };
+  delete g.__pingSelfMonitor;
+  const prev = process.env.RENDER_EXTERNAL_URL;
+  delete process.env.RENDER_EXTERNAL_URL;
+  try {
+    await ensureSelfMonitorOnBoot(); // arms lazy capture on globalThis
+    expect((g as { __pingSelfMonitor?: { lazyCaptureArmed: boolean } }).__pingSelfMonitor?.lazyCaptureArmed).toBe(true);
+    await captureSelfMonitorOrigin("https://lazy.example.com");
+    const m = await db.monitor.findFirstOrThrow({ where: { isSelfMonitor: true } });
+    expect(m.url).toBe("https://lazy.example.com/api/health");
+    expect((g as { __pingSelfMonitor?: { lazyCaptureArmed: boolean } }).__pingSelfMonitor?.lazyCaptureArmed).toBe(false);
+  } finally {
+    delete g.__pingSelfMonitor;
+    if (prev !== undefined) process.env.RENDER_EXTERNAL_URL = prev;
+  }
+});
+
+test("a concurrent create is swallowed by the deterministic id", async () => {
+  // Both calls race the same id; exactly one monitor survives.
+  await Promise.all([
+    ensureSelfMonitor("https://a.example.com"),
+    ensureSelfMonitor("https://b.example.com"),
+  ]);
+  expect(await db.monitor.count()).toBe(1);
 });
