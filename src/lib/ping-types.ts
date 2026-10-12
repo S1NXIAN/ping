@@ -168,9 +168,17 @@ export interface RenderStatusResponse {
 export interface SessionResponse {
   initialized: boolean;
   authenticated: boolean;
-  /** True when a valid session + valid (unexpired) Settings unlock cookie exist. */
-  adminUnlocked: boolean;
-  unlockExpiresAt: string | null; // ISO, null when locked
+  /** Absolute session expiry (ISO) — the shell counts down to it. null when
+   *  unauthenticated. */
+  expiresAt: string | null;
+}
+
+/** GET/POST /api/admin/session — the absolute session-length setting. */
+export interface SessionSettingsResponse {
+  sessionMinutes: number;
+  /** The durations offered in Settings (minutes). */
+  presets: number[];
+  defaultMinutes: number;
 }
 
 export interface AdminInfoResponse {

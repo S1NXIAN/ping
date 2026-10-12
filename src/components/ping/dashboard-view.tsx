@@ -5,13 +5,12 @@ import {
   Activity,
   AlertTriangle,
   ArrowDownAZ,
+  Clock,
   FolderPlus,
   Folder,
   Gauge,
   LayoutGrid,
   ListChecks,
-  LockKeyhole,
-  LockOpen,
   LogOut,
   MoveVertical,
   Plus,
@@ -68,19 +67,42 @@ import { Skeleton } from "@/components/ui/skeleton";
 export type SortMode = "manual" | "az" | "status" | "slowest";
 const SORT_STORAGE_KEY = "ping.sort";
 
+/** Countdown to sign-out: "4:59" under an hour, "1h 59m" above it. */
+function formatSessionLeft(ms: number): string {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  if (s >= 3600) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, "0")}`;
+}
+
 export function DashboardView({
-  adminUnlocked,
+  sessionExpiresAt,
   onLogout,
   onOpenAdmin,
-  onLockAdmin,
 }: {
-  adminUnlocked: boolean;
+  /** Absolute session expiry (ISO) — the header counts down to it. */
+  sessionExpiresAt: string | null;
   onLogout: () => void;
   onOpenAdmin: () => void;
-  onLockAdmin: () => void;
 }) {
   const { data, error, loading, refreshing, refresh } = useOverview(15000);
   const { toast } = useToast();
+
+  // Live countdown to the absolute session expiry (see ping-app). One clock
+  // read per second; the header shows mm:ss until sign-out.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!sessionExpiresAt) return;
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [sessionExpiresAt]);
+  const sessionMsLeft = sessionExpiresAt
+    ? new Date(sessionExpiresAt).getTime() - nowMs
+    : null;
 
   // view state
   const [activeFolder, setActiveFolder] = useState<string>("all");
@@ -523,6 +545,22 @@ export function DashboardView({
                 </div>
               </>
             )}
+            {sessionMsLeft != null && (
+              // Absolute-timeout countdown — the re-prompt is never a surprise.
+              <span
+                className={cn(
+                  "hidden h-6 items-center gap-1 rounded-none border px-2 text-[11px] tabular-nums sm:flex",
+                  sessionMsLeft < 60_000
+                    ? "border-warn/30 bg-warn/10 text-warn"
+                    : "border-border bg-muted/40 text-muted-foreground",
+                )}
+                title="Time left before this session signs you out"
+                aria-label={`Session expires in ${Math.max(0, Math.ceil(sessionMsLeft / 1000))} seconds`}
+              >
+                <Clock className="size-3" aria-hidden="true" />
+                {formatSessionLeft(sessionMsLeft)}
+              </span>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -537,41 +575,13 @@ export function DashboardView({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" aria-label="Menu" className="size-11 text-muted-foreground hover:text-foreground sm:size-9">
-                  <span className="relative">
-                    <Settings className="size-4" aria-hidden="true" />
-                    {adminUnlocked && (
-                      <span
-                        className="absolute -right-1.5 -top-1.5 flex size-3.5 items-center justify-center rounded-none bg-teal text-[#0b0c0e]"
-                        title="Settings unlocked"
-                      >
-                        <LockOpen className="size-2.5" aria-hidden="true" />
-                      </span>
-                    )}
-                  </span>
+                  <Settings className="size-4" aria-hidden="true" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem onClick={onOpenAdmin}>
-                  {adminUnlocked ? (
-                    <LockOpen className="size-4 text-teal" />
-                  ) : (
-                    <LockKeyhole className="size-4" />
-                  )}
-                  Settings
-                  <span
-                    className={cn(
-                      "ml-auto text-[10px] font-medium",
-                      adminUnlocked ? "text-teal" : "text-muted-foreground",
-                    )}
-                  >
-                    {adminUnlocked ? "unlocked" : "admin"}
-                  </span>
+                  <Settings className="size-4" /> Settings
                 </DropdownMenuItem>
-                {adminUnlocked && (
-                  <DropdownMenuItem onClick={onLockAdmin}>
-                    <LockKeyhole className="size-4" /> Lock settings now
-                  </DropdownMenuItem>
-                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onClick={logout}>
                   <LogOut className="size-4" /> Sign out
@@ -1036,7 +1046,6 @@ export function DashboardView({
         folders={folders}
         activeFolder={activeFolder}
         sortMode={sortMode}
-        adminUnlocked={adminUnlocked}
         onNewMonitor={() => setAddOpen(true)}
         onRefresh={() => refresh()}
         onOpenIncidents={() => setIncidentsOpen(true)}

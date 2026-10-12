@@ -4,23 +4,22 @@
 import { beforeEach, expect, test } from "bun:test";
 import { NextRequest } from "next/server";
 import { db, resetDb } from "./helpers/test-db";
-import { hashPassword, issueUnlockToken, SESSION_COOKIE, UNLOCK_COOKIE } from "@/lib/ping-auth";
+import { hashPassword, SESSION_COOKIE } from "@/lib/ping-auth";
 import { MAX_MONITORS } from "@/lib/checker";
 
 async function importReq(body: unknown): Promise<NextRequest> {
   const { hash, salt } = hashPassword("password123");
-  const settings = await db.settings.create({
+  await db.settings.create({
     data: { id: "main", passwordHash: hash, passwordSalt: salt },
   });
   const session = await db.session.create({
     data: { token: "sess", expiresAt: new Date(Date.now() + 60_000) },
   });
-  const unlock = issueUnlockToken(settings.passwordHash);
   return new NextRequest("http://localhost/api/import", {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      cookie: `${SESSION_COOKIE}=${session.token}; ${UNLOCK_COOKIE}=${unlock.token}`,
+      cookie: `${SESSION_COOKIE}=${session.token}`,
     },
     body: JSON.stringify(body),
   });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/ping-client";
 import type { SessionResponse } from "@/lib/ping-types";
@@ -8,7 +8,6 @@ import { PingLogo } from "./ping-logo";
 import { LoginView } from "./login-view";
 import { DashboardView } from "./dashboard-view";
 import { AdminView } from "./admin-view";
-import { UnlockDialog } from "./unlock-dialog";
 
 type Phase = "booting" | "login" | "app";
 
@@ -17,14 +16,9 @@ export function PingApp() {
   const [phase, setPhase] = useState<Phase>("booting");
   const [initialized, setInitialized] = useState(false);
   const [view, setView] = useState<"dashboard" | "admin">("dashboard");
-
-  // Admin unlock state: while an unlock cookie is valid Settings opens
-  // directly; otherwise the Settings button prompts for the password.
-  const [unlockExpiresAt, setUnlockExpiresAt] = useState<string | null>(null);
-  const [unlockPromptOpen, setUnlockPromptOpen] = useState(false);
-
-  const adminUnlocked =
-    !!unlockExpiresAt && new Date(unlockExpiresAt).getTime() > Date.now();
+  // The session's absolute expiry (ISO), reported by the server. The header
+  // counts down to it; when it passes, the next request 401s and we sign out.
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,12 +27,12 @@ export function PingApp() {
         const s = await api<SessionResponse>("/api/auth/session");
         if (cancelled) return;
         setInitialized(s.initialized);
-        setUnlockExpiresAt(s.adminUnlocked ? s.unlockExpiresAt : null);
+        setExpiresAt(s.authenticated ? s.expiresAt : null);
         setPhase(s.authenticated ? "app" : "login");
       } catch {
         if (!cancelled) {
           setInitialized(false);
-          setUnlockExpiresAt(null);
+          setExpiresAt(null);
           setPhase("login");
         }
       }
@@ -48,61 +42,33 @@ export function PingApp() {
     };
   }, []);
 
-  // Auto-lock: when the 15-minute unlock expires, drop it. If the user is
-  // sitting in Settings, bounce them back to the dashboard and say why.
+  // When the absolute expiry passes, drop the client back to the login
+  // screen. The server is the authority (every request re-checks); this is
+  // only so an idle tab re-gates without waiting for its next request.
   useEffect(() => {
-    if (!unlockExpiresAt) return;
-    const ms = new Date(unlockExpiresAt).getTime() - Date.now();
+    if (!expiresAt) return;
+    const ms = new Date(expiresAt).getTime() - Date.now();
     const t = setTimeout(
       () => {
-        setUnlockExpiresAt(null);
-        if (view === "admin") {
-          setView("dashboard");
-          toast({ description: "Settings re-locked — the 15-minute unlock expired" });
-        }
+        setExpiresAt(null);
+        setView("dashboard");
+        toast({ description: "Session expired — sign in again" });
+        setPhase("login");
       },
       Math.max(0, ms),
     );
     return () => clearTimeout(t);
-  }, [unlockExpiresAt, view, toast]);
+  }, [expiresAt, toast]);
 
-  /** Settings entry point: open directly when unlocked, else prompt. */
-  function openAdmin() {
-    if (adminUnlocked) {
-      setView("admin");
-    } else {
-      setUnlockPromptOpen(true);
-    }
-  }
-
-  function handleUnlocked(expiresAt: string) {
-    setUnlockExpiresAt(expiresAt);
-    setView("admin");
-  }
-
-  async function lockAdmin() {
-    try {
-      await api("/api/auth/lock", { method: "POST" });
-      setUnlockExpiresAt(null);
-      setView("dashboard");
-      toast({ description: "Settings locked" });
-    } catch (err) {
-      toast({
-        description: err instanceof Error ? err.message : "Could not lock Settings",
-        variant: "destructive",
-      });
-    }
-  }
-
-  /** Server-side lock/expiry (401 "Admin locked") while inside Settings. */
-  function handleAdminLockLost() {
-    setUnlockExpiresAt(null);
+  /** Session died server-side (401) — return to login. */
+  const handleAuthLost = useCallback(() => {
+    setExpiresAt(null);
     setView("dashboard");
-    setUnlockPromptOpen(true);
-  }
+    setPhase("login");
+  }, []);
 
   function handleLogout() {
-    setUnlockExpiresAt(null);
+    setExpiresAt(null);
     setView("dashboard");
     setPhase("login");
   }
@@ -123,37 +89,26 @@ export function PingApp() {
         onAuthenticated={() => {
           setPhase("app");
           setView("dashboard");
-          setUnlockExpiresAt(null);
+          // Re-read the fresh session's absolute expiry.
+          void api<SessionResponse>("/api/auth/session")
+            .then((s) => setExpiresAt(s.expiresAt))
+            .catch(() => setExpiresAt(null));
         }}
       />
     );
   }
 
-  return (
-    <>
-      {view === "admin" ? (
-        <AdminView
-          unlockExpiresAt={unlockExpiresAt}
-          onBack={() => setView("dashboard")}
-          onLock={lockAdmin}
-          onExpired={handleAdminLockLost}
-          onAuthLost={handleLogout}
-          onUnlockRenewed={(expiresAt) => setUnlockExpiresAt(expiresAt)}
-        />
-      ) : (
-        <DashboardView
-          adminUnlocked={adminUnlocked}
-          onLogout={handleLogout}
-          onOpenAdmin={openAdmin}
-          onLockAdmin={lockAdmin}
-        />
-      )}
-
-      <UnlockDialog
-        open={unlockPromptOpen}
-        onOpenChange={setUnlockPromptOpen}
-        onUnlocked={handleUnlocked}
-      />
-    </>
+  return view === "admin" ? (
+    <AdminView
+      expiresAt={expiresAt}
+      onBack={() => setView("dashboard")}
+      onAuthLost={handleAuthLost}
+    />
+  ) : (
+    <DashboardView
+      sessionExpiresAt={expiresAt}
+      onLogout={handleLogout}
+      onOpenAdmin={() => setView("admin")}
+    />
   );
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { adminGuard } from "@/lib/ping-auth";
+import { guard } from "@/lib/ping-auth";
 import { nextMonitorPosition, KEYWORD_MAX_LENGTH, MAX_MONITORS } from "@/lib/checker";
 import { monitorUrlSchema, intervalSecSchema, scheduleModeSchema, scheduleTimesSchema, timezoneSchema, scheduleError } from "@/lib/validation";
 import type { ImportResult } from "@/lib/ping-types";
@@ -50,7 +50,7 @@ class ImportError extends Error {}
 
 /** Restores monitors/folders from a PING export. Duplicated URLs are skipped. */
 export async function POST(req: NextRequest) {
-  const unauthorized = await adminGuard(req);
+  const unauthorized = await guard(req);
   if (unauthorized) return unauthorized;
 
   const body = await req.json().catch(() => null);

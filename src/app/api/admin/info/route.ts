@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminGuard } from "@/lib/ping-auth";
+import { guard } from "@/lib/ping-auth";
 import { db } from "@/lib/db";
 import { databaseFileSize } from "@/lib/db-url";
 import { MAX_CHECKS_PER_MONITOR, runtimeState } from "@/lib/checker";
@@ -7,7 +7,7 @@ import { TICK_INTERVAL_SEC } from "@/lib/scheduler";
 import type { AdminInfoResponse } from "@/lib/ping-types";
 
 export async function GET(req: NextRequest) {
-  const unauthorized = await adminGuard(req);
+  const unauthorized = await guard(req);
   if (unauthorized) return unauthorized;
 
   const [checksStored, monitors, folders, oldest, settings] = await Promise.all([

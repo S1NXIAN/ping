@@ -114,5 +114,8 @@ model Settings {
   //   0    → keep forever (only operational hygiene rows get cleaned)
   //   N>0  → keep N days (no per-monitor cap; explicit user choice)
   retentionDays Int?
+  // Absolute dashboard-session length in minutes (counted from login, no
+  // sliding). null → default (15). Constrained to SESSION_PRESETS by the API.
+  sessionMinutes Int?
   updatedAt    DateTime @updatedAt
 }

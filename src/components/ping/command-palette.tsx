@@ -8,7 +8,6 @@ import {
   Folder,
   Gauge,
   LayoutGrid,
-  LockKeyhole,
   LogOut,
   MoveVertical,
   Pause,
@@ -17,6 +16,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Settings,
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
@@ -32,7 +32,6 @@ import {
 } from "@/components/ui/command";
 import { hostOf, formatMs } from "@/lib/ping-client";
 import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
-import { cn } from "@/lib/utils";
 import { StatusDot } from "./status-dot";
 import { monitorStatus } from "@/lib/monitor-status";
 import type { SortMode } from "./dashboard-view";
@@ -55,7 +54,6 @@ export function CommandPalette({
   folders,
   activeFolder,
   sortMode,
-  adminUnlocked,
   onNewMonitor,
   onRefresh,
   onOpenIncidents,
@@ -74,7 +72,6 @@ export function CommandPalette({
   // "all" is the sentinel for no folder filter; it is just a string value.
   activeFolder: string;
   sortMode: SortMode;
-  adminUnlocked: boolean;
   onNewMonitor: () => void;
   onRefresh: () => void;
   onOpenIncidents: () => void;
@@ -218,8 +215,8 @@ export function CommandPalette({
             Refresh now
           </CommandItem>
           <CommandItem onSelect={() => run(onOpenSettings)}>
-            <LockKeyhole className={cn(adminUnlocked && "text-teal")} />
-            {adminUnlocked ? "Settings (unlocked)" : "Settings"}
+            <Settings />
+            Settings
           </CommandItem>
           <CommandItem onSelect={() => run(onLogout)} className="text-down">
             <LogOut />

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { adminGuard } from "@/lib/ping-auth";
+import { guard } from "@/lib/ping-auth";
 import { pruneChecks, runtimeState } from "@/lib/checker";
 import type { RetentionResponse } from "@/lib/ping-types";
 
@@ -17,9 +17,9 @@ async function responseBody(): Promise<RetentionResponse> {
   };
 }
 
-/** Current retention configuration (requires an unlocked admin). */
+/** Current retention configuration. */
 export async function GET(req: NextRequest) {
-  const unauthorized = await adminGuard(req);
+  const unauthorized = await guard(req);
   if (unauthorized) return unauthorized;
 
   return NextResponse.json(await responseBody(), {
@@ -48,7 +48,7 @@ const actionSchema = z.union([
  * prune → run the pruner right now and report how many checks it deleted
  */
 export async function POST(req: NextRequest) {
-  const unauthorized = await adminGuard(req);
+  const unauthorized = await guard(req);
   if (unauthorized) return unauthorized;
 
   const settings = await db.settings.findUnique({ where: { id: "main" } });

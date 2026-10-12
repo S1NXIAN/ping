@@ -11,10 +11,9 @@ import {
   HeartPulse,
   KeyRound,
   Loader2,
-  LockKeyhole,
-  LockOpen,
   Server,
   ShieldCheck,
+  Timer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +30,7 @@ import {
   formatMs,
   timeAgo,
 } from "@/lib/ping-client";
-import type { AdminInfoResponse, ImportResult } from "@/lib/ping-types";
+import type { AdminInfoResponse, ImportResult, SessionSettingsResponse } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { RenderStatusCard } from "./render-status-card";
 import { InlineAlert } from "./inline-alert";
@@ -82,23 +81,15 @@ function formatCountdown(ms: number): string {
 }
 
 export function AdminView({
-  unlockExpiresAt,
+  expiresAt,
   onBack,
-  onLock,
-  onExpired,
   onAuthLost,
-  onUnlockRenewed,
 }: {
-  unlockExpiresAt: string | null;
+  /** Absolute session expiry (ISO) — shown as a countdown. */
+  expiresAt: string | null;
   onBack: () => void;
-  /** User clicked Lock — lock immediately and return to the dashboard. */
-  onLock: () => void;
-  /** Unlock expired (server 401 "Admin locked" or countdown hit zero). */
-  onExpired: () => void;
-  /** Session itself died — sign out. */
+  /** Session died — sign out. */
   onAuthLost: () => void;
-  /** Password changed — server re-issued the unlock; refresh the countdown. */
-  onUnlockRenewed: (expiresAt: string) => void;
 }) {
   const { toast } = useToast();
 
@@ -115,6 +106,10 @@ export function AdminView({
   // --- keep-awake URL (computed client-side to match this deployment) ---
   const [tickUrl, setTickUrl] = useState("");
 
+  // --- session length ---
+  const [sessionSettings, setSessionSettings] = useState<SessionSettingsResponse | null>(null);
+  const [sessionBusy, setSessionBusy] = useState(false);
+
   // --- data retention ---
   const [retentionDraft, setRetentionDraft] = useState("default");
   const [retentionDirty, setRetentionDirty] = useState(false);
@@ -124,39 +119,29 @@ export function AdminView({
   const [importing, setImporting] = useState(false);
   const [fileInput, setFileInput] = useState<HTMLInputElement | null>(null);
 
-  // --- admin unlock countdown (ticks every second while unlocked) ---
+  // --- session countdown (ticks every second while signed in) ---
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
     setTickUrl(`${window.location.origin}/api/cron/tick`);
   }, []);
 
-  const unlockMsLeft = unlockExpiresAt
-    ? new Date(unlockExpiresAt).getTime() - nowMs
-    : Number.NEGATIVE_INFINITY;
+  const sessionMsLeft = expiresAt ? new Date(expiresAt).getTime() - nowMs : null;
 
   useEffect(() => {
-    if (!unlockExpiresAt) return;
+    if (!expiresAt) return;
     const t = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [unlockExpiresAt]);
-
-  // Countdown reached zero — let the parent lock + re-prompt.
-  useEffect(() => {
-    if (unlockExpiresAt && unlockMsLeft <= 0) onExpired();
-  }, [unlockExpiresAt, unlockMsLeft, onExpired]);
+  }, [expiresAt]);
 
   const loadInfo = useCallback(async () => {
     try {
       setInfo(await api<AdminInfoResponse>("/api/admin/info"));
     } catch (err) {
-      // A dead unlock or dead session should re-prompt, not fail silently.
-      if (err instanceof ApiError) {
-        if (err.message.startsWith("Admin locked")) onExpired();
-        else if (err.message === "Unauthorized") onAuthLost();
-      }
+      // A dead session should sign out, not fail silently.
+      if (err instanceof ApiError && err.message === "Unauthorized") onAuthLost();
     }
-  }, [onExpired, onAuthLost]);
+  }, [onAuthLost]);
 
   useEffect(() => {
     void loadInfo();
@@ -171,6 +156,37 @@ export function AdminView({
     if (d === 0) return "forever";
     return String(d);
   }, [info]);
+
+  const loadSession = useCallback(async () => {
+    try {
+      setSessionSettings(await api<SessionSettingsResponse>("/api/admin/session"));
+    } catch (err) {
+      if (err instanceof ApiError && err.message === "Unauthorized") onAuthLost();
+    }
+  }, [onAuthLost]);
+
+  useEffect(() => {
+    void loadSession();
+  }, [loadSession]);
+
+  async function setSessionMinutes(minutes: number) {
+    setSessionBusy(true);
+    try {
+      const r = await api<SessionSettingsResponse>("/api/admin/session", {
+        method: "POST",
+        body: JSON.stringify({ sessionMinutes: minutes }),
+      });
+      setSessionSettings(r);
+      toast({ description: `Sign-out timeout set to ${minutes} minutes` });
+    } catch (err) {
+      toast({
+        description: err instanceof Error ? err.message : "Could not save the timeout",
+        variant: "destructive",
+      });
+    } finally {
+      setSessionBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!retentionDirty) setRetentionDraft(retentionCurrent);
@@ -231,13 +247,11 @@ export function AdminView({
     }
     setPwBusy(true);
     try {
-      const r = await api<{ ok: boolean; unlockExpiresAt: string }>("/api/admin/password", {
+      await api("/api/admin/password", {
         method: "POST",
         body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
       });
       toast({ description: "Password changed — all other sessions signed out" });
-      onUnlockRenewed(r.unlockExpiresAt);
-      setNowMs(Date.now());
       setCurrentPw("");
       setNewPw("");
       setConfirmPw("");
@@ -272,15 +286,9 @@ export function AdminView({
       });
       void loadInfo();
     } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.message.startsWith("Admin locked")) {
-          onExpired();
-          return;
-        }
-        if (err.message === "Unauthorized") {
-          onAuthLost();
-          return;
-        }
+      if (err instanceof ApiError && err.message === "Unauthorized") {
+        onAuthLost();
+        return;
       }
       toast({
         description:
@@ -318,24 +326,21 @@ export function AdminView({
             <p className="text-xs text-muted-foreground">Security, keep-awake setup &amp; data</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            {unlockExpiresAt && (
+            {sessionMsLeft != null && (
               <span
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-none border px-2.5 py-1 text-xs font-medium tabular-nums",
-                  unlockMsLeft < 120
+                  sessionMsLeft < 60_000
                     ? "border-warn/30 bg-warn/10 text-warn"
-                    : "border-teal/30 bg-teal/10 text-teal",
+                    : "border-border bg-muted/40 text-muted-foreground",
                 )}
-                title={`Settings re-locks at ${formatDateTime(unlockExpiresAt)}`}
+                title={`Session signs out at ${formatDateTime(expiresAt ?? "")}`}
               >
-                <LockOpen className="size-3" aria-hidden="true" />
-                {formatCountdown(unlockMsLeft)}
-                <span className="sr-only">until Settings re-locks</span>
+                <Clock className="size-3" aria-hidden="true" />
+                {formatCountdown(sessionMsLeft)}
+                <span className="sr-only">until sign-out</span>
               </span>
             )}
-            <Button variant="outline" size="sm" onClick={onLock} className="shrink-0">
-              <LockKeyhole className="size-3.5" /> Lock
-            </Button>
           </div>
         </div>
 
@@ -344,7 +349,7 @@ export function AdminView({
           <Section
             icon={KeyRound}
             title="Dashboard password"
-            description="PING uses a single shared password. Changing it signs out every other session. Settings itself is password-protected — it re-locks 15 minutes after you unlock it, or instantly via the Lock button above."
+            description="PING uses a single shared password. Changing it signs out every other session."
           >
             <form onSubmit={changePassword} className="space-y-3">
               <div className="space-y-1.5">
@@ -393,6 +398,43 @@ export function AdminView({
                 )}
               </Button>
             </form>
+          </Section>
+
+          {/* Session timeout */}
+          <Section
+            icon={Timer}
+            title="Sign-out timeout"
+            description="The dashboard signs you out on an absolute timeout counted from login — no sliding, no idle detection. The header shows the time left."
+          >
+            {sessionSettings == null ? (
+              <p className="text-xs text-muted-foreground">Loading…</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {sessionSettings.presets.map((m) => (
+                  <Button
+                    key={m}
+                    variant={sessionSettings.sessionMinutes === m ? "default" : "outline"}
+                    size="sm"
+                    disabled={sessionBusy}
+                    onClick={() => setSessionMinutes(m)}
+                    className={cn(
+                      "h-9",
+                      sessionSettings.sessionMinutes === m &&
+                        "bg-white font-semibold text-black hover:bg-zinc-200",
+                    )}
+                  >
+                    {m} min
+                    {m === sessionSettings.defaultMinutes && (
+                      <span className="ml-1.5 text-[10px] font-normal opacity-70">default</span>
+                    )}
+                  </Button>
+                ))}
+              </div>
+            )}
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Applies to sessions created after you change it — your current session keeps its
+              original expiry.
+            </p>
           </Section>
 
           {/* Keep awake */}

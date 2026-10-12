@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { adminGuard } from "@/lib/ping-auth";
+import { guard } from "@/lib/ping-auth";
 
 /** Exports folders + monitor configuration (no check history) as JSON. */
 export async function GET(req: NextRequest) {
-  const unauthorized = await adminGuard(req);
+  const unauthorized = await guard(req);
   if (unauthorized) return unauthorized;
 
   const [folders, monitors] = await Promise.all([

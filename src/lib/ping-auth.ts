@@ -1,20 +1,26 @@
 // PING single-password auth: scrypt-hashed password in the DB,
 // opaque random session tokens, httpOnly cookies.
-// On top of the session sits an "admin unlock" — a short-lived, HMAC-signed
-// cookie required by the settings/admin APIs so the Settings area stays
-// password-protected even while a dashboard session is active.
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+// One gate: a dashboard Session with an ABSOLUTE expiry counted from login
+// (no sliding, no idle detection). Duration is an admin setting.
+import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "./db";
 
 export const SESSION_COOKIE = "ping_session";
-export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-export const UNLOCK_COOKIE = "ping_unlock";
-export const UNLOCK_TTL_MS = 15 * 60_000; // settings stay unlocked for 15 minutes
+/** Session-length presets (minutes) offered in Settings, and the default. */
+export const SESSION_PRESETS = [5, 15, 30, 60, 120] as const;
+export const SESSION_DEFAULT_MINUTES = 15;
 
-/** Stable error message the frontend can match to re-prompt for the password. */
-export const ADMIN_LOCKED_MSG = "Admin locked — unlock Settings with your password";
+/** The configured absolute session length in minutes (default 15). */
+export async function getSessionMinutes(): Promise<number> {
+  const s = await db.settings.findUnique({
+    where: { id: "main" },
+    select: { sessionMinutes: true },
+  });
+  const n = s?.sessionMinutes;
+  return n != null && n > 0 ? n : SESSION_DEFAULT_MINUTES;
+}
 
 export async function getSettings() {
   return db.settings.findUnique({ where: { id: "main" } });
@@ -33,7 +39,8 @@ export function verifyPassword(password: string, hash: string, salt: string): bo
 
 export async function createSession() {
   const token = randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+  const minutes = await getSessionMinutes();
+  const expiresAt = new Date(Date.now() + minutes * 60_000);
   await db.session.create({ data: { token, expiresAt } });
   return { token, expiresAt };
 }
@@ -48,102 +55,28 @@ export function setSessionCookie(res: NextResponse, token: string, expiresAt: Da
   });
 }
 
-export async function requireAuth(req: NextRequest): Promise<boolean> {
+/** The caller's unexpired session row, or null. Expired rows are dropped. */
+export async function sessionFor(req: NextRequest) {
   const token = req.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return false;
+  if (!token) return null;
   const session = await db.session.findUnique({ where: { token } });
-  if (!session) return false;
+  if (!session) return null;
   if (session.expiresAt.getTime() < Date.now()) {
     await db.session.delete({ where: { token } }).catch(() => undefined);
-    return false;
+    return null;
   }
-  return true;
+  return session;
+}
+
+export async function requireAuth(req: NextRequest): Promise<boolean> {
+  return (await sessionFor(req)) !== null;
 }
 
 /** Returns a 401 response when the caller is not authenticated, else null. */
 export async function guard(req: NextRequest): Promise<NextResponse | null> {
   const ok = await requireAuth(req);
   if (ok) return null;
-  const res = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  return res;
-}
-
-// ---- admin unlock (second gate in front of Settings) ----
-
-// The HMAC key is derived from the current password hash, so every
-// outstanding unlock token dies automatically when the password changes.
-function unlockKey(passwordHash: string): Buffer {
-  return createHmac("sha256", "ping-unlock-v1").update(passwordHash).digest();
-}
-
-export function issueUnlockToken(
-  passwordHash: string,
-): { token: string; expiresAt: Date } {
-  const expiresAt = new Date(Date.now() + UNLOCK_TTL_MS);
-  const exp = String(expiresAt.getTime());
-  const sig = createHmac("sha256", unlockKey(passwordHash)).update(exp).digest("hex");
-  return { token: `${exp}.${sig}`, expiresAt };
-}
-
-/** Validates an unlock cookie; returns its expiry when valid, else null. */
-export function verifyUnlockToken(
-  token: string | undefined,
-  passwordHash: string,
-): Date | null {
-  if (!token) return null;
-  const dot = token.indexOf(".");
-  if (dot <= 0) return null;
-  const exp = token.slice(0, dot);
-  const sig = token.slice(dot + 1);
-  const expMs = Number(exp);
-  if (!Number.isFinite(expMs) || !Number.isInteger(expMs) || expMs <= Date.now()) return null;
-  const expected = createHmac("sha256", unlockKey(passwordHash)).update(exp).digest("hex");
-  const a = Buffer.from(sig, "hex");
-  const b = Buffer.from(expected, "hex");
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-  return new Date(expMs);
-}
-
-export function setUnlockCookie(res: NextResponse, token: string, expiresAt: Date) {
-  res.cookies.set(UNLOCK_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    expires: expiresAt,
-    secure: process.env.NODE_ENV === "production",
-  });
-}
-
-export function clearUnlockCookie(res: NextResponse) {
-  res.cookies.set(UNLOCK_COOKIE, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-    secure: process.env.NODE_ENV === "production",
-  });
-}
-
-/**
- * Guard for the settings/admin APIs: requires BOTH a valid session and a
- * valid (unexpired) admin unlock. Returns a 401 response when either is
- * missing, else null. The "Admin locked" message tells the client to prompt
- * for the password again rather than sign the user out.
- */
-export async function adminGuard(req: NextRequest): Promise<NextResponse | null> {
-  const settings = await getSettings();
-  if (!settings) {
-    return NextResponse.json({ error: "PING is not set up yet" }, { status: 400 });
-  }
-  const authed = await requireAuth(req);
-  if (!authed) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const expiry = verifyUnlockToken(req.cookies.get(UNLOCK_COOKIE)?.value, settings.passwordHash);
-  if (!expiry) {
-    return NextResponse.json({ error: ADMIN_LOCKED_MSG }, { status: 401 });
-  }
-  return null;
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
 // ---- naive in-memory login throttling (per IP, 5 min window) ----
