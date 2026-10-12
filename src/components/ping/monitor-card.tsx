@@ -174,8 +174,8 @@ export function MonitorCard({
     onEdited();
   }
 
-  async function moveToFolder(folderId: string | null) {
-    await patch({ folderId }, folderId ? "Moved" : "Removed from folder", "move");
+  async function moveToFolder(folderId: string) {
+    await patch({ folderId }, "Moved", "move");
   }
 
   async function deleteMonitor() {
@@ -515,26 +515,26 @@ export function MonitorCard({
                     <Play className="size-4" /> {monitor.enabled ? "Pause" : "Resume"}
                   </DropdownMenuItem>
 
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
-                      <FolderInput className="size-4" /> Move to folder
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent>
-                      <DropdownMenuItem onClick={() => moveToFolder(null)}>
-                        (no folder)
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      {folders.map((f) => (
-                        <DropdownMenuItem
-                          key={f.id}
-                          disabled={f.id === monitor.folderId}
-                          onClick={() => moveToFolder(f.id)}
-                        >
-                          {f.name}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
+                  {folders.length > 0 && (
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <FolderInput className="size-4" /> Move to folder
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent>
+                        {folders.map((f) => (
+                          <DropdownMenuItem
+                            key={f.id}
+                            onClick={() => moveToFolder(f.id)}
+                            className={cn(
+                              f.id === monitor.folderId && "font-semibold text-foreground",
+                            )}
+                          >
+                            {f.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  )}
 
                   <DropdownMenuSeparator />
                   {/* The destructive outlier gets its own labeled chunk —
