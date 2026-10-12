@@ -3,8 +3,6 @@
 import { useState } from "react";
 import {
   Activity,
-  ArrowDown,
-  ArrowUp,
   ExternalLink,
   Folder,
   FolderInput,
@@ -96,9 +94,6 @@ export function MonitorCard({
    *  or null when none is known — null never becomes a guess. */
   downSince,
   canReorder,
-  canMoveUp,
-  canMoveDown,
-  onMove,
   dnd,
 }: {
   monitor: MonitorDTO;
@@ -111,9 +106,6 @@ export function MonitorCard({
   onDeleted: () => void;
   onCheckNow: () => void;
   canReorder: boolean;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
-  onMove: (dir: "up" | "down") => void;
   dnd: CardDnd | null;
 }) {
   const { toast } = useToast();
@@ -283,7 +275,7 @@ export function MonitorCard({
           {canReorder && (
             <button
               type="button"
-              aria-label={`Reorder ${monitor.name} (drag, or use Move up/down in the menu)`}
+              aria-label={`Reorder ${monitor.name}`}
               title="Drag to reorder"
               onClick={(e) => e.stopPropagation()}
               onPointerDown={() => setDragArmed(true)}
@@ -529,10 +521,9 @@ export function MonitorCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                  {/* Three chunks, not ten flat decisions: the monitor's own
-                      controls, then a labeled Reorder group, then the
-                      destructive outlier. "Stats & history" is not here —
-                      the card itself opens it, one click away. */}
+                  {/* Two chunks, not ten flat decisions: the monitor's own
+                      controls, then the destructive outlier. "Stats & history"
+                      is not here — the card itself opens it, one click away. */}
                   <DropdownMenuItem onClick={() => setRenameOpen(true)}>
                     <Pencil className="size-4" /> Rename
                   </DropdownMenuItem>
@@ -564,25 +555,9 @@ export function MonitorCard({
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
 
-                  {canReorder && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuLabel className="text-[11px] text-muted-foreground">
-                        Reorder
-                      </DropdownMenuLabel>
-                      <DropdownMenuItem disabled={!canMoveUp} onClick={() => onMove("up")}>
-                        <ArrowUp className="size-4" /> Move up
-                      </DropdownMenuItem>
-                      <DropdownMenuItem disabled={!canMoveDown} onClick={() => onMove("down")}>
-                        <ArrowDown className="size-4" /> Move down
-                      </DropdownMenuItem>
-                    </>
-                  )}
-
                   <DropdownMenuSeparator />
-                  {/* The destructive outlier gets its own labeled chunk, the
-                      same chunking language as Reorder — danger is a decision,
-                      not an afterthought. */}
+                  {/* The destructive outlier gets its own labeled chunk —
+                      danger is a decision, not an afterthought. */}
                   <DropdownMenuLabel className="text-[11px] text-muted-foreground">
                     Danger
                   </DropdownMenuLabel>

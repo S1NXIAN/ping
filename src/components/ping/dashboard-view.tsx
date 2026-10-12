@@ -390,18 +390,6 @@ export function DashboardView({
     }
   }
 
-  /** Move up/down via the card menu — works everywhere incl. touch. */
-  async function moveMonitor(id: string, dir: "up" | "down") {
-    if (sortMode !== "manual") return;
-    const list = [...manualList];
-    const i = list.findIndex((m) => m.id === id);
-    const j = dir === "up" ? i - 1 : i + 1;
-    if (i < 0 || j < 0 || j >= list.length) return;
-    [list[i], list[j]] = [list[j], list[i]];
-    setPreview(list); // instant feedback
-    await commitOrder(list, id);
-  }
-
   // contract handed to each card (manual sort only)
   const dnd: CardDnd | null =
     sortMode === "manual" && monitors.length > 0
@@ -843,8 +831,8 @@ export function DashboardView({
 
           {sortMode === "manual" && monitors.length > 1 && (
             <p className="-mt-1 text-[11px] text-muted-foreground/80">
-              Drag the <span className="text-muted-foreground">⠿</span> handle to reorder, or use
-              ⋮ → Move up/down. Pin a monitor to keep it at the top.
+              Drag the <span className="text-muted-foreground">⠿</span> handle to reorder.
+              Pin a monitor to keep it at the top.
             </p>
           )}
 
@@ -906,28 +894,22 @@ export function DashboardView({
             </div>
           ) : (
             <div className="space-y-2.5">
-              {visible.map((m) => {
-                const mi = manualList.findIndex((x) => x.id === m.id);
-                return (
-                  <MonitorCard
-                    key={m.id}
-                    monitor={m}
-                    folders={folders}
-                    onOpen={() => setDetailId(m.id)}
-                    onRenamed={() => refresh(true)}
-                    onEdited={() => refresh(true)}
-                    onDeleted={() => refresh(true)}
-                    onCheckNow={() => refresh(true)}
-                    onViewIncidents={() => setIncidentsOpen(true)}
-                    downSince={downSinceByMonitor.get(m.id) ?? null}
-                    canReorder={sortMode === "manual" && manualList.length > 1}
-                    canMoveUp={mi > 0}
-                    canMoveDown={mi >= 0 && mi < manualList.length - 1}
-                    onMove={(dir) => void moveMonitor(m.id, dir)}
-                    dnd={dnd}
-                  />
-                );
-              })}
+              {visible.map((m) => (
+                <MonitorCard
+                  key={m.id}
+                  monitor={m}
+                  folders={folders}
+                  onOpen={() => setDetailId(m.id)}
+                  onRenamed={() => refresh(true)}
+                  onEdited={() => refresh(true)}
+                  onDeleted={() => refresh(true)}
+                  onCheckNow={() => refresh(true)}
+                  onViewIncidents={() => setIncidentsOpen(true)}
+                  downSince={downSinceByMonitor.get(m.id) ?? null}
+                  canReorder={sortMode === "manual" && manualList.length > 1}
+                  dnd={dnd}
+                />
+              ))}
             </div>
           )}
           </div>
