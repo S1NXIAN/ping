@@ -9,7 +9,6 @@ import {
   History,
   Loader2,
   Pause,
-  Pin,
   Play,
   RefreshCw,
   Trash2,
@@ -225,11 +224,6 @@ export function MonitorDetailSheet({
             {m?.account && (
               <StatusPill tone="teal" size="sm" icon={UserRound}>
                 {m.account}
-              </StatusPill>
-            )}
-            {m?.pinned && (
-              <StatusPill tone="accent" size="sm" icon={Pin}>
-                pinned
               </StatusPill>
             )}
             <span>Last updated {timeAgo(m?.lastCheckAt)}</span>

@@ -251,7 +251,7 @@ export function MonitorCard({
         )}
         aria-label={`Monitor ${monitor.name}, status ${
           degraded ? "slow" : statusLabel(status)
-        }${monitor.pinned ? ", pinned" : ""}`}
+        }`}
       >
         {/* phone: stacked — full-width identity/meta rows, bars + actions share
             a bottom strip (a side column would pin the name to a ~150px sliver);
@@ -298,11 +298,6 @@ export function MonitorCard({
               >
                 {monitor.name}
               </button>
-              {monitor.pinned && (
-                <StatusPill tone="accent" icon={Pin} title="Pinned to top">
-                  pinned
-                </StatusPill>
-              )}
               {/* min-w-13 + center: live/down/slow are the three states a card
                   flips between, so they share one width — the pill no longer
                   twitches wider on "down". Longer labels still grow. */}
