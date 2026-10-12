@@ -13,7 +13,6 @@ import {
   LogOut,
   MoveVertical,
   Plus,
-  RefreshCw,
   Search,
   Settings,
   X,
@@ -505,17 +504,6 @@ export function DashboardView({
                 </div>
               </>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => refresh()}
-              disabled={refreshing}
-              aria-label="Refresh"
-              title="Refresh now"
-              className="size-11 text-muted-foreground hover:text-teal sm:size-9"
-            >
-              <RefreshCw className={cn("size-4", refreshing && "animate-spin")} />
-            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" aria-label="Menu" className="size-11 text-muted-foreground hover:text-foreground sm:size-9">
