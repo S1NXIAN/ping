@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { PingApp } from "@/components/ping/ping-app";
 
-const title = "PING — honest uptime monitoring";
+const title = "PING — Live service monitoring";
 const description =
   "A lightweight, honest uptime monitor. PING periodically sends real HTTP requests to your sites, keeps Render Free services awake, and shows you what actually happened — no invented statistics.";
 

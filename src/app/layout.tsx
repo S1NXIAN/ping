@@ -3,7 +3,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: "PING — honest uptime monitoring",
+  title: "PING — Live service monitoring",
   description:
     "A lightweight, honest uptime monitor. PING periodically sends real HTTP requests to your sites, keeps Render Free services awake, and shows you what actually happened — no invented statistics.",
   applicationName: "PING",
