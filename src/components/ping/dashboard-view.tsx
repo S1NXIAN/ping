@@ -923,7 +923,7 @@ export function DashboardView({
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] text-[11px] text-foreground/65 2xl:max-w-7xl">
           <span className="font-medium tracking-wide text-foreground/90">PING</span>
           <span>Live service monitoring</span>
-          <span className="ml-auto">not affiliated with render.com</span>
+          <span className="ml-auto">not affiliated with any hosting provider</span>
         </div>
       </footer>
 
