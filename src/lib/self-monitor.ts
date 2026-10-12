@@ -14,7 +14,7 @@ import type { NextRequest } from "next/server";
 import { db } from "./db";
 import { nextMonitorPosition } from "./checker";
 
-export const SELF_MONITOR_NAME = "PING self-monitor";
+export const SELF_MONITOR_NAME = "PING";
 /** 3 minutes — cheap, and frequent enough to count as inbound keep-alive. */
 export const SELF_MONITOR_INTERVAL_SEC = 180;
 /** Deterministic id: a second create with the same id fails on the primary
