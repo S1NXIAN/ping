@@ -19,7 +19,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const check = await runCheck(monitor);
   if (!check) {
-    // Another trigger (scheduler tick / scheduled ping) is running this
+    // Another trigger (scheduler tick / manual check) is running this
     // monitor's check right now — the in-flight guard refused the duplicate.
     return NextResponse.json(
       { error: "A check for this monitor is already running — try again in a few seconds" },

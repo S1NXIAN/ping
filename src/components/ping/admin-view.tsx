@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Clock,
-  Copy,
   Database,
   Download,
   Eraser,
@@ -14,7 +13,6 @@ import {
   Loader2,
   LockKeyhole,
   LockOpen,
-  RefreshCw,
   Server,
   ShieldCheck,
 } from "lucide-react";
@@ -648,7 +646,7 @@ export function AdminView({
                 Checks older than this window are deleted automatically (hourly) — “Prune now”
                 applies it immediately. Default keeps 30 days and at most 1,000 checks per monitor;
                 a custom number keeps exactly that window; “forever” disables check deletion.
-                Scheduled pings, old maintenance windows and expired sessions are always cleaned.
+                Old maintenance windows and expired sessions are always cleaned.
               </p>
             </div>
 

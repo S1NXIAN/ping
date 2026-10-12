@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
  *   up      Beacon Emerald — healthy
  *   down    Alarm Rose — failed
  *   warn    Caution Amber — slow / maintenance / confirming
- *   accent  Signal White — pinned, keyword, scheduled, account
+ *   accent  Signal White — pinned, keyword, account
  *   teal    Chalk — the soft-white working ink
  *   neutral Hairline/border — folders, paused, plain metadata
  */

@@ -79,7 +79,7 @@ export async function deriveIncidents(
 
   // 1) All down rows for the whole fleet in ONE query (newest
   //    MAX_DOWN_ROWS_PER_MONITOR per monitor; older rows can't reach the cut).
-  //    A per-monitor query here was N queries per status-page view.
+  //    A per-monitor query here was N queries per incidents view.
   const sinceMs = since.getTime();
   const rawDowns = await db.$queryRaw<
     Array<{ monitorId: string; statusCode: number | null; checkedAt: Date | number | string }>

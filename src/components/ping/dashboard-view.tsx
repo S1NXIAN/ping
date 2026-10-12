@@ -316,7 +316,6 @@ export function DashboardView({
     return list;
   }, [manualList, activeFolder, query, sortMode]);
 
-  // next pending scheduled ping per monitor (for the card badge)
   // maintenance windows — the window to surface on each card: the active one
   // if any, else the next upcoming one
   const maintenanceByMonitor = useMemo(() => {
@@ -821,7 +820,7 @@ export function DashboardView({
 
           {/* working group: toolbar + list — one tight unit (10px internal rhythm) */}
           <div className="space-y-2.5">
-          {/* toolbar: search + sort + scheduled pings + maintenance — two designed
+          {/* toolbar: search + sort + maintenance — two designed
               clusters so resizing never mixes orphans: find+order stays a unit,
               working tools wrap as a whole row when space runs out */}
           <div className="flex flex-wrap items-center gap-2">

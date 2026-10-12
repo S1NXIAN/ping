@@ -150,8 +150,8 @@ function keywordFailure(
 
 /**
  * Monitor ids with a check currently executing in this process. Overlapping
- * triggers are normal (scheduler tick × manual "check now" × scheduled ping
- * × first check after create), and without this guard they would write
+ * triggers are normal (scheduler tick × manual "check now" × first check
+ * after create), and without this guard they would write
  * duplicate Check rows, double-fire webhooks and clobber the consecutive-
  * downs streak via read-modify-write races. Returns null when skipped.
  */
