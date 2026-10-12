@@ -58,7 +58,7 @@ import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { formatTimesForDisplay } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { StatusDot, statusLabel } from "./status-dot";
-import { monitorStatus, type MonitorStatus } from "@/lib/monitor-status";
+import { monitorStatus, averageUpResponseMs, type MonitorStatus } from "@/lib/monitor-status";
 import { StatusPill, type PillTone } from "./status-pill";
 import { TextPromptDialog } from "./text-prompt-dialog";
 import { checksToSegments, UptimeBars } from "./uptime-bars";
@@ -127,6 +127,9 @@ export function MonitorCard({
 
   // Up but above the admin's latency threshold — an honest middle state.
   const degraded = status === "up" && monitor.degraded;
+  // The average the slow state is judged from, shown on the pill so the
+  // number and the label agree.
+  const avgUpMs = averageUpResponseMs(monitor.recentChecks);
 
   const statusTone: PillTone =
     status === "up" ? (degraded ? "warn" : "up") : status === "down" ? "down" : "neutral";
@@ -333,12 +336,10 @@ export function MonitorCard({
                 <StatusPill
                   tone="warn"
                   icon={Gauge}
-                  title={`Response time above the ${monitor.slowThresholdMs} ms latency threshold${
-                    monitor.lastResponseMs != null ? ` — last check ${formatMs(monitor.lastResponseMs)}` : ""
-                  }`}
+                  title={`Average of the recent up checks is above the ${monitor.slowThresholdMs} ms latency threshold`}
                 >
-                  {monitor.lastResponseMs != null
-                    ? `${formatMs(monitor.lastResponseMs)} > ${monitor.slowThresholdMs} ms`
+                  {avgUpMs != null
+                    ? `avg ${formatMs(Math.round(avgUpMs))} > ${monitor.slowThresholdMs} ms`
                     : `> ${monitor.slowThresholdMs} ms`}
                 </StatusPill>
               )}

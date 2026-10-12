@@ -208,6 +208,7 @@ export function toMonitorDTO(
   stats: MonitorStatsDTO | undefined,
   recent: CheckDTO[] | undefined,
 ): MonitorDTO {
+  const recentChecks = recent ?? [];
   return {
     id: monitor.id,
     name: monitor.name,
@@ -226,7 +227,11 @@ export function toMonitorDTO(
     keyword: monitor.keyword ?? null,
     keywordMode: monitor.keywordMode === "excludes" ? "excludes" : "contains",
     slowThresholdMs: monitor.slowThresholdMs ?? null,
-    degraded: isDegraded(monitor),
+    degraded: isDegraded({
+      lastStatus: monitor.lastStatus,
+      slowThresholdMs: monitor.slowThresholdMs ?? null,
+      recentChecks,
+    }),
     createdAt: monitor.createdAt.toISOString(),
     lastCheckAt: monitor.lastCheckAt?.toISOString() ?? null,
     lastStatus:
@@ -235,7 +240,7 @@ export function toMonitorDTO(
     lastResponseMs: monitor.lastResponseMs ?? null,
     lastError: monitor.lastError ?? null,
     stats: stats ?? emptyStats(),
-    recentChecks: recent ?? [],
+    recentChecks,
   };
 }
 

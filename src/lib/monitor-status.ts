@@ -14,11 +14,18 @@ interface StatusFields {
   lastStatus: string | null;
 }
 
-/** The latency fields the degraded predicate reads. */
+/** A check as the slow predicate reads it — status plus its response time. */
+interface SlowCheck {
+  status: string;
+  responseMs: number | null;
+}
+
+/** The latency fields the slow predicate reads: the threshold and the same
+ *  recent-Checks window the card bars show. */
 interface LatencyFields {
   lastStatus: string | null;
-  lastResponseMs: number | null;
   slowThresholdMs: number | null;
+  recentChecks: SlowCheck[];
 }
 
 /**
@@ -34,16 +41,33 @@ export function monitorStatus(m: StatusFields): MonitorStatus {
 }
 
 /**
- * True when the monitor's last check was UP but above its latency threshold —
- * an honest middle state between up and down, orthogonal to the ladder.
+ * The mean response time of the monitor's recent UP checks (the same window
+ * the card bars show), or null when the window holds no timed up check.
+ * One slow sample can no longer flip a healthy monitor; one fast sample can
+ * no longer hide a slow one.
+ */
+export function averageUpResponseMs(checks: SlowCheck[]): number | null {
+  let sum = 0;
+  let n = 0;
+  for (const c of checks) {
+    if (c.status === "up" && c.responseMs != null) {
+      sum += c.responseMs;
+      n += 1;
+    }
+  }
+  return n === 0 ? null : sum / n;
+}
+
+/**
+ * True when the monitor's recent up checks average above its latency
+ * threshold — an honest middle state between up and down, orthogonal to the
+ * ladder. A down monitor is never slow (the ladder already says down), no up
+ * checks in the window is never slow, and no threshold is never slow.
  */
 export function isDegraded(m: LatencyFields): boolean {
-  return (
-    m.slowThresholdMs != null &&
-    m.lastStatus === "up" &&
-    m.lastResponseMs != null &&
-    m.lastResponseMs > m.slowThresholdMs
-  );
+  if (m.slowThresholdMs == null || m.lastStatus !== "up") return false;
+  const avg = averageUpResponseMs(m.recentChecks);
+  return avg != null && avg > m.slowThresholdMs;
 }
 
 /**

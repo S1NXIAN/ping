@@ -178,6 +178,9 @@ export function MonitorDetailSheet({
     enabled: m?.enabled ?? false,
     lastStatus: m?.lastStatus ?? null,
   });
+  // Up but over the latency threshold — the same average-of-recent-ups rule
+  // the card and the fleet count use (GLOSSARY.md "Monitor status").
+  const degraded = status === "up" && (m?.degraded ?? false);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -190,11 +193,11 @@ export function MonitorDetailSheet({
             <StatusDot status={checking ? "checking" : status} />
             <span className="truncate">{m?.name ?? "Monitor"}</span>
             <StatusPill
-              tone={status === "up" ? "up" : status === "down" ? "down" : "neutral"}
+              tone={status === "up" ? (degraded ? "warn" : "up") : status === "down" ? "down" : "neutral"}
               size="sm"
               uppercase
             >
-              {checking ? "checking…" : statusLabel(status)}
+              {checking ? "checking…" : degraded ? "slow" : statusLabel(status)}
             </StatusPill>
           </SheetTitle>
           <SheetDescription className="flex flex-wrap items-center gap-x-3 gap-y-1 text-left">
