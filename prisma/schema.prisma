@@ -41,6 +41,10 @@ model Monitor {
   account        String? // optional label: which account/org runs this service
   pinned         Boolean   @default(false) // pinned monitors float to the top
   position       Int       @default(0) // manual order, ascending (within pinned/unpinned groups)
+  // True for the one monitor PING creates to check its own health endpoint.
+  // A durable marker so repeated boots never create a second one. Otherwise
+  // it is an ordinary monitor: visible, editable and deletable.
+  isSelfMonitor  Boolean   @default(false)
   // Optional keyword check: after a 2xx/3xx response, the (up to 256 KB of
   // the) body must contain — or must not contain — this case-insensitive
   // string for the monitor to count as up. Keyword checks always fetch with
