@@ -43,9 +43,9 @@ export function UptimeBars({
       {segments.map((s, i) => {
         let cls: string;
         if (s.ratio == null) {
-          // No data = dashed outline (the same language the public status
-          // DayBars use): honest emptiness that still clears 3:1 non-text
-          // contrast — bg-muted + opacity-40 measured 1.02:1, i.e. invisible.
+          // No data = dashed outline: honest emptiness that still clears 3:1
+          // non-text contrast — bg-muted + opacity-40 measured 1.02:1, i.e.
+          // invisible.
           cls = "border border-dashed border-muted-foreground/60 bg-transparent";
         } else if (s.ratio >= 1) {
           cls = "bg-up/90";

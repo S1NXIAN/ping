@@ -41,7 +41,7 @@ const TONE_CLASS: Record<PillTone, string> = {
 };
 
 const SIZE_CLASS = {
-  /** dense: public status, sheets, incident lists */
+  /** dense: sheets, incident lists, toolbar chips */
   sm: "gap-1 px-1.5 py-px text-[10px]",
   /** card default */
   md: "gap-1 px-2 py-0.5 text-[10px]",

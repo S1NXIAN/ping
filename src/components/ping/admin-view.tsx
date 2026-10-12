@@ -8,7 +8,6 @@ import {
   Download,
   Eraser,
   FileUp,
-  HeartPulse,
   KeyRound,
   Loader2,
   Server,
@@ -19,12 +18,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import {
   api,
   ApiError,
-  copyText,
   formatDateTime,
   formatDuration,
   formatMs,
@@ -37,20 +34,6 @@ import { RenderStatusCard } from "./render-status-card";
 import { InlineAlert } from "./inline-alert";
 import { StatTile } from "./stat-tile";
 
-const GH_ACTIONS_YAML = `name: PING keep-alive
-# Free on public repositories. Set the PING_URL repository secret
-# to your PING deployment origin, e.g. https://ping-xxxx.onrender.com
-on:
-  schedule:
-    - cron: "*/10 * * * *" # every 10 minutes (GitHub may drift a few)
-  workflow_dispatch: # allows a manual run
-jobs:
-  tick:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Tick PING (runs all due checks)
-        run: curl -fsS --max-time 90 "\${{ secrets.PING_URL }}/api/cron/tick" || true
-`;
 
 function Section({
   icon: Icon,
@@ -101,9 +84,6 @@ export function AdminView({
   // --- runtime info ---
   const [info, setInfo] = useState<AdminInfoResponse | null>(null);
 
-  // --- keep-awake URL (computed client-side to match this deployment) ---
-  const [tickUrl, setTickUrl] = useState("");
-
   // --- session length ---
   const [sessionSettings, setSessionSettings] = useState<SessionSettingsResponse | null>(null);
   const [sessionBusy, setSessionBusy] = useState(false);
@@ -119,10 +99,6 @@ export function AdminView({
 
   // --- session countdown (ticks every second while signed in) ---
   const [nowMs, setNowMs] = useState(() => Date.now());
-
-  useEffect(() => {
-    setTickUrl(`${window.location.origin}/api/cron/tick`);
-  }, []);
 
   const sessionMsLeft = expiresAt ? new Date(expiresAt).getTime() - nowMs : null;
 
@@ -261,14 +237,6 @@ export function AdminView({
     }
   }
 
-  const onCopy = useCallback(
-    async (text: string, what: string) => {
-      const ok = await copyText(text);
-      toast({ description: ok ? `${what} copied to clipboard` : "Copy failed — select it manually" });
-    },
-    [toast],
-  );
-
   async function importFile(file: File) {
     setImporting(true);
     try {
@@ -300,19 +268,6 @@ export function AdminView({
     }
   }
 
-  const freeHours = useMemo(
-    () => (
-      <p className="rounded-md border border-warn/25 bg-warn/10 px-3 py-2 text-xs leading-relaxed text-warn/90">
-        <strong>The free-hours math, honestly:</strong> Render grants ~750 free instance hours per
-        workspace per month. A 31-day month is 744 hours, so only <em>one</em> free service can be
-        awake 24/7. Keeping PING always awake plus several other services always awake will exhaust
-        the pool and they will all sleep until hours reset. PING helps you stay within what free
-        allows — it cannot create 24/7 uptime out of thin air, and no tool honestly can.
-      </p>
-    ),
-    [],
-  );
-
   return (
     <main className="ping-ambient relative min-h-dvh">
       <div className="relative z-10 mx-auto max-w-2xl px-4 pb-16 pt-4 sm:pt-6">
@@ -322,7 +277,7 @@ export function AdminView({
           </Button>
           <div className="min-w-0">
             <h1 className="text-lg font-semibold leading-tight">Settings</h1>
-            <p className="text-xs text-muted-foreground">Security, keep-awake setup &amp; data</p>
+            <p className="text-xs text-muted-foreground">Security, session &amp; data</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
             {sessionMsLeft != null && (
@@ -434,80 +389,6 @@ export function AdminView({
               Applies to sessions created after you change it — your current session keeps its
               original expiry.
             </p>
-          </Section>
-
-          {/* Keep awake */}
-          <Section
-            icon={HeartPulse}
-            title="Keep PING (and your services) awake"
-            description="Render Free services spin down after 15 minutes without inbound traffic — and a sleeping service can't wake itself. PING therefore needs a nudge from an external, always-on scheduler. Each nudge below also runs every due monitor check, so one scheduler drives everything."
-          >
-            <div className="space-y-2.5">
-              <Label>Your tick URL</Label>
-              <div className="flex items-center gap-2">
-                <code className="min-w-0 flex-1 truncate rounded-md border bg-muted px-3 py-2 text-xs">
-                  {tickUrl || "…"}
-                </code>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0"
-                  onClick={() => onCopy(tickUrl, "Tick URL")}
-                >
-                  Copy
-                </Button>
-              </div>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Point any external pinger (cron-job.org, UptimeRobot, a Raspberry Pi cron…) at this
-                URL every 5–10 minutes. It responds with a JSON summary of the checks it just ran.
-                Alternatively use <code className="rounded-none bg-muted px-1">/api/health</code> for a
-                plain keep-alive that doesn't trigger checks.
-              </p>
-            </div>
-
-            <Separator />
-
-            <div className="space-y-2.5">
-              <Label className="flex items-center gap-2">
-                Option B — GitHub Actions (free on public repos)
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2.5 text-xs"
-                  onClick={() => onCopy(GH_ACTIONS_YAML, "Workflow YAML")}
-                >
-                  Copy YAML
-                </Button>
-              </Label>
-              <pre className="max-h-44 overflow-auto rounded-md border bg-muted p-3 text-[10.5px] leading-relaxed">
-                <code>{GH_ACTIONS_YAML}</code>
-              </pre>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Add the file as <code className="rounded-none bg-muted px-1">.github/workflows/ping.yml</code>{" "}
-                in any repository, then create a <code className="rounded-none bg-muted px-1">PING_URL</code>{" "}
-                secret with your PING origin. GitHub’s free cron has no hard uptime guarantees and
-                can drift, but it costs nothing and needs no extra account.
-              </p>
-            </div>
-
-            <Separator />
-
-            <div className="space-y-2.5">
-              <Label>Choosing your cadence</Label>
-              <ul className="space-y-1.5 text-xs leading-relaxed text-muted-foreground">
-                <li>
-                  <span className="text-foreground/90">Tick ≤ 10 min:</span> PING itself stays awake
-                  24/7 — its built-in scheduler then respects each monitor's interval precisely.
-                  Costs ~744 instance hours/month.
-                </li>
-                <li>
-                  <span className="text-foreground/90">Tick ≥ 20 min:</span> PING spins down between
-                  ticks and cold-boots (~30–60 s) on each nudge — checks then run at the tick
-                  cadence, not the configured interval. Uses far fewer free hours.
-                </li>
-              </ul>
-              {freeHours}
-            </div>
           </Section>
 
           {/* Render Free facts */}

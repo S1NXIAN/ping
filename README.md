@@ -1,10 +1,13 @@
-# PING — honest uptime monitoring for Render Free
+# PING — honest uptime monitoring
 
-PING is a lightweight, mobile-first uptime monitor for people who run things on
-[Render's free tier](https://render.com). It sends **real HTTP requests** to the
-URLs you configure, on the schedule you choose, and shows you exactly what it
-observed — status codes, response times, failure history. Nothing is simulated,
-and no uptime number is ever shown for a window PING didn't actually measure.
+PING is a lightweight, mobile-first uptime monitor for web services. It sends
+**real HTTP requests** to the URLs you configure, on the schedule you choose,
+and shows you exactly what it observed — status codes, response times, failure
+history. Nothing is simulated, and no uptime number is ever shown for a window
+PING didn't actually measure.
+
+PING is **display-only**: it records and shows the truth, it never alerts.
+Nothing will tell you a service went down except opening the dashboard.
 
 > PING is an independent hobby tool. It is not affiliated with or endorsed by
 > render.com.
@@ -20,42 +23,32 @@ and no uptime number is ever shown for a window PING didn't actually measure.
   the service — searchable).
 - **Ordering** — pin monitors to the top, drag to reorder (desktop) or move
   up/down from the menu (works on touch), and switch the list between manual,
-  A–Z, Z–A, and status-first sorting. Pinned monitors float to the top in
-  every sort mode; dropping a card into the pinned zone pins it
-  automatically. Your sort choice is remembered per device, and `/`
-  (Gmail-style) jumps to the search box.
-- **Scheduled pings** — run one real check at an exact future moment
-  (“ping my deploy at 09:00”). The scheduler fires it, records the result in
-  the monitor's history, and shows it in a dedicated sheet with countdowns,
-  notes, and results. Cancel anytime before it fires.
+  A–Z, and status-first sorting. Pinned monitors float to the top in every sort
+  mode; dropping a card into the pinned zone pins it automatically. Your sort
+  choice is remembered per device, and `/` (Gmail-style) jumps to the search box.
+- **Self-monitor** — on first setup (and on boot) PING creates a monitor that
+  checks its own `/api/health` endpoint every 3 minutes, so you can see whether
+  PING itself is up — and its own inbound traffic helps keep the instance awake.
+  It is an ordinary monitor otherwise: visible in the list, editable, and
+  deletable like any other.
 - **Keyword checks** — beyond the status code: require (or forbid) a word in
   the response body, so a 200 from a broken page still counts as down. Set in
   the monitor form (“Keyword check”: body must contain / must not contain,
   case-insensitive, first 256 KB of the body, ≤200 chars). Keyword checks
   always fetch with GET — a HEAD response has no body — and a failed keyword
-  match is recorded as a real down check (error message, incidents, webhooks
-  and uptime math all follow).
-- **Latency alerting (slow/degraded)** — optional per-monitor threshold
-  (50–30000 ms, set in the monitor form). When an up check takes longer than
-  the threshold, the monitor card shows an amber “slow” state with the exact
-  response time, the public status page marks the service **degraded** (amber
-  banner + badge), and channels with slow alerts get a “slow” webhook. Events
-  fire on fast→slow transitions only, are suppressed during active
-  maintenance, and are skipped when a down/recovery event already fired (the
-  recovery message carries the response time).
-- **Down-alert delay (confirmations)** — per-monitor setting (monitor form:
-  “Down-alert delay”): wait for N consecutive failed checks before the down
-  webhook fires (immediate → after 6 checks). Downtime is always recorded and
-  shown right away — only the notification waits for confirmation. The card
-  and detail sheet show a live “confirming 2/3” pill while a failure streak is
-  still under the threshold. Held events are deferred, never lost: if the
-  service stays down past the threshold the alert fires exactly then. Editing
-  a monitor's delay or URL resets the streak.
+  match is recorded as a real down check (error message, incidents and uptime
+  math all follow).
+- **Slow (degraded) state** — optional per-monitor threshold (50–30000 ms, set
+  in the monitor form). A monitor is **slow** when the average response time of
+  its recent up checks is over the threshold — the same recent-checks window the
+  card bars show. One slow sample cannot mislabel a healthy service, and one
+  fast sample cannot hide a slow one. The card shows an amber “slow” state, and
+  the fleet header counts slow monitors; the detail sheet agrees.
 - **Incident postmortem notes** — from the Incidents sheet, attach a short
-  note (500 chars) to any derived incident; it appears under that incident on
-  the public status page (e.g. “what happened and what fixed it”). Notes are
-  keyed to the incident's exact start, editable, removable, and pruned once
-  older than the 30-day incident window.
+  note (500 chars) to any derived incident, for your own later reference.
+  Notes are keyed to the incident's exact start, editable, removable, and
+  pruned once older than the 30-day incident window. Ongoing incidents are
+  pinned to the top of the list and can never be buried under newer ones.
 - **Response-time chart with a time axis** — the monitor detail sheet's
   “Response time” section renders a real chart (1h / 24h / 7d ranges) with
   labelled time and ms axes, dashed gridlines, per-point markers, rose tick
@@ -64,40 +57,6 @@ and no uptime number is ever shown for a window PING didn't actually measure.
   read as gaps, not fake slopes); dense windows are bucket-averaged and say
   so honestly in the caption. One click downloads the full retained history
   as CSV (`checkedAt,status,statusCode,responseMs,error`).
-- **Maintenance windows** — planned work on a service (e.g. a deploy):
-  checks keep running and stay recorded — the data stays honest — but
-  down/recovery webhook alerts are silenced and the public status page shows
-  an amber “maintenance” state instead of a red outage. If the service goes
-  down *during* the window and is still down after it ends, the down alert
-  fires then — nothing is lost, just deferred. Windows last up to 7 days,
-  can be scheduled up to 90 days ahead, and are listed in a dedicated sheet
-  with active/upcoming/recently-ended states.
-- **Public status page** — opt in from Settings to get a secret, shareable
-  link (`/?status=<token>`, 192-bit) that shows monitor names, live statuses,
-  7d/30d uptime, a 30-day per-day bar strip on a labelled track, and a
-  response-time sparkline of the last 20 checks — with the exact time window
-  it covers labelled on it — read-only, no login, no
-  URLs or accounts exposed. Regenerate or disable the link anytime; hide
-  individual monitors from their ⋮ menu. A custom page title, a 30-day
-  incident history (stitched from real checks, with a clear “ongoing” state),
-  and active/upcoming maintenance windows (with notes) are included; down
-  periods fully inside a maintenance window are not listed as incidents.
-- **README status badge** — a shields.io-style SVG that mirrors the status
-  page live: `![status](https://your-host/api/public/badge?token=…)` (green
-  operational / amber degraded / red down / gray no data; `&monitor=Name` for
-  a single monitor, `&uptime=24h|7d|30d` for a real uptime %, `style=flat-square`
-  for sharp corners). Copy-ready Markdown/HTML snippets and an RSS 2.0 feed of
-  incidents + maintenance (`/api/public/feed?token=…`, also linked on the
-  public page) live in Settings → Public status page.
-- **Webhook notifications** — when a monitor goes down, recovers, or answers
-  slower than its latency threshold, PING POSTs one JSON event to each
-  configured channel (Slack `text`, Discord `content`, plus a structured
-  `{ event, monitor, check }` object). Events fire on transitions only — no
-  per-check spam, and they are suppressed during active maintenance windows.
-  Channels can be routed to a single monitor (or all monitors) and subscribe
-  per event type (down / up / slow). Best-effort delivery (10 s timeout, no
-  retries) with the honest outcome of the last attempt shown in Settings,
-  and a built-in “Send test” button.
 - **Real health checks** — the server performs the request with a 15 s timeout,
   records status code, response time, and the exact error on failures. History
   is kept for 30 days (capped at 1 000 checks per monitor).
@@ -107,30 +66,24 @@ and no uptime number is ever shown for a window PING didn't actually measure.
 - **Render-aware** — live platform status from status.render.com plus the
   limits Render documents (with links), and honest guidance about free-tier
   sleep and instance-hour math.
-- **Auth** — single-password login, hashed with scrypt; change the password in
-  Settings (this signs out all other sessions). Settings itself is gated by a
-  second, 15-minute admin unlock.
+- **Auth** — a single password, hashed with scrypt, and one dashboard session.
+  The session signs you out on an **absolute** timeout counted from login
+  (no sliding, no idle detection); the header shows the time left. Choose the
+  timeout from presets (5/15/30/60/120 minutes; default 15) in Settings.
+  Changing the password signs out every other session.
 - **Keep-awake strategy** — an external scheduler hits `/api/cron/tick`, which
   both wakes PING and runs every due check (see below).
-- **Import/export** — your monitor configuration as JSON (includes accounts,
-  webhook channels with their routing, and upcoming maintenance windows).
+- **Import/export** — your monitor configuration as JSON.
 
 ### Trust model (read this before exposing PING)
 
 PING is single-admin software: whoever holds the password controls every
-monitor. Two consequences follow, and they are deliberate:
-
-- **Monitor URLs may point anywhere**, including `localhost`, LAN addresses
-  and `169.254.*` link-local hosts — monitoring internal services is a normal
-  use. Creating a monitor requires the admin session, so this is not an
-  untrusted-input path. If you expose PING to the internet, treat the password
-  as the only thing standing between a stranger and your internal network.
-- **Webhook URLs are the untrusted path** (they leave PING and can be
-  influenced by a compromised account), so they are held to a stricter rule:
-  no loopback/private/link-local targets — checked both on the hostname and
-  on what it resolves to, so a public name pointing at an internal address is
-  refused — and redirects are never followed: a public URL that 302s to an
-  internal host is refused.
+monitor. Monitor URLs may point anywhere, including `localhost`, LAN addresses
+and `169.254.*` link-local hosts — monitoring internal services is a normal
+use. Creating a monitor requires the authenticated admin session, so this is
+not an untrusted-input path. If you expose PING to the internet, treat the
+password as the only thing standing between a stranger and your internal
+network.
 
 ## Run locally
 
@@ -142,6 +95,8 @@ bun run dev            # http://localhost:3000
 
 Set `DATABASE_URL` in `.env` (e.g. `file:./db/custom.db`).
 Optional env: `CRON_SECRET` — when set, `/api/cron/tick` requires `?token=<secret>`.
+On Render, `RENDER_EXTERNAL_URL` (set by the platform) is used as the
+Self-monitor's origin.
 
 ## Deploy on Render
 
@@ -180,7 +135,7 @@ with build `bun install && bunx prisma generate && bun run build` and start
    scheduler drives everything.
 3. Scheduler options:
    - **GitHub Actions** — `.github/workflows/keep-alive.yml` in any public repo
-     (free), with a `PING_URL` repository secret. Copyable from Settings.
+     (free), with a `PING_URL` repository secret. See the YAML below.
    - **cron-job.org / UptimeRobot free tier** — hit the tick URL on a schedule.
    - **Plain cron** on any box: `*/10 * * * * curl -fsS https://…/api/cron/tick`.
 
@@ -188,16 +143,37 @@ The tick endpoint returns a JSON summary (`{"ran":3,"up":3,"down":0,…}`), and
 `/api/health` is a dependency-free alternative that only wakes the service
 without triggering checks.
 
+### GitHub Actions keep-alive workflow
+
+Add this file as `.github/workflows/ping.yml` in any repository, then create a
+`PING_URL` secret with your PING origin (no trailing slash, no `/api` path).
+Free on public repositories; GitHub's cron can drift a few minutes, which is
+fine here since each tick only runs checks that are actually due.
+
+```yaml
+name: PING keep-alive
+on:
+  schedule:
+    - cron: "*/10 * * * *" # every 10 minutes (GitHub may drift a few)
+  workflow_dispatch: # allows a manual run
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tick PING (runs all due checks)
+        run: curl -fsS --max-time 90 "${{ secrets.PING_URL }}/api/cron/tick" || true
+```
+
 ## Architecture (small on purpose)
 
-- Next.js (App Router) single-page app, dark Render-style theme, no chart
+- Next.js (App Router) single-page app, dark theme, no chart
   libraries — the sparkline and uptime bars are hand-rolled SVG.
-- Prisma + SQLite: `Folder`, `Monitor`, `Check`, `ScheduledPing`,
-  `MaintenanceWindow`, `IncidentNote`, `WebhookChannel`, `Session`,
+- Prisma + SQLite: `Folder`, `Monitor`, `Check`, `IncidentNote`, `Session`,
   `Settings`.
 - An in-process scheduler (via `instrumentation.ts`) wakes every 30 s and
   checks every enabled monitor whose interval elapsed (concurrency-capped).
-- Auth: scrypt password hash + opaque session tokens in httpOnly cookies.
+- Auth: scrypt password hash + opaque session tokens in httpOnly cookies, with
+  an absolute, admin-configurable expiry.
 - `GET /api/cron/tick` — external trigger for the same "due checks" routine.
 
 ## API (cookie-authenticated unless noted)
@@ -209,15 +185,10 @@ without triggering checks.
 | `POST /api/monitors`, `GET/PATCH/DELETE /api/monitors/[id]` | manage monitors |
 | `POST /api/monitors/[id]/check` | run one check now |
 | `POST /api/folders`, `PATCH/DELETE /api/folders/[id]` | folders |
-| `POST /api/admin/password`, `GET /api/admin/info` | settings & runtime info |
-| `GET/POST /api/webhooks`, `PATCH/DELETE /api/webhooks/[id]`, `POST /api/webhooks/[id]/test` | notification channels (per-monitor routing via `monitorId`) |
-| `GET/POST /api/scheduled-pings`, `DELETE /api/scheduled-pings/[id]` | scheduled pings |
+| `POST /api/admin/password`, `GET/POST /api/admin/session` | password & session timeout |
+| `GET /api/admin/info`, `GET/POST /api/admin/retention` | runtime info & data retention |
 | `GET/POST/DELETE /api/incidents` | incident list + postmortem notes |
-| `GET/POST /api/maintenance`, `DELETE /api/maintenance/[id]` | maintenance windows |
-| `GET /api/public/status?token=` | public status page (no auth; token-gated) |
-| `GET /api/public/badge?token=` | shields-style SVG badge (no auth; token-gated; `monitor`, `label`, `uptime`, `style` params) |
-| `GET /api/public/feed?token=` | RSS 2.0 feed of incidents + maintenance (no auth; token-gated) |
 | `GET /api/render-status` | live status from status.render.com (5 min cache) |
-| `GET /api/export`, `POST /api/import` | backup / restore (monitors, webhook channels, future maintenance windows) |
+| `GET /api/export`, `POST /api/import` | backup / restore (monitors, folders) |
 | `GET /api/health` | public keep-alive ping, no DB access |
 | `GET/POST /api/cron/tick` | run all due checks (optional `CRON_SECRET`) |

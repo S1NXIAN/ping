@@ -6,7 +6,7 @@ schedule, records exactly what it observed, and never invents a number.
 ## Language
 
 **Monitor**:
-One http(s) URL PING checks, with its own cadence, alerts and history.
+One http(s) URL PING checks, with its own cadence and history.
 _Avoid_: target, site, endpoint
 
 **Check**:
@@ -21,6 +21,32 @@ or `pending`. Only `up` and `down` are measured health, from the latest Check.
 is the absence of any Check yet — neither is a health verdict.
 _Avoid_: state, condition (and do not read `paused`/`pending` as health)
 
+**Slow (degraded)**:
+The middle state of an `up` monitor whose recent up Checks average above the
+configured latency threshold (`slowThresholdMs`). Judged from the **average**
+of the most recent up Checks — the same recent-Checks window the card bars
+show — so one slow sample cannot mislabel a healthy monitor and one fast
+sample cannot hide a slow one. A monitor with no up Checks in the window, no
+threshold, or a non-`up` status is never slow. One word, one meaning: the card
+pill, the fleet slow count and the detail sheet all say "slow".
+_Avoid_: degraded (in prose), latency alert, warning
+
+**Self-monitor**:
+The one Monitor PING creates to check its own health endpoint
+(`/api/health`) every 3 minutes, so the operator can see whether PING itself
+is up and its own traffic helps keep the instance awake. It is an ordinary
+Monitor otherwise — visible, editable and deletable — and a durable marker
+keeps creation idempotent so repeated boots never make a second one.
+_Avoid_: heartbeat, internal monitor
+
+**Session**:
+The single dashboard login, with an **absolute** expiry counted from login (no
+sliding, no idle detection). Its length is an admin setting (presets 5/15/30/
+60/120 minutes, default 15). Every authenticated request re-checks the expiry
+server-side; a request after it is unauthenticated and returns to the login
+screen. Any visit before expiry asks for no password.
+_Avoid_: token, cookie, unlock
+
 **Interval schedule**:
 A monitor checks every N seconds, N between 1 minute and 24 hours. Set as a
 preset or as a custom `H`/`M` value.
@@ -30,11 +56,6 @@ _Avoid_: recurring, periodic
 A monitor checks at fixed clock times (e.g. 1:00 PM, 3:00 AM) every day,
 interpreted in its own timezone.
 _Avoid_: scheduled, cron, time-based
-
-**Scheduled ping**:
-A one-off check at a single future instant the user picked. Distinct from a
-times-of-day schedule, which repeats daily.
-_Avoid_: schedule (bare), job
 
 **Scheduled instant**:
 The moment a times-of-day schedule says a check should run, as an absolute
@@ -54,11 +75,9 @@ only to judge whether a gap in check history means PING was asleep.
 _Avoid_: interval (for a times-of-day monitor)
 
 **Incident**:
-A continuous stretch of failed checks, derived from check history. Never
-entered by hand.
+A continuous stretch of failed Checks, derived from check history and never
+stored or entered by hand. An **ongoing** Incident (no end yet) is pinned to
+the top of the incidents list and is exempt from the list's size cap, so a
+long outage can never be buried under newer ones or dropped — the exempt set
+is itself bounded.
 _Avoid_: outage record, event
-
-**Maintenance window**:
-A planned period when checks keep running and recording but alerts are
-silenced. Downtime inside one is still recorded.
-_Avoid_: downtime, blackout

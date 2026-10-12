@@ -129,7 +129,7 @@ export function formatMs(ms: number | null | undefined): string {
 
 /**
  * Uptime band -> status ink, shared by every surface that shows an uptime
- * percentage (dashboard stat, detail sheet, public status). Bands match the
+ * percentage (dashboard stat, detail sheet). Bands match the
  * formatter's rounding so ink and glyph never disagree: values that display
  * as "100%" (>= 99.995%) are up, 90–99.99% warn, below 90% down. Null stays
  * null — unknown must never read as healthy.
