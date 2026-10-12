@@ -171,7 +171,7 @@ export function CommandPalette({
                 }
               >
                 {opsMonitor.enabled ? <Pause /> : <Play />}
-                {opsMonitor.enabled ? "Pause checks" : "Resume checks"}
+                {opsMonitor.enabled ? "Pause" : "Resume"}
               </CommandItem>
               <CommandItem
                 value={`monitor pin ${opsMonitor.name}`}

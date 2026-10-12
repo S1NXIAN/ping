@@ -517,7 +517,7 @@ export function MonitorCard({
                     disabled={busyAction === "pause"}
                     onClick={() => patch({ enabled: !monitor.enabled }, monitor.enabled ? "Paused" : "Resumed", "pause")}
                   >
-                    <Play className="size-4" /> {monitor.enabled ? "Pause checks" : "Resume checks"}
+                    <Play className="size-4" /> {monitor.enabled ? "Pause" : "Resume"}
                   </DropdownMenuItem>
 
                   <DropdownMenuSub>
