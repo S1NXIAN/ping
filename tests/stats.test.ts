@@ -41,6 +41,41 @@ test("uptime and timing are computed per monitor from real checks", async () => 
   expect(sb.avgMs24h).toBeCloseTo(60, 10);
 });
 
+test("the recent-checks window caps at RECENT_CHECKS", async () => {
+  const { collectMonitorStats, RECENT_CHECKS } = await import("@/lib/ping-stats");
+  const m = await db.monitor.create({ data: { name: "busy", url: "https://busy.com" } });
+  const base = Date.now();
+  await db.check.createMany({
+    data: Array.from({ length: RECENT_CHECKS + 3 }, (_, i) => ({
+      monitorId: m.id,
+      status: "up",
+      responseMs: i,
+      checkedAt: new Date(base - i * 60_000),
+    })),
+  });
+
+  const { recentByMonitor } = await collectMonitorStats();
+  expect(recentByMonitor.get(m.id)!).toHaveLength(RECENT_CHECKS);
+});
+
+test("the recent-checks window is newest first", async () => {
+  const { collectMonitorStats } = await import("@/lib/ping-stats");
+  const m = await db.monitor.create({ data: { name: "busy", url: "https://busy.com" } });
+  const base = Date.now();
+  await db.check.createMany({
+    data: Array.from({ length: 5 }, (_, i) => ({
+      monitorId: m.id,
+      status: "up",
+      responseMs: i,
+      checkedAt: new Date(base - i * 60_000),
+    })),
+  });
+
+  const { recentByMonitor } = await collectMonitorStats();
+  // responseMs 0 is the newest check (checkedAt = base), so it leads the window.
+  expect(recentByMonitor.get(m.id)![0]!.responseMs).toBe(0);
+});
+
 test("a monitor with no checks has null uptime, never an invented number", async () => {
   const { collectMonitorStats } = await import("@/lib/ping-stats");
   await db.monitor.create({ data: { name: "empty", url: "https://empty.com" } });

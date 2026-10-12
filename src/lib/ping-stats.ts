@@ -10,6 +10,16 @@ import type { CheckDTO, DailyBucket, MonitorDTO, MonitorStatsDTO } from "./ping-
 
 const H24 = 24 * 60 * 60 * 1000;
 
+/**
+ * The recent-checks window: how many of the newest checks within 48h the card
+ * bars show. One window, one meaning — the slow verdict averages the same
+ * checks, so this constant feeds the overview SQL and the detail slice alike.
+ *
+ * shortcut: the 48h boundary is duplicated (overview SQL and the detail slice);
+ * change both together if it ever moves.
+ */
+export const RECENT_CHECKS = 12;
+
 /** Shape of a groupBy(monitorId, status) count result. */
 type StatusCounts = Array<{ monitorId: string; status: string; _count: { _all: number } }>;
 
@@ -74,7 +84,7 @@ export interface StatsBundle {
 }
 
 /**
- * Collects stats + the most recent checks (last 20 within 48h) for every
+ * Collects stats + the most recent checks (RECENT_CHECKS within 48h) for every
  * monitor. Used by the overview endpoint.
  */
 export async function collectMonitorStats(): Promise<StatsBundle> {
@@ -131,7 +141,7 @@ export async function collectMonitorStats(): Promise<StatsBundle> {
         SELECT id, monitorId, status, statusCode, responseMs, error, checkedAt,
                ROW_NUMBER() OVER (PARTITION BY monitorId ORDER BY checkedAt DESC) AS rn
         FROM "Check" WHERE checkedAt >= ${since48hMs}
-      ) WHERE rn <= 20
+      ) WHERE rn <= ${RECENT_CHECKS}
       ORDER BY checkedAt DESC`,
   ]);
 
