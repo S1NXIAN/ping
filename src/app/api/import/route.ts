@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { adminGuard } from "@/lib/ping-auth";
-import { nextMonitorPosition, KEYWORD_MAX_LENGTH, MAX_MONITORS, MAX_WINDOWS_PER_MONITOR, MAX_WINDOWS_TOTAL } from "@/lib/checker";
+import { nextMonitorPosition, KEYWORD_MAX_LENGTH, MAX_MONITORS } from "@/lib/checker";
 import { monitorUrlSchema, intervalSecSchema, scheduleModeSchema, scheduleTimesSchema, timezoneSchema, scheduleError } from "@/lib/validation";
 import { MAX_WEBHOOK_CHANNELS, isPrivateWebhookUrl, resolvesToPrivate } from "@/lib/webhooks";
 import { urlSchema } from "@/app/api/webhooks/route";
@@ -60,24 +60,13 @@ const schema = z.object({
     )
     .max(5)
     .optional(),
-  maintenanceWindows: z
-    .array(
-      z.object({
-        monitor: z.string().trim().min(1).max(80),
-        startsAt: z.string().datetime(),
-        endsAt: z.string().datetime(),
-        note: z.string().trim().max(120).nullish(),
-      }),
-    )
-    .max(50)
-    .optional(),
 });
 
 /** Thrown inside the import transaction for a user-facing 400 (rolls back). */
 class ImportError extends Error {}
 
-/** Restores monitors/folders, webhook channels and future maintenance windows
- *  from a PING export. Duplicated URLs and channel names are skipped. */
+/** Restores monitors/folders and webhook channels from a PING export.
+ *  Duplicated URLs and channel names are skipped. */
 export async function POST(req: NextRequest) {
   const unauthorized = await adminGuard(req);
   if (unauthorized) return unauthorized;
@@ -91,7 +80,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { folders, monitors, webhookChannels, maintenanceWindows } = parsed.data;
+  const { folders, monitors, webhookChannels } = parsed.data;
 
   // Validate every webhook URL up front — the same SSRF rule create/patch and
   // delivery enforce, including what the hostname RESOLVES to (imported
@@ -233,69 +222,14 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Maintenance windows — only future ones, attached to monitors that exist
-        // by name (imported or pre-existing). Re-importing the same file skips
-        // windows that already exist (same monitor + start time). The caps are
-        // checked against the resulting totals; exceeding one throws so the
-        // transaction rolls back.
-        let windowsCreated = 0;
-        if (maintenanceWindows) {
-          const now = Date.now();
-          const existingWindows = new Set(
-            (
-              await tx.maintenanceWindow.findMany({
-                where: { endsAt: { gte: new Date(now) } },
-                select: { monitorId: true, startsAt: true },
-              })
-            ).map((w) => `${w.monitorId}:${w.startsAt.getTime()}`),
-          );
-          const existingTotal = await tx.maintenanceWindow.count();
-          const perMonitor = new Map<string, number>(
-            (
-              await tx.maintenanceWindow.groupBy({ by: ["monitorId"], _count: { _all: true } })
-            ).map((r) => [r.monitorId, r._count._all] as const),
-          );
-
-          const pending: { monitorId: string; startsAt: Date; endsAt: Date; note: string | null }[] = [];
-          for (const w of maintenanceWindows) {
-            const startsAt = new Date(w.startsAt);
-            const endsAt = new Date(w.endsAt);
-            if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) continue;
-            if (endsAt.getTime() <= now || endsAt.getTime() <= startsAt.getTime()) continue;
-            const monitorId = monitorIdByName.get(w.monitor);
-            if (!monitorId) continue;
-            if (existingWindows.has(`${monitorId}:${startsAt.getTime()}`)) continue;
-            existingWindows.add(`${monitorId}:${startsAt.getTime()}`);
-            pending.push({ monitorId, startsAt, endsAt, note: w.note ?? null });
-          }
-
-          if (existingTotal + pending.length > MAX_WINDOWS_TOTAL) {
-            throw new ImportError(`Total maintenance-window limit reached (${MAX_WINDOWS_TOTAL})`);
-          }
-          for (const w of pending) {
-            const count = (perMonitor.get(w.monitorId) ?? 0) + 1;
-            if (count > MAX_WINDOWS_PER_MONITOR) {
-              throw new ImportError(
-                `A monitor would exceed ${MAX_WINDOWS_PER_MONITOR} maintenance windows`,
-              );
-            }
-            perMonitor.set(w.monitorId, count);
-          }
-
-          for (const w of pending) {
-            await tx.maintenanceWindow.create({ data: w });
-            windowsCreated += 1;
-          }
-        }
-
-        return { created, skipped, foldersCreated, channelsCreated, windowsCreated };
+        return { created, skipped, foldersCreated, channelsCreated };
       },
       // A max-size import writes hundreds of rows; Prisma's 5s default could
       // abort a valid import with P2028 on a slow SQLite instance.
       { timeout: 30_000 },
     );
 
-    const body: ImportResult & { channelsCreated: number; windowsCreated: number } = result;
+    const body: ImportResult & { channelsCreated: number } = result;
     return NextResponse.json(body);
   } catch (e) {
     if (e instanceof ImportError) {

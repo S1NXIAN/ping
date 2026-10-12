@@ -18,7 +18,6 @@ import {
   Plus,
   RefreshCw,
   Trash2,
-  Wrench,
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -59,7 +58,6 @@ export function CommandPalette({
   adminUnlocked,
   onNewMonitor,
   onRefresh,
-  onOpenMaintenance,
   onOpenIncidents,
   onOpenSettings,
   onLogout,
@@ -79,7 +77,6 @@ export function CommandPalette({
   adminUnlocked: boolean;
   onNewMonitor: () => void;
   onRefresh: () => void;
-  onOpenMaintenance: () => void;
   onOpenIncidents: () => void;
   onOpenSettings: () => void;
   onLogout: () => void;
@@ -231,10 +228,6 @@ export function CommandPalette({
         </CommandGroup>
 
         <CommandGroup heading="Open">
-          <CommandItem onSelect={() => run(onOpenMaintenance)}>
-            <Wrench />
-            Maintenance windows
-          </CommandItem>
           <CommandItem onSelect={() => run(onOpenIncidents)}>
             <AlertTriangle />
             Incidents &amp; notes

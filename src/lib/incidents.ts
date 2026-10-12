@@ -24,17 +24,13 @@ export interface DerivedIncident {
   endedAt: string | null;
   downChecks: number;
   lastStatusCode: number | null;
-  /** True when the down period overlaps a planned maintenance window. */
-  duringMaintenance: boolean;
 }
 
 /**
  * Stitches recorded checks into down incidents for the given monitors.
  * Derived from real data only — no incident is ever fabricated. Gaps longer
  * than 3× the monitor's interval are treated as "no data" and end an
- * incident. Down streaks that fall entirely inside a planned maintenance
- * window are skipped (planned, not an outage); partial overlaps are kept
- * but flagged `duringMaintenance` so pages can present them honestly.
+ * incident.
  *
  * Implementation note — memory safety: a naive derivation scans EVERY check
  * of the last 30 days (tens of thousands of rows per monitor under a short
@@ -57,23 +53,6 @@ export async function deriveIncidents(
 ): Promise<DerivedIncident[]> {
   if (monitors.length === 0) return [];
   const since = new Date(Date.now() - INCIDENT_WINDOW_DAYS * 86400_000);
-
-  // All windows that overlap the incident lookback (incl. already-ended
-  // ones) — used to classify down streaks, never shown directly.
-  const historyWindows = await db.maintenanceWindow.findMany({
-    where: {
-      monitorId: { in: monitors.map((m) => m.id) },
-      startsAt: { lte: new Date() },
-      endsAt: { gte: since },
-    },
-    select: { monitorId: true, startsAt: true, endsAt: true },
-  });
-  const windowsByMonitor = new Map<string, { startsAt: number; endsAt: number }[]>();
-  for (const w of historyWindows) {
-    const list = windowsByMonitor.get(w.monitorId) ?? [];
-    list.push({ startsAt: w.startsAt.getTime(), endsAt: w.endsAt.getTime() });
-    windowsByMonitor.set(w.monitorId, list);
-  }
 
   const incidents: DerivedIncident[] = [];
 
@@ -112,7 +91,6 @@ export async function deriveIncidents(
           ? nominalPeriodSec(parseTimes(monitor.scheduleTimes))
           : monitor.intervalSec;
       const gapMs = nominalSec * 3 * 1000;
-      const monitorWindows = windowsByMonitor.get(monitor.id) ?? [];
 
       const downs = downsByMonitor.get(monitor.id) ?? [];
       if (downs.length === 0) return;
@@ -181,10 +159,6 @@ export async function deriveIncidents(
             endedAt = boundary ? boundary.checkedAt.getTime() : null;
           }
 
-          const rel = windowRelation(monitorWindows, subStart, subLast);
-          // Down streaks fully inside a planned window are maintenance, not
-          // outages — skip them. Partial overlaps stay, flagged honestly.
-          if (rel === "inside") continue;
           incidents.push({
             monitorId: monitor.id,
             monitorName: monitor.name,
@@ -192,7 +166,6 @@ export async function deriveIncidents(
             endedAt: endedAt == null ? null : new Date(endedAt).toISOString(),
             downChecks: sub.rows.length,
             lastStatusCode: sub.rows[sub.rows.length - 1].code,
-            duringMaintenance: rel === "overlaps",
           });
         }
       }
@@ -218,17 +191,4 @@ export async function incidentsWithNotes(
     const n = byKey.get(`${inc.monitorId}:${new Date(inc.startedAt).getTime()}`);
     return { ...inc, noteId: n?.id ?? null, note: n?.note ?? null };
   });
-}
-
-/** How the down streak [start, end] relates to the monitor's windows. */
-function windowRelation(
-  windows: { startsAt: number; endsAt: number }[],
-  start: number,
-  end: number,
-): "inside" | "overlaps" | "none" {
-  for (const w of windows) {
-    if (w.startsAt <= start && end <= w.endsAt) return "inside";
-    if (start < w.endsAt && w.startsAt < end) return "overlaps";
-  }
-  return "none";
 }

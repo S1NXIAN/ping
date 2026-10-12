@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  * Tone vocabulary is measurement semantics, not decoration:
  *   up      Beacon Emerald — healthy
  *   down    Alarm Rose — failed
- *   warn    Caution Amber — slow / maintenance / confirming
+ *   warn    Caution Amber — slow / confirming
  *   accent  Signal White — pinned, keyword, account
  *   teal    Chalk — the soft-white working ink
  *   neutral Hairline/border — folders, paused, plain metadata

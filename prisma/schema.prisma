@@ -70,7 +70,6 @@ model Monitor {
   // went down during maintenance still raises "down" once it ends.
   lastNotifiedStatus String?
   checks         Check[]
-  maintenanceWindows MaintenanceWindow[]
   webhookChannels   WebhookChannel[]
 }
 
@@ -88,23 +87,6 @@ model IncidentNote {
   updatedAt DateTime @updatedAt
 
   @@unique([monitorId, startedAt])
-}
-
-// A planned maintenance window for one monitor (e.g. a deploy). Checks keep
-// running and being recorded — data stays honest — but down/recovery webhook
-// notifications are suppressed, and the public status page shows a
-// maintenance state instead of a red outage.
-model MaintenanceWindow {
-  id        String   @id @default(cuid())
-  monitorId String
-  monitor   Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
-  startsAt  DateTime
-  endsAt    DateTime
-  note      String?
-  createdAt DateTime @default(now())
-
-  @@index([monitorId])
-  @@index([startsAt, endsAt])
 }
 
 // One health-check result. Only real, recorded checks exist here.

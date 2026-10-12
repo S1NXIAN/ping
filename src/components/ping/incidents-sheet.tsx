@@ -202,16 +202,6 @@ function IncidentRow({
             ongoing
           </StatusPill>
         )}
-        {inc.duringMaintenance && (
-          <StatusPill
-            tone="warn"
-            size="sm"
-            uppercase
-            title="This down period overlapped a planned maintenance window"
-          >
-            during maintenance
-          </StatusPill>
-        )}
         <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
           {formatDuration(Math.round(durationMs / 1000))}
         </span>

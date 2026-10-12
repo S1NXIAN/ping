@@ -59,26 +59,6 @@ test("an ongoing down run has endedAt null", async () => {
   expect(incidents[0].endedAt).toBeNull();
 });
 
-test("a down fully inside a maintenance window is not an incident", async () => {
-  const { deriveIncidents } = await import("@/lib/incidents");
-  const m = await db.monitor.create({
-    data: { name: "svc", url: "https://svc.example.com", intervalSec: 60 },
-  });
-  const start = new Date(Date.now() - 9 * 60_000);
-  const end = new Date(Date.now() - 7 * 60_000);
-  await db.maintenanceWindow.create({
-    data: { monitorId: m.id, startsAt: new Date(start.getTime() - 60_000), endsAt: new Date(end.getTime() + 60_000) },
-  });
-  await db.check.createMany({
-    data: [
-      { monitorId: m.id, status: "down", statusCode: 503, checkedAt: start },
-      { monitorId: m.id, status: "down", statusCode: 503, checkedAt: end },
-    ],
-  });
-  const incidents = await deriveIncidents([m]);
-  expect(incidents.length).toBe(0);
-});
-
 test("the batched query keeps each monitor's incidents separate", async () => {
   const { deriveIncidents } = await import("@/lib/incidents");
   const a = await db.monitor.create({ data: { name: "a", url: "https://a.com", intervalSec: 60 } });

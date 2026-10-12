@@ -251,12 +251,3 @@ export function formatClock(iso: string | null | undefined): string {
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
-
-/**
- * Date → the value `<input type="datetime-local">` expects (device-local, no
- * timezone). Used by the maintenance dialog to seed its date fields.
- */
-export function toLocalInputValue(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}

@@ -21,7 +21,6 @@ import {
   ScanSearch,
   Trash2,
   UserRound,
-  Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,12 +55,11 @@ import {
   hostOf,
   timeAgo,
 } from "@/lib/ping-client";
-import type { FolderDTO, MaintenanceWindowDTO, MonitorDTO } from "@/lib/ping-types";
+import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { formatTimesForDisplay } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { StatusDot, statusLabel } from "./status-dot";
 import { monitorStatus, type MonitorStatus } from "@/lib/monitor-status";
-import { windowCountdown, windowState } from "@/lib/maintenance";
 import { StatusPill, type PillTone } from "./status-pill";
 import { TextPromptDialog } from "./text-prompt-dialog";
 import { checksToSegments, UptimeBars } from "./uptime-bars";
@@ -94,12 +92,10 @@ export function MonitorCard({
   onEdited,
   onDeleted,
   onCheckNow,
-  onScheduleMaintenance,
   onViewIncidents,
   /** Start of the monitor's ONGOING incident (its real first failed check),
    *  or null when none is known — null never becomes a guess. */
   downSince,
-  maintenanceWindow,
   canReorder,
   canMoveUp,
   canMoveDown,
@@ -115,9 +111,6 @@ export function MonitorCard({
   onEdited: () => void;
   onDeleted: () => void;
   onCheckNow: () => void;
-  onScheduleMaintenance: () => void;
-  /** Active or next upcoming window for this monitor (null = none). */
-  maintenanceWindow: MaintenanceWindowDTO | null;
   canReorder: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
@@ -136,24 +129,8 @@ export function MonitorCard({
   // Up but above the admin's latency threshold — an honest middle state.
   const degraded = status === "up" && monitor.degraded;
 
-  // Maintenance context: is the window active right now, or upcoming?
-  // One clock read per render, so state and countdown can't disagree.
-  const now = Date.now();
-  const maintenanceState =
-    maintenanceWindow != null ? windowState(maintenanceWindow, now) : null;
-  const maintenanceNow = maintenanceState === "active";
-  const maintenanceUpcoming = maintenanceState === "upcoming";
-
   const statusTone: PillTone =
-    status === "up"
-      ? degraded
-        ? "warn"
-        : "up"
-      : status === "down"
-        ? maintenanceNow
-          ? "warn"
-          : "down"
-        : "neutral";
+    status === "up" ? (degraded ? "warn" : "up") : status === "down" ? "down" : "neutral";
 
   const beingDragged = dnd?.isDragging === true && dragArmed;
 
@@ -282,22 +259,20 @@ export function MonitorCard({
         className={cn(
           "ping-fade-up group relative cursor-pointer rounded-lg border bg-card p-3 outline-none transition-colors sm:p-5 @container",
           "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40",
-          status === "down" && !maintenanceNow && "border-down/30 hover:border-down/50",
-          degraded && !maintenanceNow &&
+          status === "down" && "border-down/30 hover:border-down/50",
+          degraded &&
             "border-warn/30 hover:border-warn/50 hover:bg-warn/[0.03]",
-          !monitor.pinned && !maintenanceNow &&
+          !monitor.pinned &&
             "hover:border-primary/40 hover:bg-card/70",
-          monitor.pinned && !maintenanceNow &&
+          monitor.pinned &&
             "border-primary/35 bg-primary/[0.03] hover:border-primary/50 hover:bg-primary/[0.05]",
-          status === "down" && monitor.pinned && !maintenanceNow && "border-down/40 bg-down/[0.04]",
-          maintenanceNow &&
-            "border-warn/35 bg-warn/[0.03] hover:border-warn/50 hover:bg-warn/[0.06]",
+          status === "down" && monitor.pinned && "border-down/40 bg-down/[0.04]",
           beingDragged && "opacity-40",
           dnd?.isDragging && !dragArmed && "transition-transform",
         )}
         aria-label={`Monitor ${monitor.name}, status ${
-          status === "down" && maintenanceNow ? "under maintenance" : degraded ? "slow" : statusLabel(status)
-        }${monitor.pinned ? ", pinned" : ""}${maintenanceNow ? ", maintenance active" : ""}`}
+          degraded ? "slow" : statusLabel(status)
+        }${monitor.pinned ? ", pinned" : ""}`}
       >
         {/* phone: stacked — full-width identity/meta rows, bars + actions share
             a bottom strip (a side column would pin the name to a ~150px sliver);
@@ -353,13 +328,7 @@ export function MonitorCard({
                   flips between, so they share one width — the pill no longer
                   twitches wider on "down". Longer labels still grow. */}
               <StatusPill tone={statusTone} uppercase className="min-w-13 justify-center">
-                {checking
-                  ? "checking…"
-                  : status === "down" && maintenanceNow
-                    ? "maintenance"
-                    : degraded
-                      ? "slow"
-                      : statusLabel(status)}
+                {checking ? "checking…" : degraded ? "slow" : statusLabel(status)}
               </StatusPill>
               {degraded && monitor.slowThresholdMs != null && (
                 <StatusPill
@@ -372,25 +341,6 @@ export function MonitorCard({
                   {monitor.lastResponseMs != null
                     ? `${formatMs(monitor.lastResponseMs)} > ${monitor.slowThresholdMs} ms`
                     : `> ${monitor.slowThresholdMs} ms`}
-                </StatusPill>
-              )}
-              {maintenanceNow && (
-                <StatusPill
-                  tone="warn"
-                  icon={Wrench}
-                  title={`Maintenance until ${new Date(maintenanceWindow!.endsAt).toLocaleString()} — alerts silenced`}
-                >
-                  {windowCountdown(maintenanceWindow!, now)}
-                </StatusPill>
-              )}
-              {maintenanceUpcoming && (
-                <StatusPill
-                  tone="warn"
-                  icon={Wrench}
-                  className="text-warn/80"
-                  title={`Maintenance starts ${new Date(maintenanceWindow!.startsAt).toLocaleString()}`}
-                >
-                  {windowCountdown(maintenanceWindow!, now)}
                 </StatusPill>
               )}
               {monitor.account && (
@@ -420,7 +370,6 @@ export function MonitorCard({
                 </StatusPill>
               )}
               {status === "down" &&
-                !maintenanceNow &&
                 monitor.alertDelay > 0 &&
                 monitor.consecutiveDowns <= monitor.alertDelay && (
                   <StatusPill
@@ -498,12 +447,9 @@ export function MonitorCard({
             )}
 
             {/* The outage moment, answered on the card: how long (the ongoing
-                incident's real first failed check — never an estimate) and
-                what to do next. Silence opens the maintenance dialog
-                pre-filled to now; View incident opens the incidents timeline.
-                Hidden under an active maintenance window — silence is
-                meaningless while alerts are already quiet. */}
-            {status === "down" && !maintenanceNow && (
+                incident's real first failed check — never an estimate) and a
+                way into the incidents timeline. */}
+            {status === "down" && (
               <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-down/90">
                 {downSince && (
                   <span
@@ -520,29 +466,13 @@ export function MonitorCard({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onScheduleMaintenance();
+                    onViewIncidents();
                   }}
-                  title="Schedule a maintenance window — checks keep running and stay recorded, alerts go quiet"
+                  title="Open the incidents timeline — down periods stitched from real checks"
                   className="-my-2 inline-flex min-h-11 items-center rounded-none px-0.5 font-medium underline-offset-2 transition-colors hover:text-down hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                 >
-                  Silence alerts…
+                  View incident
                 </button>
-                {downSince && (
-                  <>
-                    <span className="text-down/40" aria-hidden="true">·</span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onViewIncidents();
-                      }}
-                      title="Open the incidents timeline — down periods stitched from real checks"
-                      className="-my-2 inline-flex min-h-11 items-center rounded-none px-0.5 font-medium underline-offset-2 transition-colors hover:text-down hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                    >
-                      View incident
-                    </button>
-                  </>
-                )}
               </div>
             )}
             </div>
@@ -612,9 +542,9 @@ export function MonitorCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                  {/* Four chunks, not ten flat decisions: the monitor's own
-                      controls, then labeled Schedule and Reorder groups, then
-                      the destructive outlier. "Stats & history" is not here —
+                  {/* Three chunks, not ten flat decisions: the monitor's own
+                      controls, then a labeled Reorder group, then the
+                      destructive outlier. "Stats & history" is not here —
                       the card itself opens it, one click away. */}
                   <DropdownMenuItem onClick={() => setRenameOpen(true)}>
                     <Pencil className="size-4" /> Rename
@@ -647,14 +577,6 @@ export function MonitorCard({
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
 
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-[11px] text-muted-foreground">
-                    Schedule
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem onClick={onScheduleMaintenance}>
-                    <Wrench className="size-4" /> Schedule maintenance…
-                  </DropdownMenuItem>
-
                   {canReorder && (
                     <>
                       <DropdownMenuSeparator />
@@ -672,8 +594,8 @@ export function MonitorCard({
 
                   <DropdownMenuSeparator />
                   {/* The destructive outlier gets its own labeled chunk, the
-                      same chunking language as Schedule and Reorder — danger
-                      is a decision, not an afterthought. */}
+                      same chunking language as Reorder — danger is a decision,
+                      not an afterthought. */}
                   <DropdownMenuLabel className="text-[11px] text-muted-foreground">
                     Danger
                   </DropdownMenuLabel>

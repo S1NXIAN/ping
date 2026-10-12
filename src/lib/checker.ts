@@ -10,9 +10,6 @@ export const CHECK_TIMEOUT_MS = 15_000;
 export const MAX_CONCURRENCY = 5;
 export const RETENTION_DAYS = 30;
 export const MAX_CHECKS_PER_MONITOR = 1000;
-export const MAINTENANCE_RETENTION_DAYS = 7;
-export const MAX_WINDOWS_PER_MONITOR = 10;
-export const MAX_WINDOWS_TOTAL = 50;
 /** Hard cap on monitors — matches the import limit; keeps tick duration and
  *  DB size sane on a free-tier instance. */
 export const MAX_MONITORS = 200;
@@ -79,14 +76,6 @@ function describeError(e: unknown): string {
   if (code === "UND_ERR_CONNECT_TIMEOUT") return "Connection timed out";
   if (code) return `Network error (${code})`;
   return (err?.message ?? "Request failed").slice(0, 200);
-}
-
-/** True while `monitorId` is inside an active maintenance window right now. */
-export async function isUnderMaintenance(monitorId: string, now = new Date()): Promise<boolean> {
-  const n = await db.maintenanceWindow.count({
-    where: { monitorId, startsAt: { lte: now }, endsAt: { gte: now } },
-  });
-  return n > 0;
 }
 
 /**
@@ -235,10 +224,9 @@ async function runCheckInner(monitor: Monitor): Promise<Check> {
   // and is reset by any success.
   const consecutiveDowns = status === "down" ? (monitor.consecutiveDowns ?? 0) + 1 : 0;
 
-  // Notification decision — pure and maintenance/delay-aware. See
-  // lib/notifications.ts for the contract; this function only performs the
-  // effects it decides on. Downtime itself is always recorded honestly above.
-  const inMaintenance = await isUnderMaintenance(monitor.id);
+  // Notification decision — pure. See lib/notifications.ts for the contract;
+  // this function only performs the effects it decides on. Downtime itself is
+  // always recorded honestly above.
   const decision = decideNotification({
     previousStatus,
     lastNotifiedStatus: monitor.lastNotifiedStatus,
@@ -248,20 +236,11 @@ async function runCheckInner(monitor: Monitor): Promise<Check> {
     slowThresholdMs: monitor.slowThresholdMs,
     lastResponseMs: monitor.lastResponseMs,
     responseMs,
-    inMaintenance,
   });
 
   if (decision.outcome === "held") {
     console.log(
       `[PING] down event for "${monitor.name}" held — alert delay ${consecutiveDowns}/${monitor.alertDelay + 1} confirmations`,
-    );
-  } else if (decision.outcome === "suppressed") {
-    console.log(
-      `[PING] ${status} transition for "${monitor.name}" suppressed — active maintenance window`,
-    );
-  } else if (decision.outcome === "slow-suppressed") {
-    console.log(
-      `[PING] slow transition for "${monitor.name}" suppressed — active maintenance window`,
     );
   } else if (decision.event === "slow") {
     void fireWebhooks("slow", monitor, {
@@ -378,9 +357,9 @@ export async function runDueChecks(): Promise<TickResult> {
 
 /**
  * Prunes old checks according to the configured retention policy (see
- * getRetentionPolicy) and drops expired sessions and long-past maintenance
- * windows. Operational hygiene rows (maintenance windows, sessions) are
- * always cleaned — only check history respects the retention setting.
+ * getRetentionPolicy) and drops expired sessions. Operational hygiene rows
+ * (sessions) are always cleaned — only check history respects the retention
+ * setting.
  */
 export async function pruneChecks(): Promise<{ deleted: number }> {
   const policy = await getRetentionPolicy();
@@ -410,11 +389,6 @@ export async function pruneChecks(): Promise<{ deleted: number }> {
       }
     }
   }
-
-  // Maintenance windows that ended more than a week ago are no longer useful.
-  await db.maintenanceWindow.deleteMany({
-    where: { endsAt: { lt: new Date(Date.now() - MAINTENANCE_RETENTION_DAYS * 86400_000) } },
-  });
 
   // Incident notes older than the incident lookback can never match a derived
   // incident again — tied to the fixed lookback, not the retention setting.

@@ -77,17 +77,6 @@ export interface MonitorDTO {
   recentChecks: CheckDTO[]; // newest first, small window for sparklines
 }
 
-/** A planned maintenance window for one monitor. */
-export interface MaintenanceWindowDTO {
-  id: string;
-  monitorId: string;
-  monitorName: string;
-  startsAt: string; // ISO
-  endsAt: string; // ISO
-  note: string | null;
-  createdAt: string;
-}
-
 export interface OverviewSummary {
   monitors: number;
   up: number;
@@ -106,8 +95,6 @@ export interface OverviewResponse {
   folders: FolderDTO[];
   monitors: MonitorDTO[];
   summary: OverviewSummary;
-  /** Active, upcoming and recently-ended maintenance windows. */
-  maintenance: MaintenanceWindowDTO[];
   serverTime: string;
 }
 
@@ -160,7 +147,6 @@ export interface AdminIncidentDTO {
   endedAt: string | null;
   downChecks: number;
   lastStatusCode: number | null;
-  duringMaintenance: boolean;
   /** Non-null when a note is attached (this is its row id). */
   noteId: string | null;
   note: string | null;
@@ -248,6 +234,4 @@ export interface ImportResult {
   foldersCreated: number;
   /** Webhook channels imported (0 for v1 exports without channel data). */
   channelsCreated: number;
-  /** Future maintenance windows imported. */
-  windowsCreated: number;
 }

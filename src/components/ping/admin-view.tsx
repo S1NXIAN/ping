@@ -273,10 +273,6 @@ export function AdminView({
           r.channelsCreated
             ? `, ${r.channelsCreated} webhook channel${r.channelsCreated === 1 ? "" : "s"}`
             : ""
-        }${
-          r.windowsCreated
-            ? `, ${r.windowsCreated} maintenance window${r.windowsCreated === 1 ? "" : "s"}`
-            : ""
         }`,
       });
       void loadInfo();
@@ -646,7 +642,7 @@ export function AdminView({
                 Checks older than this window are deleted automatically (hourly) — “Prune now”
                 applies it immediately. Default keeps 30 days and at most 1,000 checks per monitor;
                 a custom number keeps exactly that window; “forever” disables check deletion.
-                Old maintenance windows and expired sessions are always cleaned.
+                Old sessions are always cleaned.
               </p>
             </div>
 

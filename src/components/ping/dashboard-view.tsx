@@ -18,7 +18,6 @@ import {
   RefreshCw,
   Search,
   Settings,
-  Wrench,
   X,
   XCircle,
 } from "lucide-react";
@@ -51,21 +50,13 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useOverview } from "@/hooks/use-overview";
 import { api, formatUptime, timeAgo, uptimeTone } from "@/lib/ping-client";
-import type {
-  AdminIncidentDTO,
-  FolderDTO,
-  MaintenanceWindowDTO,
-  MonitorDTO,
-} from "@/lib/ping-types";
+import type { AdminIncidentDTO, FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
 import { MonitorCard, type CardDnd } from "./monitor-card";
 import { monitorStatus, type MonitorStatus } from "@/lib/monitor-status";
-import { windowState } from "@/lib/maintenance";
 import { MonitorDetailSheet } from "./monitor-detail-sheet";
 import { AddMonitorDialog } from "./add-monitor-dialog";
-import { MaintenanceDialog } from "./maintenance-dialog";
-import { MaintenanceSheet } from "./maintenance-sheet";
 import { IncidentsSheet } from "./incidents-sheet";
 import { TextPromptDialog } from "./text-prompt-dialog";
 import { StatCard } from "./stat-card";
@@ -165,10 +156,6 @@ export function DashboardView({
     }
   }
 
-  // maintenance — sheet + per-monitor dialog
-  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
-  const [maintenanceTargetId, setMaintenanceTargetId] = useState<string | null>(null);
-
   // incidents — postmortem-note sheet, plus the 30d list that drives both
   // the toolbar's rose state and the cards' outage rows (same endpoint the
   // sheet renders; refreshed on mount and on sheet close so the badge never
@@ -255,9 +242,6 @@ export function DashboardView({
     }
     void refresh(true);
   }, [paletteDelete, refresh, toast]);
-  const maintenanceMonitor = maintenanceTargetId
-    ? (monitors.find((m) => m.id === maintenanceTargetId) ?? null)
-    : null;
 
   // the manual-order list: server order (pinned → position), or the live
   // drag preview while reordering
@@ -315,34 +299,6 @@ export function DashboardView({
     // order, or the live drag preview)
     return list;
   }, [manualList, activeFolder, query, sortMode]);
-
-  // maintenance windows — the window to surface on each card: the active one
-  // if any, else the next upcoming one
-  const maintenanceByMonitor = useMemo(() => {
-    const now = Date.now();
-    const map = new Map<string, MaintenanceWindowDTO>();
-    for (const w of data?.maintenance ?? []) {
-      if (windowState(w, now) === "ended") continue;
-      const existing = map.get(w.monitorId);
-      if (!existing) {
-        map.set(w.monitorId, w);
-        continue;
-      }
-      const exStart = new Date(existing.startsAt).getTime();
-      const wStart = new Date(w.startsAt).getTime();
-      // prefer the active window; otherwise the soonest upcoming
-      const wActive = windowState(w, now) === "active";
-      const exActive = windowState(existing, now) === "active";
-      if (wActive && !exActive) map.set(w.monitorId, w);
-      else if (wActive === exActive && wStart < exStart) map.set(w.monitorId, w);
-    }
-    return map;
-  }, [data?.maintenance]);
-
-  const activeMaintenanceCount = useMemo(() => {
-    const now = Date.now();
-    return (data?.maintenance ?? []).filter((w) => windowState(w, now) === "active").length;
-  }, [data?.maintenance]);
 
   const folderStats = useMemo(() => {
     const map = new Map<string, { total: number; down: number }>();
@@ -477,11 +433,6 @@ export function DashboardView({
           },
         }
       : null;
-
-  async function cancelMaintenance(id: string) {
-    await api(`/api/maintenance/${id}`, { method: "DELETE" });
-    void refresh(true);
-  }
 
   async function logout() {
     try {
@@ -820,7 +771,7 @@ export function DashboardView({
 
           {/* working group: toolbar + list — one tight unit (10px internal rhythm) */}
           <div className="space-y-2.5">
-          {/* toolbar: search + sort + maintenance — two designed
+          {/* toolbar: search + sort + incidents — two designed
               clusters so resizing never mixes orphans: find+order stays a unit,
               working tools wrap as a whole row when space runs out */}
           <div className="flex flex-wrap items-center gap-2">
@@ -902,33 +853,10 @@ export function DashboardView({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setMaintenanceOpen(true)}
-              className={cn(
-                "relative h-11 gap-1 px-1.5 text-[10px] sm:h-9 sm:gap-1.5 sm:px-3 sm:text-xs",
-                activeMaintenanceCount > 0 &&
-                  "border-warn/45 bg-warn/15 text-warn hover:bg-warn/20 hover:text-warn",
-              )}
-              aria-label={`Maintenance windows${activeMaintenanceCount ? ` (${activeMaintenanceCount} active)` : ""}`}
-              title="Maintenance windows — silence alerts during planned work"
-            >
-              <Wrench className="size-4" aria-hidden="true" />
-              <span>Maintenance</span>
-              {activeMaintenanceCount > 0 && (
-                <span
-                  className="ml-0.5 grid min-w-4 place-items-center rounded-none bg-warn/20 px-1 text-[10px] font-semibold tabular-nums text-warn"
-                >
-                  {activeMaintenanceCount}
-                </span>
-              )}
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
               onClick={() => setIncidentsOpen(true)}
               className={cn(
                 "relative h-11 gap-1 px-1.5 text-[10px] sm:h-9 sm:gap-1.5 sm:px-3 sm:text-xs",
-                // Rose state voice (mirrors Maintenance's amber): the /10 wash
+                // Rose state voice: the /10 wash
                 // is the AA-safe rose recipe (4.63:1; /15 measures 4.35:1).
                 incidentCount > 0 &&
                   "border-down/40 bg-down/10 text-down hover:bg-down/10 hover:text-down",
@@ -1024,10 +952,8 @@ export function DashboardView({
                     onEdited={() => refresh(true)}
                     onDeleted={() => refresh(true)}
                     onCheckNow={() => refresh(true)}
-                    onScheduleMaintenance={() => setMaintenanceTargetId(m.id)}
                     onViewIncidents={() => setIncidentsOpen(true)}
                     downSince={downSinceByMonitor.get(m.id) ?? null}
-                    maintenanceWindow={maintenanceByMonitor.get(m.id) ?? null}
                     canReorder={sortMode === "manual" && manualList.length > 1}
                     canMoveUp={mi > 0}
                     canMoveDown={mi >= 0 && mi < manualList.length - 1}
@@ -1095,24 +1021,6 @@ export function DashboardView({
         onDeleted={() => refresh(true)}
       />
 
-      <MaintenanceDialog
-        open={!!maintenanceTargetId}
-        onOpenChange={(o) => {
-          if (!o) setMaintenanceTargetId(null);
-        }}
-        monitor={maintenanceMonitor}
-        windows={data?.maintenance ?? []}
-        onChanged={() => refresh(true)}
-      />
-
-      <MaintenanceSheet
-        open={maintenanceOpen}
-        onOpenChange={setMaintenanceOpen}
-        windows={data?.maintenance ?? []}
-        onCancel={cancelMaintenance}
-        serverTime={data?.serverTime ?? null}
-      />
-
       <IncidentsSheet
         open={incidentsOpen}
         onOpenChange={(o) => {
@@ -1131,7 +1039,6 @@ export function DashboardView({
         adminUnlocked={adminUnlocked}
         onNewMonitor={() => setAddOpen(true)}
         onRefresh={() => refresh()}
-        onOpenMaintenance={() => setMaintenanceOpen(true)}
         onOpenIncidents={() => setIncidentsOpen(true)}
         onOpenSettings={onOpenAdmin}
         onLogout={logout}

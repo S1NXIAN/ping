@@ -16,8 +16,8 @@ const TONE = {
 
 /**
  * The 10–12px uppercase tracked heading above a group (see DESIGN.md
- * "Instrument Type Rule"). `tone` carries the section's state — warn for an
- * active maintenance group — never decoration.
+ * "Instrument Type Rule"). `tone` carries the section's state — warn for a
+ * degraded group — never decoration.
  */
 export function SectionLabel({
   icon: Icon,

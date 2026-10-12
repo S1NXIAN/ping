@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
-import { collectMonitorStats, toMaintenanceDTO, toMonitorDTO } from "@/lib/ping-stats";
+import { collectMonitorStats, toMonitorDTO } from "@/lib/ping-stats";
 import { fleetStatus } from "@/lib/monitor-status";
 import type { OverviewResponse } from "@/lib/ping-types";
 
@@ -9,17 +9,11 @@ export async function GET(req: NextRequest) {
   const unauthorized = await guard(req);
   if (unauthorized) return unauthorized;
 
-  const [monitors, folders, bundle, windowRows] = await Promise.all([
+  const [monitors, folders, bundle] = await Promise.all([
     // Pinned first, then the user's manual order, then oldest-created as a tiebreak.
     db.monitor.findMany({ orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }] }),
     db.folder.findMany({ orderBy: { createdAt: "asc" } }),
     collectMonitorStats(),
-    // Active + upcoming windows, plus ones that just ended (for context).
-    db.maintenanceWindow.findMany({
-      where: { endsAt: { gte: new Date(Date.now() - 2 * 86400_000) } },
-      orderBy: { startsAt: "asc" },
-      take: 100,
-    }),
   ]);
 
   const folderById = new Map(folders.map((f) => [f.id, f]));
@@ -31,11 +25,6 @@ export async function GET(req: NextRequest) {
       bundle.recentByMonitor.get(m.id),
     ),
   );
-
-  const monitorNameById = new Map(monitors.map((m) => [m.id, m.name]));
-  const maintenance = windowRows
-    .filter((w) => monitorNameById.has(w.monitorId))
-    .map((w) => toMaintenanceDTO(w, monitorNameById.get(w.monitorId) ?? "?"));
 
   const { up, down, degraded, paused, pending } = fleetStatus(dtos);
 
@@ -75,7 +64,6 @@ export async function GET(req: NextRequest) {
       monitorsWithFailures24h,
       lastCheckAt,
     },
-    maintenance,
     serverTime: new Date().toISOString(),
   };
 

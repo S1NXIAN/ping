@@ -1,24 +1,18 @@
 // The notification decision, extracted from runCheckInner so the
-// delay/maintenance/slow interaction is pure and synchronous — testable
+// delay/slow interaction is pure and synchronous — testable
 // without fetch or a database.
 //
 // The contract it preserves: downtime is always recorded (the caller's job);
 // only the notification is deferred. `lastNotifiedStatus` diverges from
-// `lastStatus` while a maintenance window suppresses events or an alert delay
-// is still confirming, so a service that went down during either still raises
-// "down" on the first check after it ends. Deferred, never lost.
+// `lastStatus` while an alert delay is still confirming, so a service that
+// went down during one still raises "down" on the first check after it ends.
+// Deferred, never lost.
 import { isTransition } from "./webhooks";
 
 export type NotificationEvent = "down" | "up" | "slow";
 
 /** Why the decision came out the way it did — drives the caller's logging. */
-export type NotificationOutcome =
-  | "fired"
-  | "slow"
-  | "held"
-  | "suppressed"
-  | "slow-suppressed"
-  | "none";
+export type NotificationOutcome = "fired" | "slow" | "held" | "none";
 
 export interface NotificationInput {
   /** The monitor's status before this check ran. */
@@ -33,8 +27,6 @@ export interface NotificationInput {
   /** The previous check's response time (for the was-already-slow test). */
   lastResponseMs: number | null;
   responseMs: number;
-  /** True while the monitor is inside an active maintenance window. */
-  inMaintenance: boolean;
 }
 
 export interface NotificationDecision {
@@ -55,11 +47,9 @@ export function decideNotification(input: NotificationInput): NotificationDecisi
     slowThresholdMs,
     lastResponseMs,
     responseMs,
-    inMaintenance,
   } = input;
 
-  // "unknown" is the sentinel for "no notification has ever been sent" — it
-  // keeps a first-check event alive through a window that started before it.
+  // "unknown" is the sentinel for "no notification has ever been sent".
   const sentinel = lastNotifiedStatus ?? previousStatus ?? "unknown";
   // The divergence between notified and actual status is the whole point:
   // compare the transition against what was last NOTIFIED, not last seen.
@@ -72,24 +62,18 @@ export function decideNotification(input: NotificationInput): NotificationDecisi
     return { event: null, outcome: "held", lastNotifiedStatus: sentinel };
   }
 
-  // 2. A real transition. Maintenance suppresses the webhook but remembers the
-  //    divergence so it fires once the window ends.
+  // 2. A real transition.
   if (transition) {
-    if (inMaintenance) {
-      return { event: null, outcome: "suppressed", lastNotifiedStatus: sentinel };
-    }
     return { event: transition, outcome: "fired", lastNotifiedStatus: status };
   }
 
   // 3. Latency alert: an up check over the threshold that wasn't slow before.
-  //    Skipped when a transition (fired or suppressed) already spoke this
-  //    check — the recovery/down message carries the response time. A missed
-  //    slow alert during planned work is acceptable, unlike a missed down.
+  //    Skipped when a transition already spoke this check — the
+  //    recovery/down message carries the response time.
   if (slowThresholdMs != null && status === "up" && responseMs > slowThresholdMs) {
     const wasSlow =
       previousStatus === "up" && lastResponseMs != null && lastResponseMs > slowThresholdMs;
     if (!wasSlow) {
-      if (inMaintenance) return { event: null, outcome: "slow-suppressed" };
       return { event: "slow", outcome: "slow" };
     }
   }

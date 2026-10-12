@@ -6,7 +6,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "./db";
 import { parseTimes } from "./schedule";
 import { isDegraded } from "./monitor-status";
-import type { CheckDTO, DailyBucket, MaintenanceWindowDTO, MonitorDTO, MonitorStatsDTO, WebhookChannelDTO } from "./ping-types";
+import type { CheckDTO, DailyBucket, MonitorDTO, MonitorStatsDTO, WebhookChannelDTO } from "./ping-types";
 
 const H24 = 24 * 60 * 60 * 1000;
 
@@ -78,22 +78,6 @@ export function toWebhookChannelDTO(
     monitorName,
     createdAt: ch.createdAt.toISOString(),
     lastDeliveryAt: ch.lastDeliveryAt?.toISOString() ?? null,
-  };
-}
-
-/** Maps a MaintenanceWindow row to its DTO (monitor name resolved by the caller). */
-export function toMaintenanceDTO(
-  w: { id: string; monitorId: string; startsAt: Date; endsAt: Date; note: string | null; createdAt: Date },
-  monitorName: string,
-): MaintenanceWindowDTO {
-  return {
-    id: w.id,
-    monitorId: w.monitorId,
-    monitorName,
-    startsAt: w.startsAt.toISOString(),
-    endsAt: w.endsAt.toISOString(),
-    note: w.note ?? null,
-    createdAt: w.createdAt.toISOString(),
   };
 }
 
