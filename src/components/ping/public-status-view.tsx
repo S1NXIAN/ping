@@ -21,6 +21,7 @@ import type {
   PublicStatusMonitor,
   PublicStatusResponse,
 } from "@/lib/ping-types";
+import { windowCountdown, windowState } from "@/lib/maintenance";
 import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
 import { ResponseSparkline } from "./response-sparkline";
@@ -260,9 +261,7 @@ function bannerState(
   dot: "up" | "down" | "paused" | "pending";
   maintCount: number;
 } {
-  const maintCount = maintenance.filter(
-    (w) => new Date(w.startsAt).getTime() <= now && new Date(w.endsAt).getTime() > now,
-  ).length;
+  const maintCount = maintenance.filter((w) => windowState(w, now) === "active").length;
   if (!summary || summary.total === 0) {
     return {
       headline: "Nothing tracked yet",
@@ -526,10 +525,8 @@ function IncidentList({ incidents, now }: { incidents: PublicIncident[]; now: nu
 
 /** Active + upcoming planned maintenance windows (real rows, not derived). */
 function MaintenanceList({ maintenance, now }: { maintenance: PublicMaintenance[]; now: number }) {
-  const active = maintenance.filter(
-    (w) => new Date(w.startsAt).getTime() <= now,
-  );
-  const upcoming = maintenance.filter((w) => new Date(w.startsAt).getTime() > now);
+  const active = maintenance.filter((w) => windowState(w, now) === "active");
+  const upcoming = maintenance.filter((w) => windowState(w, now) === "upcoming");
   return (
     <section className="ping-fade-up rounded-xl border bg-card p-4">
       <h2 className="flex items-center gap-2 text-sm font-semibold">
@@ -540,9 +537,7 @@ function MaintenanceList({ maintenance, now }: { maintenance: PublicMaintenance[
         {[...active, ...upcoming].map((w, i) => {
           const start = new Date(w.startsAt).getTime();
           const end = new Date(w.endsAt).getTime();
-          const isActive = start <= now;
-          const minsLeft = Math.max(0, Math.round((end - now) / 60_000));
-          const minsToStart = Math.max(0, Math.round((start - now) / 60_000));
+          const isActive = windowState(w, now) === "active";
           return (
             <li key={`${w.monitorId}-${w.startsAt}-${i}`} className="py-2.5 first:pt-0 last:pb-0">
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -559,14 +554,10 @@ function MaintenanceList({ maintenance, now }: { maintenance: PublicMaintenance[
                   {formatDateTime(w.startsAt)} → {formatDateTime(w.endsAt)}
                 </span>
                 {isActive && (
-                  <span className="text-warn">
-                    {minsLeft <= 0 ? "ending…" : minsLeft < 60 ? `${minsLeft}m left` : `${Math.round(minsLeft / 60)}h left`}
-                  </span>
+                  <span className="text-warn">{windowCountdown(w, now)}</span>
                 )}
                 {!isActive && (
-                  <span>
-                    {minsToStart < 60 ? `starts in ${minsToStart}m` : `starts in ${Math.round(minsToStart / 60)}h`}
-                  </span>
+                  <span>{windowCountdown(w, now)}</span>
                 )}
                 {w.note && <span className="italic">{w.note}</span>}
               </div>

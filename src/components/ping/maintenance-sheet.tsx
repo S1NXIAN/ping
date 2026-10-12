@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { formatDateTime, formatDuration } from "@/lib/ping-client";
+import { windowCountdown, windowState } from "@/lib/maintenance";
 import type { MaintenanceWindowDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { StatusPill } from "./status-pill";
@@ -38,13 +39,13 @@ export function MaintenanceSheet({
 }) {
   const now = serverTime ? new Date(serverTime).getTime() : Date.now();
   const active = windows
-    .filter((w) => new Date(w.startsAt).getTime() <= now && new Date(w.endsAt).getTime() > now)
+    .filter((w) => windowState(w, now) === "active")
     .sort((a, b) => a.endsAt.localeCompare(b.endsAt));
   const upcoming = windows
-    .filter((w) => new Date(w.startsAt).getTime() > now)
+    .filter((w) => windowState(w, now) === "upcoming")
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const ended = windows
-    .filter((w) => new Date(w.endsAt).getTime() <= now)
+    .filter((w) => windowState(w, now) === "ended")
     .sort((a, b) => b.endsAt.localeCompare(a.endsAt));
   const empty = active.length === 0 && upcoming.length === 0 && ended.length === 0;
 
@@ -144,7 +145,6 @@ function WindowRow({
   const start = new Date(w.startsAt).getTime();
   const end = new Date(w.endsAt).getTime();
   const durationSec = Math.round((end - start) / 1000);
-
   async function cancel() {
     setBusy(true);
     try {
@@ -158,9 +158,6 @@ function WindowRow({
       setBusy(false);
     }
   }
-
-  const minsLeft = Math.max(0, Math.round((end - now) / 60_000));
-  const minsToStart = Math.max(0, Math.round((start - now) / 60_000));
 
   return (
     <div
@@ -191,14 +188,10 @@ function WindowRow({
         <p className="truncate text-[11px] text-muted-foreground">
           {formatDateTime(w.startsAt)} · {formatDuration(durationSec)}
           {tone === "active" && (
-            <span className="ml-1.5 text-warn">
-              {minsLeft <= 0 ? "ending…" : minsLeft < 60 ? `${minsLeft}m left` : `${Math.round(minsLeft / 60)}h left`}
-            </span>
+            <span className="ml-1.5 text-warn">{windowCountdown(w, now)}</span>
           )}
           {tone === "upcoming" && (
-            <span className="ml-1.5 text-primary/90">
-              {minsToStart < 60 ? `starts in ${minsToStart}m` : `starts in ${Math.round(minsToStart / 60)}h`}
-            </span>
+            <span className="ml-1.5 text-primary/90">{windowCountdown(w, now)}</span>
           )}
           {w.note && <span className="text-muted-foreground/80"> — {w.note}</span>}
         </p>

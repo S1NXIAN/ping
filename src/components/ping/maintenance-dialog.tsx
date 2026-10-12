@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { api, ApiError, formatDateTime, toLocalInputValue } from "@/lib/ping-client";
 import type { MaintenanceWindowDTO, MonitorDTO } from "@/lib/ping-types";
+import { windowState } from "@/lib/maintenance";
 import { cn } from "@/lib/utils";
 import { InlineAlert } from "./inline-alert";
 
@@ -59,7 +60,7 @@ export function MaintenanceDialog({
     // invalidated the memo on every render, making it a no-op.
     const now = Date.now();
     return windows
-      .filter((w) => w.monitorId === monitor?.id && new Date(w.endsAt).getTime() > now)
+      .filter((w) => w.monitorId === monitor?.id && windowState(w, now) !== "ended")
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   }, [windows, monitor?.id]);
 
@@ -254,7 +255,7 @@ export function MaintenanceDialog({
               </Label>
               <div className="max-h-36 space-y-1 overflow-y-auto rounded-lg border bg-muted/30 p-1.5 slim-scrollbar">
                 {upcoming.map((w) => {
-                  const active = new Date(w.startsAt).getTime() <= Date.now();
+                  const active = windowState(w, Date.now()) === "active";
                   return (
                     <div
                       key={w.id}

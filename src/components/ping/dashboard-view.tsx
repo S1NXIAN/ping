@@ -62,6 +62,7 @@ import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
 import { MonitorCard, type CardDnd } from "./monitor-card";
 import { monitorStatus, type MonitorStatus } from "@/lib/monitor-status";
+import { windowState } from "@/lib/maintenance";
 import { MonitorDetailSheet } from "./monitor-detail-sheet";
 import { AddMonitorDialog } from "./add-monitor-dialog";
 import { SchedulePingDialog } from "./schedule-ping-dialog";
@@ -347,8 +348,7 @@ export function DashboardView({
     const now = Date.now();
     const map = new Map<string, MaintenanceWindowDTO>();
     for (const w of data?.maintenance ?? []) {
-      const end = new Date(w.endsAt).getTime();
-      if (end <= now) continue;
+      if (windowState(w, now) === "ended") continue;
       const existing = map.get(w.monitorId);
       if (!existing) {
         map.set(w.monitorId, w);
@@ -357,8 +357,8 @@ export function DashboardView({
       const exStart = new Date(existing.startsAt).getTime();
       const wStart = new Date(w.startsAt).getTime();
       // prefer the active window; otherwise the soonest upcoming
-      const wActive = wStart <= now;
-      const exActive = exStart <= now;
+      const wActive = windowState(w, now) === "active";
+      const exActive = windowState(existing, now) === "active";
       if (wActive && !exActive) map.set(w.monitorId, w);
       else if (wActive === exActive && wStart < exStart) map.set(w.monitorId, w);
     }
@@ -367,9 +367,7 @@ export function DashboardView({
 
   const activeMaintenanceCount = useMemo(() => {
     const now = Date.now();
-    return (data?.maintenance ?? []).filter(
-      (w) => new Date(w.startsAt).getTime() <= now && new Date(w.endsAt).getTime() > now,
-    ).length;
+    return (data?.maintenance ?? []).filter((w) => windowState(w, now) === "active").length;
   }, [data?.maintenance]);
 
   const folderStats = useMemo(() => {

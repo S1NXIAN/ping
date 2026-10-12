@@ -65,6 +65,7 @@ import { formatTimesForDisplay } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { StatusDot, statusLabel } from "./status-dot";
 import { monitorStatus, type MonitorStatus } from "@/lib/monitor-status";
+import { windowCountdown, windowState } from "@/lib/maintenance";
 import { StatusPill, type PillTone } from "./status-pill";
 import { TextPromptDialog } from "./text-prompt-dialog";
 import { checksToSegments, UptimeBars } from "./uptime-bars";
@@ -79,16 +80,6 @@ function formatDownFor(startedAt: string): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ${String(m % 60).padStart(2, "0")}m`;
   return `${Math.floor(h / 24)}d ${h % 24}h`;
-}
-
-/** Time left in an active maintenance window: "12m left" / "1h 05m left". */
-function formatMaintenanceLeft(endsAt: string): string {
-  const s = Math.max(0, (new Date(endsAt).getTime() - Date.now()) / 1000);
-  if (s <= 0) return "ending…";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m left`;
-  const h = Math.floor(m / 60);
-  return h < 24 ? `${h}h ${String(m % 60).padStart(2, "0")}m left` : `${Math.floor(h / 24)}d ${h % 24}h left`;
 }
 
 /** Drag-and-drop contract owned by the dashboard (manual sort mode only). */
@@ -154,12 +145,12 @@ export function MonitorCard({
   const degraded = status === "up" && monitor.degraded;
 
   // Maintenance context: is the window active right now, or upcoming?
-  const maintenanceNow =
-    maintenanceWindow != null &&
-    new Date(maintenanceWindow.startsAt).getTime() <= Date.now() &&
-    new Date(maintenanceWindow.endsAt).getTime() > Date.now();
-  const maintenanceUpcoming =
-    maintenanceWindow != null && new Date(maintenanceWindow.startsAt).getTime() > Date.now();
+  // One clock read per render, so state and countdown can't disagree.
+  const now = Date.now();
+  const maintenanceState =
+    maintenanceWindow != null ? windowState(maintenanceWindow, now) : null;
+  const maintenanceNow = maintenanceState === "active";
+  const maintenanceUpcoming = maintenanceState === "upcoming";
 
   const statusTone: PillTone =
     status === "up"
@@ -397,7 +388,7 @@ export function MonitorCard({
                   icon={Wrench}
                   title={`Maintenance until ${new Date(maintenanceWindow!.endsAt).toLocaleString()} — alerts silenced`}
                 >
-                  {formatMaintenanceLeft(maintenanceWindow!.endsAt)}
+                  {windowCountdown(maintenanceWindow!, now)}
                 </StatusPill>
               )}
               {maintenanceUpcoming && (
@@ -407,7 +398,7 @@ export function MonitorCard({
                   className="text-warn/80"
                   title={`Maintenance starts ${new Date(maintenanceWindow!.startsAt).toLocaleString()}`}
                 >
-                  maint. {formatCountdown(maintenanceWindow!.startsAt)}
+                  {windowCountdown(maintenanceWindow!, now)}
                 </StatusPill>
               )}
               {monitor.account && (
