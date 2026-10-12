@@ -28,14 +28,14 @@ export async function GET(req: NextRequest) {
 
 const schema = z.object({
   // Only the offered presets are accepted — a mistyped 0 can never lock the
-  // operator out of a zero-length session.
-  sessionMinutes: z.union([
-    z.literal(SESSION_PRESETS[0]),
-    z.literal(SESSION_PRESETS[1]),
-    z.literal(SESSION_PRESETS[2]),
-    z.literal(SESSION_PRESETS[3]),
-    z.literal(SESSION_PRESETS[4]),
-  ]),
+  // operator out of a zero-length session. Derived from SESSION_PRESETS so
+  // adding a preset needs no edit here.
+  sessionMinutes: z
+    .number()
+    .int()
+    .refine((n) => (SESSION_PRESETS as readonly number[]).includes(n), {
+      message: "Pick one of the offered durations",
+    }),
 });
 
 /** Sets the absolute session length. Applies to sessions created after this. */

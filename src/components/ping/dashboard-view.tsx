@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useOverview } from "@/hooks/use-overview";
-import { api, formatUptime, timeAgo, uptimeTone } from "@/lib/ping-client";
+import { api, formatSessionLeft, formatUptime, timeAgo, uptimeTone } from "@/lib/ping-client";
 import type { AdminIncidentDTO, FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
@@ -66,18 +66,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export type SortMode = "manual" | "az" | "status" | "slowest";
 const SORT_STORAGE_KEY = "ping.sort";
-
-/** Countdown to sign-out: "4:59" under an hour, "1h 59m" above it. */
-function formatSessionLeft(ms: number): string {
-  const s = Math.max(0, Math.ceil(ms / 1000));
-  if (s >= 3600) {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    return m > 0 ? `${h}h ${m}m` : `${h}h`;
-  }
-  const m = Math.floor(s / 60);
-  return `${m}:${String(s % 60).padStart(2, "0")}`;
-}
 
 export function DashboardView({
   sessionExpiresAt,
@@ -549,7 +537,7 @@ export function DashboardView({
               // Absolute-timeout countdown — the re-prompt is never a surprise.
               <span
                 className={cn(
-                  "hidden h-6 items-center gap-1 rounded-none border px-2 text-[11px] tabular-nums sm:flex",
+                  "flex h-6 items-center gap-1 rounded-none border px-2 text-[11px] tabular-nums",
                   sessionMsLeft < 60_000
                     ? "border-warn/30 bg-warn/10 text-warn"
                     : "border-border bg-muted/40 text-muted-foreground",

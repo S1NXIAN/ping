@@ -28,6 +28,7 @@ import {
   formatDateTime,
   formatDuration,
   formatMs,
+  formatSessionLeft,
   timeAgo,
 } from "@/lib/ping-client";
 import type { AdminInfoResponse, ImportResult, SessionSettingsResponse } from "@/lib/ping-types";
@@ -74,22 +75,19 @@ function Section({
   );
 }
 
-function formatCountdown(ms: number): string {
-  const s = Math.max(0, Math.ceil(ms / 1000));
-  const m = Math.floor(s / 60);
-  return `${m}:${String(s % 60).padStart(2, "0")}`;
-}
-
 export function AdminView({
   expiresAt,
   onBack,
   onAuthLost,
+  onSessionRenewed,
 }: {
   /** Absolute session expiry (ISO) — shown as a countdown. */
   expiresAt: string | null;
   onBack: () => void;
   /** Session died — sign out. */
   onAuthLost: () => void;
+  /** Password change rotated the session — refresh the expiry. */
+  onSessionRenewed: () => void;
 }) {
   const { toast } = useToast();
 
@@ -252,6 +250,7 @@ export function AdminView({
         body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
       });
       toast({ description: "Password changed — all other sessions signed out" });
+      onSessionRenewed();
       setCurrentPw("");
       setNewPw("");
       setConfirmPw("");
@@ -337,7 +336,7 @@ export function AdminView({
                 title={`Session signs out at ${formatDateTime(expiresAt ?? "")}`}
               >
                 <Clock className="size-3" aria-hidden="true" />
-                {formatCountdown(sessionMsLeft)}
+                {formatSessionLeft(sessionMsLeft)}
                 <span className="sr-only">until sign-out</span>
               </span>
             )}

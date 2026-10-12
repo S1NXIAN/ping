@@ -67,6 +67,14 @@ export function PingApp() {
     setPhase("login");
   }, []);
 
+  /** Re-read the session's absolute expiry (after login or a password change
+   *  rotates the session server-side). */
+  const refreshSession = useCallback(() => {
+    void api<SessionResponse>("/api/auth/session")
+      .then((s) => setExpiresAt(s.expiresAt))
+      .catch(() => undefined);
+  }, []);
+
   function handleLogout() {
     setExpiresAt(null);
     setView("dashboard");
@@ -89,10 +97,7 @@ export function PingApp() {
         onAuthenticated={() => {
           setPhase("app");
           setView("dashboard");
-          // Re-read the fresh session's absolute expiry.
-          void api<SessionResponse>("/api/auth/session")
-            .then((s) => setExpiresAt(s.expiresAt))
-            .catch(() => setExpiresAt(null));
+          refreshSession();
         }}
       />
     );
@@ -103,6 +108,7 @@ export function PingApp() {
       expiresAt={expiresAt}
       onBack={() => setView("dashboard")}
       onAuthLost={handleAuthLost}
+      onSessionRenewed={refreshSession}
     />
   ) : (
     <DashboardView

@@ -12,6 +12,7 @@ import {
   requireAuth,
   SESSION_COOKIE,
   SESSION_DEFAULT_MINUTES,
+  SESSION_PRESETS,
   verifyPassword,
 } from "@/lib/ping-auth";
 import { beforeEach } from "bun:test";
@@ -46,6 +47,10 @@ test("the session length defaults to 15 minutes when unset", async () => {
   });
   expect(await getSessionMinutes()).toBe(SESSION_DEFAULT_MINUTES);
   expect(SESSION_DEFAULT_MINUTES).toBe(15);
+});
+
+test("the offered durations are exactly 5/15/30/60/120 minutes", () => {
+  expect([...SESSION_PRESETS]).toEqual([5, 15, 30, 60, 120]);
 });
 
 test("the configured duration is what the created session carries", async () => {
