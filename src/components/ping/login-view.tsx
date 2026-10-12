@@ -67,8 +67,7 @@ export function LoginView({
           <PingLogo className="size-14 ping-breathe" />
           <PingWordmark className="text-2xl" />
           <p className="max-w-[280px] text-sm leading-relaxed text-muted-foreground">
-            Lightweight, honest uptime monitoring. Real HTTP checks — no invented
-            statistics, no uptime guarantees.
+            Lightweight HTTP checks and monitoring for free-tier services.
           </p>
         </div>
 
