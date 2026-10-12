@@ -5,7 +5,6 @@ import {
   Activity,
   ArrowDown,
   ArrowUp,
-  Clock,
   ExternalLink,
   Eye,
   EyeOff,
@@ -52,7 +51,6 @@ import { useToast } from "@/hooks/use-toast";
 import {
   api,
   ApiError,
-  formatCountdown,
   formatDateTime,
   formatInterval,
   formatMs,
@@ -98,13 +96,11 @@ export function MonitorCard({
   onEdited,
   onDeleted,
   onCheckNow,
-  onSchedulePing,
   onScheduleMaintenance,
   onViewIncidents,
   /** Start of the monitor's ONGOING incident (its real first failed check),
    *  or null when none is known — null never becomes a guess. */
   downSince,
-  nextPingAt,
   maintenanceWindow,
   canReorder,
   canMoveUp,
@@ -121,9 +117,7 @@ export function MonitorCard({
   onEdited: () => void;
   onDeleted: () => void;
   onCheckNow: () => void;
-  onSchedulePing: () => void;
   onScheduleMaintenance: () => void;
-  nextPingAt: string | null;
   /** Active or next upcoming window for this monitor (null = none). */
   maintenanceWindow: MaintenanceWindowDTO | null;
   canReorder: boolean;
@@ -445,16 +439,6 @@ export function MonitorCard({
                   {monitor.folderName}
                 </StatusPill>
               )}
-              {nextPingAt && (
-                <StatusPill
-                  tone="accent"
-                  icon={Clock}
-                  className="text-primary/90"
-                  title={`Scheduled ping ${formatCountdown(nextPingAt)} — ${new Date(nextPingAt).toLocaleString()}`}
-                >
-                  ping {formatCountdown(nextPingAt)}
-                </StatusPill>
-              )}
             </div>
 
             <a
@@ -689,9 +673,6 @@ export function MonitorCard({
                   <DropdownMenuLabel className="text-[11px] text-muted-foreground">
                     Schedule
                   </DropdownMenuLabel>
-                  <DropdownMenuItem onClick={onSchedulePing}>
-                    <Clock className="size-4" /> Schedule ping…
-                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={onScheduleMaintenance}>
                     <Wrench className="size-4" /> Schedule maintenance…
                   </DropdownMenuItem>

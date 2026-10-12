@@ -5,7 +5,6 @@ import {
   Activity,
   AlertTriangle,
   ArrowDownAZ,
-  CalendarClock,
   FolderPlus,
   Folder,
   Gauge,
@@ -65,8 +64,6 @@ import { monitorStatus, type MonitorStatus } from "@/lib/monitor-status";
 import { windowState } from "@/lib/maintenance";
 import { MonitorDetailSheet } from "./monitor-detail-sheet";
 import { AddMonitorDialog } from "./add-monitor-dialog";
-import { SchedulePingDialog } from "./schedule-ping-dialog";
-import { ScheduledPingsSheet } from "./scheduled-pings-sheet";
 import { MaintenanceDialog } from "./maintenance-dialog";
 import { MaintenanceSheet } from "./maintenance-sheet";
 import { IncidentsSheet } from "./incidents-sheet";
@@ -168,10 +165,6 @@ export function DashboardView({
     }
   }
 
-  // scheduled pings — sheet + per-monitor dialog
-  const [pingsOpen, setPingsOpen] = useState(false);
-  const [scheduleTargetId, setScheduleTargetId] = useState<string | null>(null);
-
   // maintenance — sheet + per-monitor dialog
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [maintenanceTargetId, setMaintenanceTargetId] = useState<string | null>(null);
@@ -262,9 +255,6 @@ export function DashboardView({
     }
     void refresh(true);
   }, [paletteDelete, refresh, toast]);
-  const scheduleMonitor = scheduleTargetId
-    ? (monitors.find((m) => m.id === scheduleTargetId) ?? null)
-    : null;
   const maintenanceMonitor = maintenanceTargetId
     ? (monitors.find((m) => m.id === maintenanceTargetId) ?? null)
     : null;
@@ -327,21 +317,6 @@ export function DashboardView({
   }, [manualList, activeFolder, query, sortMode]);
 
   // next pending scheduled ping per monitor (for the card badge)
-  const nextPingByMonitor = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const p of data?.scheduledPings ?? []) {
-      if (p.status === "done") continue;
-      const existing = map.get(p.monitorId);
-      if (!existing || p.runAt < existing) map.set(p.monitorId, p.runAt);
-    }
-    return map;
-  }, [data?.scheduledPings]);
-
-  const pendingPingCount = useMemo(
-    () => (data?.scheduledPings ?? []).filter((p) => p.status !== "done").length,
-    [data?.scheduledPings],
-  );
-
   // maintenance windows — the window to surface on each card: the active one
   // if any, else the next upcoming one
   const maintenanceByMonitor = useMemo(() => {
@@ -503,11 +478,6 @@ export function DashboardView({
           },
         }
       : null;
-
-  async function cancelScheduledPing(id: string) {
-    await api(`/api/scheduled-pings/${id}`, { method: "DELETE" });
-    void refresh(true);
-  }
 
   async function cancelMaintenance(id: string) {
     await api(`/api/maintenance/${id}`, { method: "DELETE" });
@@ -933,28 +903,6 @@ export function DashboardView({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPingsOpen(true)}
-              className="relative h-11 gap-1 px-1.5 text-[10px] sm:h-9 sm:gap-1.5 sm:px-3 sm:text-xs"
-              aria-label={`Scheduled pings${pendingPingCount ? ` (${pendingPingCount} upcoming)` : ""}`}
-              title="Scheduled pings — one-off checks at a specific time"
-            >
-              <CalendarClock className="size-4" aria-hidden="true" />
-              <span>Scheduled</span>
-              {pendingPingCount > 0 && (
-                <span
-                  className={cn(
-                    "ml-0.5 grid min-w-4 place-items-center rounded-none px-1 text-[10px] font-semibold tabular-nums",
-                    "bg-primary/15 text-primary",
-                  )}
-                >
-                  {pendingPingCount}
-                </span>
-              )}
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
               onClick={() => setMaintenanceOpen(true)}
               className={cn(
                 "relative h-11 gap-1 px-1.5 text-[10px] sm:h-9 sm:gap-1.5 sm:px-3 sm:text-xs",
@@ -1077,11 +1025,9 @@ export function DashboardView({
                     onEdited={() => refresh(true)}
                     onDeleted={() => refresh(true)}
                     onCheckNow={() => refresh(true)}
-                    onSchedulePing={() => setScheduleTargetId(m.id)}
                     onScheduleMaintenance={() => setMaintenanceTargetId(m.id)}
                     onViewIncidents={() => setIncidentsOpen(true)}
                     downSince={downSinceByMonitor.get(m.id) ?? null}
-                    nextPingAt={nextPingByMonitor.get(m.id) ?? null}
                     maintenanceWindow={maintenanceByMonitor.get(m.id) ?? null}
                     canReorder={sortMode === "manual" && manualList.length > 1}
                     canMoveUp={mi > 0}
@@ -1150,24 +1096,6 @@ export function DashboardView({
         onDeleted={() => refresh(true)}
       />
 
-      <SchedulePingDialog
-        open={!!scheduleTargetId}
-        onOpenChange={(o) => {
-          if (!o) setScheduleTargetId(null);
-        }}
-        monitor={scheduleMonitor}
-        pings={data?.scheduledPings ?? []}
-        onChanged={() => refresh(true)}
-      />
-
-      <ScheduledPingsSheet
-        open={pingsOpen}
-        onOpenChange={setPingsOpen}
-        pings={data?.scheduledPings ?? []}
-        onCancel={cancelScheduledPing}
-        serverTime={data?.serverTime ?? null}
-      />
-
       <MaintenanceDialog
         open={!!maintenanceTargetId}
         onOpenChange={(o) => {
@@ -1204,7 +1132,6 @@ export function DashboardView({
         adminUnlocked={adminUnlocked}
         onNewMonitor={() => setAddOpen(true)}
         onRefresh={() => refresh()}
-        onOpenPings={() => setPingsOpen(true)}
         onOpenMaintenance={() => setMaintenanceOpen(true)}
         onOpenIncidents={() => setIncidentsOpen(true)}
         onOpenSettings={onOpenAdmin}

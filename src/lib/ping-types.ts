@@ -79,21 +79,6 @@ export interface MonitorDTO {
   recentChecks: CheckDTO[]; // newest first, small window for sparklines
 }
 
-/** A one-off check the user explicitly scheduled for a specific moment. */
-export interface ScheduledPingDTO {
-  id: string;
-  monitorId: string;
-  monitorName: string;
-  runAt: string; // ISO — when it should fire
-  note: string | null;
-  status: "pending" | "running" | "done";
-  ranAt: string | null;
-  up: boolean | null; // null = not run yet / outcome unknown
-  statusCode: number | null;
-  responseMs: number | null;
-  error: string | null;
-}
-
 /** A planned maintenance window for one monitor. */
 export interface MaintenanceWindowDTO {
   id: string;
@@ -123,8 +108,6 @@ export interface OverviewResponse {
   folders: FolderDTO[];
   monitors: MonitorDTO[];
   summary: OverviewSummary;
-  /** Pending + recently finished scheduled pings (newest activity first). */
-  scheduledPings: ScheduledPingDTO[];
   /** Active, upcoming and recently-ended maintenance windows. */
   maintenance: MaintenanceWindowDTO[];
   serverTime: string;

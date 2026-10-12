@@ -4,7 +4,6 @@ import {
   Activity,
   AlertTriangle,
   ArrowDownAZ,
-  CalendarClock,
   Check,
   Folder,
   Gauge,
@@ -60,7 +59,6 @@ export function CommandPalette({
   adminUnlocked,
   onNewMonitor,
   onRefresh,
-  onOpenPings,
   onOpenMaintenance,
   onOpenIncidents,
   onOpenSettings,
@@ -81,7 +79,6 @@ export function CommandPalette({
   adminUnlocked: boolean;
   onNewMonitor: () => void;
   onRefresh: () => void;
-  onOpenPings: () => void;
   onOpenMaintenance: () => void;
   onOpenIncidents: () => void;
   onOpenSettings: () => void;
@@ -234,10 +231,6 @@ export function CommandPalette({
         </CommandGroup>
 
         <CommandGroup heading="Open">
-          <CommandItem onSelect={() => run(onOpenPings)}>
-            <CalendarClock />
-            Scheduled pings
-          </CommandItem>
           <CommandItem onSelect={() => run(onOpenMaintenance)}>
             <Wrench />
             Maintenance windows

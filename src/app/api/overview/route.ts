@@ -1,32 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
-import { collectMonitorStats, toMaintenanceDTO, toMonitorDTO, toScheduledPingDTO } from "@/lib/ping-stats";
+import { collectMonitorStats, toMaintenanceDTO, toMonitorDTO } from "@/lib/ping-stats";
 import { fleetStatus } from "@/lib/monitor-status";
-import type { OverviewResponse, ScheduledPingDTO } from "@/lib/ping-types";
+import type { OverviewResponse } from "@/lib/ping-types";
 
 export async function GET(req: NextRequest) {
   const unauthorized = await guard(req);
   if (unauthorized) return unauthorized;
 
-  const [monitors, folders, bundle, pingRows, windowRows] = await Promise.all([
+  const [monitors, folders, bundle, windowRows] = await Promise.all([
     // Pinned first, then the user's manual order, then oldest-created as a tiebreak.
     db.monitor.findMany({ orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }] }),
     db.folder.findMany({ orderBy: { createdAt: "asc" } }),
     collectMonitorStats(),
-    // Pending (soonest first) + the most recent finished ones.
-    db.$transaction([
-      db.scheduledPing.findMany({
-        where: { status: { in: ["pending", "running"] } },
-        orderBy: { runAt: "asc" },
-        take: 50,
-      }),
-      db.scheduledPing.findMany({
-        where: { status: "done" },
-        orderBy: { ranAt: "desc" },
-        take: 20,
-      }),
-    ]),
     // Active + upcoming windows, plus ones that just ended (for context).
     db.maintenanceWindow.findMany({
       where: { endsAt: { gte: new Date(Date.now() - 2 * 86400_000) } },
@@ -46,9 +33,6 @@ export async function GET(req: NextRequest) {
   );
 
   const monitorNameById = new Map(monitors.map((m) => [m.id, m.name]));
-  const scheduledPings: ScheduledPingDTO[] = [...pingRows[0], ...pingRows[1]]
-    .filter((p) => monitorNameById.has(p.monitorId))
-    .map((p) => toScheduledPingDTO(p, monitorNameById.get(p.monitorId) ?? "?"));
   const maintenance = windowRows
     .filter((w) => monitorNameById.has(w.monitorId))
     .map((w) => toMaintenanceDTO(w, monitorNameById.get(w.monitorId) ?? "?"));
@@ -91,7 +75,6 @@ export async function GET(req: NextRequest) {
       monitorsWithFailures24h,
       lastCheckAt,
     },
-    scheduledPings,
     maintenance,
     serverTime: new Date().toISOString(),
   };

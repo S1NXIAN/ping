@@ -71,29 +71,8 @@ model Monitor {
   // went down during maintenance still raises "down" once it ends.
   lastNotifiedStatus String?
   checks         Check[]
-  scheduledPings ScheduledPing[]
   maintenanceWindows MaintenanceWindow[]
   webhookChannels   WebhookChannel[]
-}
-
-// A one-off check explicitly scheduled for a specific moment
-// (e.g. "ping my deploy at 09:00 right after it goes live").
-model ScheduledPing {
-  id         String    @id @default(cuid())
-  monitorId  String
-  monitor    Monitor   @relation(fields: [monitorId], references: [id], onDelete: Cascade)
-  runAt      DateTime
-  note       String?
-  status     String    @default("pending") // pending | running | done (stale "running" rows are re-run by the next tick)
-  ranAt      DateTime?
-  up         Boolean?
-  statusCode Int?
-  responseMs Int?
-  error      String?
-  createdAt  DateTime  @default(now())
-
-  @@index([status, runAt])
-  @@index([monitorId, status])
 }
 
 // A postmortem/acknowledgment note the admin attaches to one derived

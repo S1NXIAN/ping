@@ -7,7 +7,6 @@ export const db = (await import("@/lib/db")).db;
 /** Wipes every table between tests (children before parents for FK order). */
 export async function resetDb() {
   await db.check.deleteMany();
-  await db.scheduledPing.deleteMany();
   await db.incidentNote.deleteMany();
   await db.maintenanceWindow.deleteMany();
   await db.webhookChannel.deleteMany();
