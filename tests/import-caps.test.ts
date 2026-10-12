@@ -84,6 +84,24 @@ test("a file whose monitors already exist is skipped, not counted against the ca
   expect(body.skipped).toBe(1);
 });
 
+test("an old-format export carrying removed fields still imports", async () => {
+  // A file written before scheduled pings / maintenance / webhooks were
+  // removed: the unknown fields are simply ignored, monitors still land.
+  const { POST } = await import("@/app/api/import/route");
+  const res = await POST(
+    await importReq({
+      app: "PING",
+      version: 1,
+      monitors: [{ name: "legacy", url: "https://legacy.example.com" }],
+      scheduledPings: [{ monitorId: "x", runAt: new Date().toISOString() }],
+      maintenanceWindows: [{ monitor: "legacy", startsAt: new Date().toISOString(), endsAt: new Date().toISOString() }],
+      webhookChannels: [{ name: "old", url: "https://hooks.slack.com/services/x" }],
+    }),
+  );
+  expect(res.status).toBe(200);
+  expect(await db.monitor.count()).toBe(1);
+});
+
 test("a bad schedule in one monitor rejects the whole file before writing", async () => {
   const { POST } = await import("@/app/api/import/route");
   const res = await POST(

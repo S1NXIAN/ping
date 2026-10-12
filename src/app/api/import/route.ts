@@ -108,10 +108,10 @@ export async function POST(req: NextRequest) {
     if (schedErr) return NextResponse.json({ error: `${m.name}: ${schedErr}` }, { status: 400 });
   }
 
-  // Everything below is one transaction: the monitor cap and the window caps
-  // are checked inside it against the totals the writes themselves see, so two
-  // concurrent imports cannot both pass — and any late validation failure rolls
-  // the whole import back, leaving the DB untouched rather than half-imported.
+  // Everything below is one transaction: the monitor cap is checked inside it
+  // against the total the writes themselves see, so two concurrent imports
+  // cannot both pass — and any late validation failure rolls the whole import
+  // back, leaving the DB untouched rather than half-imported.
   try {
     const result = await db.$transaction(
       async (tx) => {
@@ -229,7 +229,7 @@ export async function POST(req: NextRequest) {
       { timeout: 30_000 },
     );
 
-    const body: ImportResult & { channelsCreated: number } = result;
+    const body: ImportResult = result;
     return NextResponse.json(body);
   } catch (e) {
     if (e instanceof ImportError) {

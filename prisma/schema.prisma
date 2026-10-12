@@ -66,8 +66,8 @@ model Monitor {
   lastResponseMs Int?
   lastError      String?
   // Last status a webhook was actually sent for. Diverges from lastStatus
-  // while a maintenance window suppresses notifications, so a service that
-  // went down during maintenance still raises "down" once it ends.
+  // while an alert delay is still confirming a down, so a service that went
+  // down during the delay still raises "down" once enough checks confirm it.
   lastNotifiedStatus String?
   checks         Check[]
   webhookChannels   WebhookChannel[]
