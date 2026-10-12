@@ -54,7 +54,7 @@ import { cn } from "@/lib/utils";
 import { HistoryChart } from "./history-chart";
 import { StatusDot, statusLabel } from "./status-dot";
 import { monitorStatus, type MonitorStatus } from "@/lib/monitor-status";
-import { StatusPill } from "./status-pill";
+import { StatusPill, monitorStatusTone } from "./status-pill";
 import { dailyToSegments, UptimeBars } from "./uptime-bars";
 import { SectionLabel } from "./section-label";
 import { StatTile } from "./stat-tile";
@@ -179,7 +179,7 @@ export function MonitorDetailSheet({
     lastStatus: m?.lastStatus ?? null,
   });
   // Up but over the latency threshold — the same average-of-recent-ups rule
-  // the card and the fleet count use (GLOSSARY.md "Monitor status").
+  // the card and the fleet count use.
   const degraded = status === "up" && (m?.degraded ?? false);
 
   return (
@@ -193,7 +193,7 @@ export function MonitorDetailSheet({
             <StatusDot status={checking ? "checking" : status} />
             <span className="truncate">{m?.name ?? "Monitor"}</span>
             <StatusPill
-              tone={status === "up" ? (degraded ? "warn" : "up") : status === "down" ? "down" : "neutral"}
+              tone={monitorStatusTone(status, degraded)}
               size="sm"
               uppercase
             >

@@ -61,7 +61,7 @@ export interface MonitorDTO {
   keywordMode: KeywordMode;
   /** Latency threshold in ms; null = off. */
   slowThresholdMs: number | null;
-  /** True when the last check was UP but slower than slowThresholdMs. */
+  /** True when the recent up checks average above slowThresholdMs. */
   degraded: boolean;
   createdAt: string;
   lastCheckAt: string | null;
@@ -77,7 +77,7 @@ export interface OverviewSummary {
   monitors: number;
   up: number;
   down: number;
-  /** Up but slower than their slowThresholdMs. */
+  /** Slow sub-count: up monitors whose recent up checks average over threshold. */
   degraded: number;
   paused: number;
   pending: number; // never checked yet

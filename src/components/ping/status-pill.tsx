@@ -17,6 +17,19 @@ import { cn } from "@/lib/utils";
  */
 export type PillTone = "up" | "down" | "warn" | "accent" | "teal" | "neutral";
 
+/**
+ * The tone and label for a monitor's headline status pill, so the card and the
+ * detail sheet can never disagree. `degraded` is the slow sub-state of "up".
+ */
+export function monitorStatusTone(
+  status: "up" | "down" | "paused" | "pending",
+  degraded: boolean,
+): PillTone {
+  if (status === "up") return degraded ? "warn" : "up";
+  if (status === "down") return "down";
+  return "neutral";
+}
+
 /** Tone -> canonical wash + border + ink. The one place these alphas live. */
 const TONE_CLASS: Record<PillTone, string> = {
   up: "border-up/30 bg-up/10 text-up",

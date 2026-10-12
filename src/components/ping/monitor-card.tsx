@@ -59,7 +59,7 @@ import { formatTimesForDisplay } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { StatusDot, statusLabel } from "./status-dot";
 import { monitorStatus, averageUpResponseMs, type MonitorStatus } from "@/lib/monitor-status";
-import { StatusPill, type PillTone } from "./status-pill";
+import { StatusPill, monitorStatusTone } from "./status-pill";
 import { TextPromptDialog } from "./text-prompt-dialog";
 import { checksToSegments, UptimeBars } from "./uptime-bars";
 
@@ -131,8 +131,7 @@ export function MonitorCard({
   // number and the label agree.
   const avgUpMs = averageUpResponseMs(monitor.recentChecks);
 
-  const statusTone: PillTone =
-    status === "up" ? (degraded ? "warn" : "up") : status === "down" ? "down" : "neutral";
+  const statusTone = monitorStatusTone(status, degraded);
 
   const beingDragged = dnd?.isDragging === true && dragArmed;
 

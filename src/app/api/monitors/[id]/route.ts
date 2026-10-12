@@ -109,8 +109,16 @@ export async function GET(req: NextRequest, { params }: Params) {
     totalChecks,
   };
 
+  // The card bars' window is the last 20 checks within 48h. The detail sheet's
+  // slow state must read that same window, or a long-interval monitor would
+  // disagree with its own card.
+  const since48h = new Date(now - 2 * H24);
+  const recentWindow = recent
+    .filter((c) => new Date(c.checkedAt).getTime() >= since48h.getTime())
+    .slice(0, 20);
+
   const body: MonitorDetailResponse = {
-    monitor: toMonitorDTO(monitor, folder, stats, recent.slice(0, 20)),
+    monitor: toMonitorDTO(monitor, folder, stats, recentWindow),
     p95Ms24h: p95,
     daily,
     checks: recent,
