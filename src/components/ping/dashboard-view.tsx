@@ -900,7 +900,10 @@ export function DashboardView({
                   monitor={m}
                   folders={folders}
                   onOpen={() => setDetailId(m.id)}
-                  onRenamed={() => refresh(true)}
+                  onEdit={() => {
+                    setEditTarget(m);
+                    setAddOpen(true);
+                  }}
                   onEdited={() => refresh(true)}
                   onDeleted={() => refresh(true)}
                   onCheckNow={() => refresh(true)}

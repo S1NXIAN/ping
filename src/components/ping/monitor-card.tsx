@@ -58,7 +58,6 @@ import { cn } from "@/lib/utils";
 import { StatusDot, statusLabel } from "./status-dot";
 import { monitorStatus, averageUpResponseMs, type MonitorStatus } from "@/lib/monitor-status";
 import { StatusPill, monitorStatusTone } from "./status-pill";
-import { TextPromptDialog } from "./text-prompt-dialog";
 import { checksToSegments, UptimeBars } from "./uptime-bars";
 
 /** Duration since an outage began, from its real first failed check:
@@ -85,7 +84,7 @@ export function MonitorCard({
   monitor,
   folders,
   onOpen,
-  onRenamed,
+  onEdit,
   onEdited,
   onDeleted,
   onCheckNow,
@@ -101,7 +100,7 @@ export function MonitorCard({
   onViewIncidents: () => void;
   downSince: string | null;
   onOpen: () => void;
-  onRenamed: (name: string) => void;
+  onEdit: () => void;
   onEdited: () => void;
   onDeleted: () => void;
   onCheckNow: () => void;
@@ -111,7 +110,6 @@ export function MonitorCard({
   const { toast } = useToast();
   const [checking, setChecking] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [renameOpen, setRenameOpen] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [dragArmed, setDragArmed] = useState(false);
 
@@ -178,18 +176,6 @@ export function MonitorCard({
 
   async function moveToFolder(folderId: string | null) {
     await patch({ folderId }, folderId ? "Moved" : "Removed from folder", "move");
-  }
-
-  // Rename via the shared TextPromptDialog — the same instrument as folder
-  // rename, not window.prompt (a native dialog outside the design system, no
-  // inline errors, no busy state). The dialog already trims and blocks empty
-  // values; an unchanged name closes silently (no fake success toast).
-  async function renameMonitor(name: string) {
-    if (name === monitor.name) return;
-    await api(`/api/monitors/${monitor.id}`, { method: "PATCH", body: JSON.stringify({ name }) });
-    toast({ description: "Monitor renamed" });
-    onRenamed(name);
-    onEdited();
   }
 
   async function deleteMonitor() {
@@ -524,8 +510,8 @@ export function MonitorCard({
                   {/* Two chunks, not ten flat decisions: the monitor's own
                       controls, then the destructive outlier. "Stats & history"
                       is not here — the card itself opens it, one click away. */}
-                  <DropdownMenuItem onClick={() => setRenameOpen(true)}>
-                    <Pencil className="size-4" /> Rename
+                  <DropdownMenuItem onClick={onEdit}>
+                    <Pencil className="size-4" /> Edit
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled={busyAction === "pause"}
@@ -594,17 +580,6 @@ export function MonitorCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <TextPromptDialog
-        open={renameOpen}
-        onOpenChange={setRenameOpen}
-        title="Rename monitor"
-        label="Monitor name"
-        initialValue={monitor.name}
-        maxLength={80}
-        submitLabel="Rename"
-        onSubmit={renameMonitor}
-      />
     </>
   );
 }
