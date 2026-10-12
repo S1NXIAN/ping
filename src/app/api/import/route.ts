@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
 import { nextMonitorPosition, KEYWORD_MAX_LENGTH, MAX_MONITORS } from "@/lib/checker";
-import { monitorUrlSchema, intervalSecSchema, scheduleModeSchema, scheduleTimesSchema, timezoneSchema, scheduleError } from "@/lib/validation";
+import { monitorUrlSchema, intervalSecSchema, scheduleModeSchema, scheduleTimesSchema, timezoneSchema, scheduleError, methodKeywordError } from "@/lib/validation";
 import type { ImportResult } from "@/lib/ping-types";
 
 const schema = z.object({
@@ -74,6 +74,9 @@ export async function POST(req: NextRequest) {
       timezone: m.timezone,
     });
     if (schedErr) return NextResponse.json({ error: `${m.name}: ${schedErr}` }, { status: 400 });
+
+    const methodErr = methodKeywordError({ method: m.method, keyword: m.keyword });
+    if (methodErr) return NextResponse.json({ error: `${m.name}: ${methodErr}` }, { status: 400 });
   }
 
   // Everything below is one transaction: the monitor cap is checked inside it

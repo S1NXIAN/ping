@@ -5,6 +5,7 @@
 import { expect, test } from "bun:test";
 import {
   monitorUrlSchema,
+  methodKeywordError,
   scheduleError,
   scheduleTimesSchema,
   timezoneSchema,
@@ -55,4 +56,18 @@ test("timezoneSchema accepts real zones and rejects invented ones", () => {
   expect(timezoneSchema.safeParse("America/New_York").success).toBe(true);
   expect(timezoneSchema.safeParse("Mars/Olympus_Mons").success).toBe(false);
   expect(timezoneSchema.safeParse("").success).toBe(false);
+});
+
+// HEAD returns no body, so a keyword can never match and the monitor would
+// report a permanent false down. Enforced at create, patch and import (the
+// same three boundaries as the schedule pairing), so the rule is stated
+// rather than silently coerced in the checker.
+test("methodKeywordError rejects HEAD with a keyword", () => {
+  expect(methodKeywordError({ method: "HEAD", keyword: "welcome" })).toMatch(/body/i);
+});
+
+test("methodKeywordError accepts GET with a keyword, and HEAD without one", () => {
+  expect(methodKeywordError({ method: "GET", keyword: "welcome" })).toBeNull();
+  expect(methodKeywordError({ method: "HEAD", keyword: null })).toBeNull();
+  expect(methodKeywordError({ method: "HEAD", keyword: "" })).toBeNull();
 });

@@ -34,10 +34,11 @@ Nothing will tell you a service went down except opening the dashboard.
 - **Keyword checks** — beyond the status code: require (or forbid) a word in
   the response body, so a 200 from a broken page still counts as down. Set in
   the monitor form (“Keyword check”: body must contain / must not contain,
-  case-insensitive, first 256 KB of the body, ≤200 chars). Keyword checks
-  always fetch with GET — a HEAD response has no body — and a failed keyword
-  match is recorded as a real down check (error message, incidents and uptime
-  math all follow).
+  case-insensitive, first 256 KB of the body, ≤200 chars). A keyword needs a
+  response body, so it can't be combined with a HEAD check: PING rejects that
+  pairing (create, edit and import all refuse it) rather than silently
+  switching the method. A failed keyword match is recorded as a real down
+  check (error message, incidents and uptime math all follow).
 - **Slow (degraded) state** — optional per-monitor threshold (50–30000 ms, set
   in the monitor form). A monitor is **slow** when the average response time of
   its recent up checks is over the threshold — the same recent-checks window the

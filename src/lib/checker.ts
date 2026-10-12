@@ -161,10 +161,11 @@ async function runCheckInner(monitor: Monitor): Promise<Check> {
   let statusCode: number | null = null;
   let error: string | null = null;
 
-  // A keyword check needs a response body, so it always fetches with GET —
-  // a HEAD response legitimately has none.
+  // A keyword check needs a response body, so HEAD can never carry one —
+  // every write boundary rejects that pairing (see methodKeywordError), so
+  // the stored method is used as-is here.
   const keyword = monitor.keyword?.trim() || null;
-  const method = keyword ? "GET" : monitor.method;
+  const method = monitor.method;
 
   try {
     const res = await fetch(monitor.url, {

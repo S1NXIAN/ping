@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
 import { KEYWORD_MAX_LENGTH } from "@/lib/checker";
-import { monitorUrlSchema, intervalSecSchema, scheduleFields, scheduleError } from "@/lib/validation";
+import { monitorUrlSchema, intervalSecSchema, scheduleFields, scheduleError, methodKeywordError } from "@/lib/validation";
 import {
   dailyBuckets,
   toCheckDTO,
@@ -213,6 +213,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
   if (keywordMode !== undefined) {
     data.keywordMode = keywordMode;
+  }
+  // Method/keyword pairing, checked against the RESULTING state so a patch
+  // that only flips the method still validates against the stored keyword
+  // (and vice versa) — the same guarded shape as the schedule rule above.
+  if (method !== undefined || keyword !== undefined) {
+    const methodErr = methodKeywordError({
+      method: method ?? (monitor.method === "HEAD" ? "HEAD" : "GET"),
+      keyword: keyword !== undefined ? keyword ?? null : monitor.keyword,
+    });
+    if (methodErr) return NextResponse.json({ error: methodErr }, { status: 400 });
   }
   // absent → untouched; null or "" → cleared; string → set
   if (account !== undefined) data.account = account === "" ? null : account;

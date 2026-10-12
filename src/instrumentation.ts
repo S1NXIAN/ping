@@ -7,4 +7,12 @@ export async function register() {
   startScheduler();
   const { ensureSelfMonitorOnBoot } = await import("./lib/self-monitor");
   await ensureSelfMonitorOnBoot();
+  // One-shot repair: monitors written before the method/keyword rule existed
+  // may hold HEAD + keyword, which would run as HEAD, find no body and record
+  // a permanent false down. Normalise them to GET once, idempotently.
+  const { db } = await import("./lib/db");
+  await db.monitor.updateMany({
+    where: { method: "HEAD", keyword: { not: null } },
+    data: { method: "GET" },
+  });
 }

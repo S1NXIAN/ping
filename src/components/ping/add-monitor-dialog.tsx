@@ -202,12 +202,11 @@ export function AddMonitorDialog({
     }
   }, [open, initial, defaultFolderId]);
 
-  // Keyword checks need a response body — a HEAD response has none, so GET
-  // is forced while a keyword is active.
+  // Keyword checks need a response body, and a HEAD response has none — the
+  // two controls can't both be live (and every write boundary enforces the
+  // same rule). HEAD is disabled while a keyword is set, and the keyword
+  // control is disabled while HEAD is chosen; no silent method flip.
   const keywordActive = keywordMode !== "off";
-  useEffect(() => {
-    if (keywordActive && method === "HEAD") setMethod("GET");
-  }, [keywordActive, method]);
 
   const clearError = (key: keyof FieldErrors) =>
     setFieldErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
@@ -652,6 +651,7 @@ export function AddMonitorDialog({
                   <Select
                     value={keywordMode}
                     onValueChange={(v) => setKeywordMode(v as "off" | "contains" | "excludes")}
+                    disabled={method === "HEAD"}
                   >
                     <SelectTrigger id="m-keyword-mode" className={fieldClass}>
                       <SelectValue />
@@ -664,6 +664,11 @@ export function AddMonitorDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                  {method === "HEAD" && (
+                    <p className="text-xs text-muted-foreground">
+                      HEAD returns no body — switch Method to GET to check the body.
+                    </p>
+                  )}
                   {keywordActive && (
                     <div className="space-y-2">
                       <Input

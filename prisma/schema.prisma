@@ -47,8 +47,9 @@ model Monitor {
   isSelfMonitor  Boolean   @default(false)
   // Optional keyword check: after a 2xx/3xx response, the (up to 256 KB of
   // the) body must contain — or must not contain — this case-insensitive
-  // string for the monitor to count as up. Keyword checks always fetch with
-  // GET (a HEAD response has no body). null = keyword checking off.
+  // string for the monitor to count as up. A keyword needs a body, so it
+  // can't be combined with a HEAD check — that pairing is rejected at create,
+  // edit and import (see methodKeywordError). null = keyword checking off.
   keyword     String?
   keywordMode String  @default("contains") // "contains" | "excludes"
   // Optional latency threshold in ms. When an UP check takes longer than

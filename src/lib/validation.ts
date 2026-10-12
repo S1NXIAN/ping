@@ -92,3 +92,20 @@ export function scheduleError(input: {
   if (!input.timezone) return "Pick a timezone";
   return null;
 }
+
+/**
+ * Cross-field check for the method/keyword pairing. A HEAD response has no
+ * body, so a keyword check can never match and the monitor would record a
+ * permanent false down. Enforced at every write boundary (create, patch,
+ * import) instead of being silently coerced to GET in the checker. Evaluated
+ * against the resulting state, so a patch that only switches the method still
+ * validates against the keyword already stored. Returns a message, or null.
+ */
+export function methodKeywordError(input: {
+  method?: "GET" | "HEAD";
+  keyword?: string | null;
+}): string | null {
+  if (input.method !== "HEAD") return null;
+  if (!input.keyword) return null;
+  return "HEAD checks can't read the response body — use GET, or turn the keyword off.";
+}

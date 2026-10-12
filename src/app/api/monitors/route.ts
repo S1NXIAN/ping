@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
 import { runCheck, nextMonitorPosition, KEYWORD_MAX_LENGTH, MAX_MONITORS } from "@/lib/checker";
-import { monitorUrlSchema, intervalSecSchema, scheduleFields, scheduleError } from "@/lib/validation";
+import { monitorUrlSchema, intervalSecSchema, scheduleFields, scheduleError, methodKeywordError } from "@/lib/validation";
 import { emptyStats, toMonitorDTO } from "@/lib/ping-stats";
 
 const createSchema = z.object({
@@ -57,6 +57,11 @@ export async function POST(req: NextRequest) {
   // silently never run.
   const schedErr = scheduleError({ scheduleMode, scheduleTimes, timezone });
   if (schedErr) return NextResponse.json({ error: schedErr }, { status: 400 });
+
+  // A HEAD check can't read the body a keyword needs — reject rather than
+  // store a monitor that would report a permanent false down.
+  const methodErr = methodKeywordError({ method: method ?? "GET", keyword });
+  if (methodErr) return NextResponse.json({ error: methodErr }, { status: 400 });
 
   if (folderId) {
     const folder = await db.folder.findUnique({ where: { id: folderId } });

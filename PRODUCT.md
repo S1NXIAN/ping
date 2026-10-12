@@ -34,7 +34,7 @@ Honesty of data as the core mechanism, purpose-built for cold-booting free-tier 
 Capabilities (confirmed, shipping):
 
 - Monitors: any http(s) URL, GET or HEAD, two schedule kinds — an **interval** (1 min–24 hours; presets, or a custom `H`/`M` value such as `4M` or `4H30M`) or **times of day** (fixed clock times every day, e.g. 1:00 PM + 3:00 AM, in a per-monitor timezone) — folders, pinning, manual/A–Z/status sorting, drag reorder, per-device sort memory, `/` search focus, ⌘K command palette.
-- Real checks: 15 s timeout, 2xx–3xx = up, exact error text on failure; keyword checks (body must contain / must not contain, case-insensitive, first 256 KB, forces GET); latency "slow" state (50–30 000 ms threshold, judged from the **average** of the monitor's recent up Checks).
+- Real checks: 15 s timeout, 2xx–3xx = up, exact error text on failure; keyword checks (body must contain / must not contain, case-insensitive, first 256 KB, can't be combined with HEAD — the pairing is rejected at create, edit and import); latency "slow" state (50–30 000 ms threshold, judged from the **average** of the monitor's recent up Checks).
 - Self-monitor: created by default, checks PING's own health endpoint every 3 minutes; an ordinary monitor otherwise (visible, editable, deletable).
 - Incidents: derived from real check history (30-day window), with admin postmortem notes; ongoing incidents are pinned to the top and exempt from the list cap.
 - Import/export of configuration as JSON; Render platform status card; keep-alive workflow YAML in the README.
