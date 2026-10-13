@@ -117,10 +117,9 @@ with build `bun install && bunx prisma generate && bun run build` and start
 
 **Honest caveats** (see render.yaml comments too):
 
-- The **free plan has no persistent disks**. The blueprint therefore mounts a
-  1 GB disk (a paid `starter` feature) so the SQLite database survives
-  restarts. On a strictly-free deployment the database resets on restart —
-  export/import your monitors, or point `DATABASE_URL` somewhere durable.
+- **The free plan has no persistent disks.** The blueprint runs on the free
+  plan, so the SQLite database lives on the instance's ephemeral filesystem:
+  it resets on every deploy and every spin-down.
 - **Free services spin down after 15 min of inactivity.** A sleeping service
   cannot wake itself, so PING cannot keep itself alive from inside.
 - **~750 free instance hours per workspace per month.** A 31-day month is 744

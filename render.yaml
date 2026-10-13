@@ -6,8 +6,7 @@
 #   to stay awake. Without it, checks pause while the instance sleeps.
 # - No persistent disk on free: the SQLite file lives on the instance's
 #   ephemeral filesystem and RESETS on every deploy and every spin-down.
-#   Back up via Settings → "Export monitors". For durable data, upgrade the
-#   plan and re-add the disk block below (commented for reference).
+#   Back up via Settings → "Export monitors".
 # - Free instance hours are pooled per workspace (~750/month).
 #
 # Render Blueprint docs: https://render.com/docs/blueprints
@@ -38,8 +37,3 @@ services:
       # PING_TOKEN repository secret (see README).
       - key: CRON_SECRET
         generateValue: true
-    # Paid plan only — re-enable for durable SQLite storage:
-    # disk:
-    #   name: ping-data
-    #   mountPath: /var/data
-    #   sizeGB: 1
