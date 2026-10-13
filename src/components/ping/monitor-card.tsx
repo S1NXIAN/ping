@@ -438,7 +438,8 @@ export function MonitorCard({
                 aria-label={monitor.pinned ? "Unpin monitor" : "Pin to top"}
                 title={monitor.pinned ? "Unpin" : "Pin to top"}
                 className={cn(
-                  "ml-auto h-11 w-11 hover:bg-secondary sm:ml-0 sm:h-8 sm:w-8",
+                  // Hidden below sm, where the menu carries Pin instead.
+                  "ml-auto h-11 w-11 hover:bg-secondary max-sm:hidden sm:ml-0 sm:h-8 sm:w-8",
                   monitor.pinned
                     ? "text-primary hover:text-primary"
                     : "text-muted-foreground/60 hover:text-primary",
@@ -457,7 +458,7 @@ export function MonitorCard({
                 disabled={checking}
                 aria-label="Check now"
                 title="Check now"
-                className="h-11 w-11 text-muted-foreground hover:bg-secondary hover:text-teal sm:h-8 sm:w-8"
+                className="h-11 w-11 text-muted-foreground hover:bg-secondary hover:text-teal max-sm:hidden sm:h-8 sm:w-8"
               >
                 {checking ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -481,6 +482,16 @@ export function MonitorCard({
                   {/* Two chunks, not ten flat decisions: the monitor's own
                       controls, then the destructive outlier. "Stats & history"
                       is not here — the card itself opens it, one click away. */}
+                  {/* Below sm the Pin and Check now icon buttons are hidden, so
+                      the menu carries those two actions; at sm+ the icons are
+                      visible and these duplicates stay out of the menu. */}
+                  <DropdownMenuItem
+                    disabled={checking}
+                    onClick={checkNow}
+                    className="sm:hidden"
+                  >
+                    <RefreshCw className="size-4" /> Check now
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={onEdit}>
                     <Pencil className="size-4" /> Edit
                   </DropdownMenuItem>
@@ -489,6 +500,14 @@ export function MonitorCard({
                     onClick={() => patch({ enabled: !monitor.enabled }, monitor.enabled ? "Paused" : "Resumed", "pause")}
                   >
                     <Play className="size-4" /> {monitor.enabled ? "Pause" : "Resume"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={busyAction === "pin"}
+                    onClick={() => void pinToggle()}
+                    className="sm:hidden"
+                  >
+                    {monitor.pinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
+                    {monitor.pinned ? "Unpin" : "Pin to top"}
                   </DropdownMenuItem>
 
                   {folders.length > 0 && (
