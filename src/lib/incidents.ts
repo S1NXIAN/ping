@@ -6,15 +6,17 @@
 // failed check, which is the stable key both sides agree on.
 import { db } from "./db";
 import { Prisma } from "@prisma/client";
+import { MAX_MONITORS } from "./checker";
 import { nominalPeriodSec, parseTimes } from "./schedule";
 import type { AdminIncidentDTO } from "./ping-types";
 
 export const INCIDENT_WINDOW_DAYS = 30;
 export const MAX_INCIDENTS = 15;
 /** Ongoing incidents are exempt from MAX_INCIDENTS so a long outage is never
- *  dropped for newer ones — but the exempt set is itself capped so a
- *  pathological fleet cannot make the list unbounded. */
-export const MAX_ONGOING_INCIDENTS = 5;
+ *  dropped for newer ones. Each monitor yields at most one ongoing incident,
+ *  so the exempt set is bounded by the fleet cap — never a small fixed number,
+ *  which silently hid a real current outage (six monitors down, five listed). */
+export const MAX_ONGOING_INCIDENTS = MAX_MONITORS;
 /** Hard caps so a pathological (flapping) monitor can never make this unbounded. */
 const MAX_DOWN_ROWS_PER_MONITOR = 5000;
 const MAX_STREAKS_PER_MONITOR = 40;
@@ -178,9 +180,9 @@ export async function deriveIncidents(
 
   // Ongoing incidents (no end) pin to the top, newest-first among themselves,
   // and are exempt from the closed-incident size cap; closed incidents keep
-  // the existing newest-first order and cap. Both subsets are bounded, so the
-  // list can never grow without limit — at most MAX_ONGOING_INCIDENTS
-  // concurrent outages are listed.
+  // the existing newest-first order and cap. The exempt set is bounded by the
+  // fleet cap (one ongoing incident per monitor), so the list can never grow
+  // without limit while still never dropping a real current outage.
   const byNewest = (a: DerivedIncident, b: DerivedIncident) =>
     new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
   const ongoing = incidents.filter((i) => i.endedAt == null).sort(byNewest);

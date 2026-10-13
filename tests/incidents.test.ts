@@ -162,11 +162,12 @@ test("multiple ongoing incidents are ordered newest-first among themselves", asy
   expect(incidents.map((i) => i.monitorName)).toEqual(["newer", "older"]);
 });
 
-test("the exempt ongoing set is bounded", async () => {
-  const { deriveIncidents, MAX_ONGOING_INCIDENTS } = await import("@/lib/incidents");
-  // Ten monitors, each with its own ongoing incident.
+test("every ongoing outage is listed — six monitors down, six incidents", async () => {
+  const { deriveIncidents } = await import("@/lib/incidents");
+  // The reported bug: more monitors down at once than the old fixed cap of 5,
+  // so the oldest ongoing outage vanished from the list.
   const monitors: Awaited<ReturnType<typeof db.monitor.create>>[] = [];
-  for (let i = 0; i < MAX_ONGOING_INCIDENTS + 5; i++) {
+  for (let i = 0; i < 6; i++) {
     const m = await db.monitor.create({
       data: { name: `svc${i}`, url: `https://svc${i}.example.com`, intervalSec: 60 },
     });
@@ -176,5 +177,15 @@ test("the exempt ongoing set is bounded", async () => {
     monitors.push(m);
   }
   const incidents = await deriveIncidents(monitors);
-  expect(incidents.filter((i) => i.endedAt == null).length).toBe(MAX_ONGOING_INCIDENTS);
+  const ongoing = incidents.filter((i) => i.endedAt == null);
+  expect(ongoing.length).toBe(6);
+  expect(new Set(ongoing.map((i) => i.monitorId)).size).toBe(6);
+});
+
+test("the exempt ongoing set is bounded by the fleet cap, not a small fixed number", async () => {
+  const { MAX_ONGOING_INCIDENTS } = await import("@/lib/incidents");
+  const { MAX_MONITORS } = await import("@/lib/checker");
+  // One ongoing incident per monitor, so the set is bounded by the fleet cap.
+  // A cap below that would hide a real current outage — the bug this guards.
+  expect(MAX_ONGOING_INCIDENTS).toBe(MAX_MONITORS);
 });
