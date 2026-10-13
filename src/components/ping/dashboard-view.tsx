@@ -47,8 +47,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useOverview } from "@/hooks/use-overview";
 import { useCardReorder } from "@/hooks/use-card-reorder";
-import { api, formatUptime, timeAgo, uptimeTone } from "@/lib/ping-client";
+import { api, fetchIncidents, formatUptime, timeAgo, uptimeTone } from "@/lib/ping-client";
 import { pinnedSetAfterMove } from "@/lib/reorder";
+import { summarize } from "@/lib/summary";
 import type { AdminIncidentDTO, FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
@@ -154,19 +155,28 @@ export function DashboardView({
   // incidents — postmortem-note sheet, plus the 30d list that drives both
   // the toolbar's rose state and the cards' outage rows (same endpoint the
   // sheet renders; refreshed on mount and on sheet close so the badge never
-  // outlives its data)
-  const [incidents, setIncidents] = useState<AdminIncidentDTO[] | null>(null);
+  // outlives its data). Scoped to the active Folder so the badge counts the
+  // Scope, not the whole Fleet. The loaded list is tagged with the Folder it
+  // came from, so a failed scoped fetch shows no badge rather than another
+  // Folder's count (one scope per view).
+  const scopeFolderId = activeFolder === "all" ? null : activeFolder;
+  const [incidentData, setIncidentData] = useState<{
+    folderId: string | null;
+    list: AdminIncidentDTO[];
+  } | null>(null);
   const loadIncidents = useCallback(async () => {
     try {
-      const r = await api<{ incidents: AdminIncidentDTO[] }>("/api/incidents");
-      setIncidents(r.incidents);
+      const list = await fetchIncidents(scopeFolderId);
+      setIncidentData({ folderId: scopeFolderId, list });
     } catch {
-      // The sheet surfaces its own errors; the badge keeps the last list.
+      // The sheet surfaces its own errors; a failed fetch leaves the previous
+      // list tagged to its own Folder, so it never leaks into this Scope.
     }
-  }, []);
+  }, [scopeFolderId]);
   useEffect(() => {
     void loadIncidents();
   }, [loadIncidents]);
+  const incidents = incidentData?.folderId === scopeFolderId ? incidentData.list : null;
   const incidentCount = incidents?.length ?? 0;
 
   // Down cards' honest "down since": the ONGOING incident's real first
@@ -192,7 +202,20 @@ export function DashboardView({
   // render; memoise on `data` so the derived maps below stay stable.
   const monitors = useMemo(() => data?.monitors ?? [], [data]);
   const folders = useMemo(() => data?.folders ?? [], [data]);
-  const summary = data?.summary;
+
+  // The Scope (GLOSSARY.md): the whole Fleet on "All monitors", one Folder
+  // otherwise. The search query never changes it — search filters the list,
+  // not the instrument. The stat strip and header pills read this, so they
+  // always agree with each other and with the active Folder. Undefined while
+  // loading keeps the "—" placeholder rather than a misleading zero.
+  const scopedMonitors = useMemo(
+    () => (activeFolder === "all" ? monitors : monitors.filter((m) => m.folderId === activeFolder)),
+    [monitors, activeFolder],
+  );
+  const summary = useMemo(
+    () => (data ? summarize(scopedMonitors) : undefined),
+    [data, scopedMonitors],
+  );
 
   // ---------- reorder / pin engine ----------
 
@@ -238,7 +261,7 @@ export function DashboardView({
 
   // 24h fleet floor — a mean hides outliers; "worst" is the honest companion
   // readout (min over the same monitors the API averages, nulls excluded).
-  const uptimes24h = monitors
+  const uptimes24h = scopedMonitors
     .map((m) => m.stats.uptime24h)
     .filter((u): u is number => u != null);
   const worst24h = uptimes24h.length ? Math.min(...uptimes24h) : null;
@@ -949,6 +972,7 @@ export function DashboardView({
           setIncidentsOpen(o);
           if (!o) void loadIncidents();
         }}
+        folderId={activeFolder === "all" ? null : activeFolder}
       />
 
       <CommandPalette

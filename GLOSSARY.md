@@ -45,6 +45,21 @@ Monitor otherwise — visible, editable and deletable — and a durable marker
 keeps creation idempotent so repeated boots never make a second one.
 _Avoid_: heartbeat, internal monitor
 
+**Folder**:
+A named group of Monitors. A Monitor belongs to at most one Folder; deleting
+the Folder returns its Monitors to the top level, never deletes them.
+_Avoid_: group, tag, collection
+
+**Fleet**:
+Every Monitor PING has, filed in a Folder or not.
+_Avoid_: everything, total fleet
+
+**Scope**:
+The set of Monitors a surface currently summarizes: the Fleet when "All
+monitors" is active, otherwise one Folder. The search query never changes the
+Scope — it filters the list only.
+_Avoid_: view, filter, selection
+
 **Session**:
 The single dashboard login, remembered for a **window counted from the last
 password entry** (no sliding, no idle detection). Its length is an admin

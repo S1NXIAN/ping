@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
 import { collectMonitorStats, toMonitorDTO } from "@/lib/ping-stats";
-import { fleetStatus } from "@/lib/monitor-status";
 import type { OverviewResponse } from "@/lib/ping-types";
 
 export async function GET(req: NextRequest) {
@@ -26,25 +25,8 @@ export async function GET(req: NextRequest) {
     ),
   );
 
-  const { up, down, degraded, paused, pending } = fleetStatus(dtos);
-
-  const uptimes = dtos.map((m) => m.stats.uptime24h).filter((u): u is number => u != null);
-  const checks24h = dtos.reduce((acc, m) => acc + m.stats.checks24h, 0);
-  const monitorsWithFailures24h = dtos.filter((m) => {
-    // Null means "no checks recorded yet", not "no failures" — and 0 (every
-    // check failed) is exactly the value a truthy check would swallow.
-    if (m.stats.uptime24h == null) return false;
-    return m.stats.uptime24h < 1;
-  }).length;
-
-  const lastCheckAts = dtos
-    .map((m) => m.lastCheckAt)
-    .filter((t): t is string => !!t)
-    .map((t) => new Date(t).getTime());
-  const lastCheckAt = lastCheckAts.length
-    ? new Date(Math.max(...lastCheckAts)).toISOString()
-    : null;
-
+  // No server-side summary: the client derives the stat strip and header pills
+  // from these monitors, scoped to the active Folder (see lib/summary.ts).
   const body: OverviewResponse = {
     folders: folders.map((f) => ({
       id: f.id,
@@ -52,18 +34,6 @@ export async function GET(req: NextRequest) {
       createdAt: f.createdAt.toISOString(),
     })),
     monitors: dtos,
-    summary: {
-      monitors: dtos.length,
-      up,
-      down,
-      degraded,
-      paused,
-      pending,
-      avgUptime24h: uptimes.length ? uptimes.reduce((a, b) => a + b, 0) / uptimes.length : null,
-      checks24h,
-      monitorsWithFailures24h,
-      lastCheckAt,
-    },
   };
 
   return NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });

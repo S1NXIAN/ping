@@ -1,4 +1,5 @@
 // Small client-side helpers for PING: fetch wrapper + formatters.
+import type { AdminIncidentDTO } from "./ping-types";
 
 /** Check-interval bounds, shared with the API schemas (see lib/validation.ts).
  *  The floor is 60s and seconds are not a grammar unit: the scheduler wakes
@@ -65,6 +66,17 @@ export class ApiError extends Error {
     super(message);
     this.status = status;
   }
+}
+
+/**
+ * Lists incidents for one Scope (see GLOSSARY.md "Scope"): the whole Fleet
+ * when `folderId` is null, else that Folder's monitors. The server scopes
+ * before the list cap, so the badge and the sheet never undercount.
+ */
+export async function fetchIncidents(folderId: string | null): Promise<AdminIncidentDTO[]> {
+  const qs = folderId ? `?folderId=${encodeURIComponent(folderId)}` : "";
+  const r = await api<{ incidents: AdminIncidentDTO[] }>(`/api/incidents${qs}`);
+  return r.incidents;
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {

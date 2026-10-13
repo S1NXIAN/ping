@@ -45,7 +45,8 @@ Nothing will tell you a service went down except opening the dashboard.
   its recent up checks is over the threshold — the same recent-checks window the
   card bars show. One slow sample cannot mislabel a healthy service, and one
   fast sample cannot hide a slow one. The card shows an amber “slow” state, and
-  the fleet header counts slow monitors; the detail sheet agrees.
+  the header counts slow monitors in the active Scope (see `GLOSSARY.md`); the
+  detail sheet agrees.
 - **Incident postmortem notes** — from the Incidents sheet, attach a short
   note (500 chars) to any derived incident, for your own later reference.
   Notes are keyed to the incident's exact start, editable, removable, and

@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { api, formatDateTime, formatDuration } from "@/lib/ping-client";
+import { api, fetchIncidents, formatDateTime, formatDuration } from "@/lib/ping-client";
 import type { AdminIncidentDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { StatusPill } from "./status-pill";
@@ -37,9 +37,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function IncidentsSheet({
   open,
   onOpenChange,
+  folderId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Active Folder to scope to; null = the whole Fleet ("All monitors"). */
+  folderId: string | null;
 }) {
   const { toast } = useToast();
   const [incidents, setIncidents] = useState<AdminIncidentDTO[] | null>(null);
@@ -47,13 +50,12 @@ export function IncidentsSheet({
 
   const load = useCallback(async () => {
     try {
-      const r = await api<{ incidents: AdminIncidentDTO[] }>("/api/incidents");
-      setIncidents(r.incidents);
+      setIncidents(await fetchIncidents(folderId));
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load incidents");
     }
-  }, []);
+  }, [folderId]);
 
   useEffect(() => {
     if (open) void load();
@@ -115,7 +117,8 @@ export function IncidentsSheet({
             )}
           </SheetTitle>
           <SheetDescription>
-            Down periods stitched from real checks over the last 30 days. Attach a postmortem note
+            Down periods stitched from real checks over the last 30 days
+            {folderId ? " in this folder" : " across every monitor"}. Attach a postmortem note
             to any incident to record what happened for your own reference.
           </SheetDescription>
         </SheetHeader>

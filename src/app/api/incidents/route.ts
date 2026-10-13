@@ -7,12 +7,16 @@ import { deriveIncidents, incidentsWithNotes } from "@/lib/incidents";
 const NOTE_MAX = 500;
 
 /** Lists the last 30 days of derived incidents (all monitors, incl. hidden)
- *  with their admin postmortem notes. Session required. */
+ *  with their admin postmortem notes. Session required. An optional `folderId`
+ *  narrows the list to that Folder's monitors — scoping happens BEFORE the
+ *  cap, so a Folder's incidents are never dropped for another Folder's. */
 export async function GET(req: NextRequest) {
   const unauthorized = await guard(req);
   if (unauthorized) return unauthorized;
 
+  const folderId = req.nextUrl.searchParams.get("folderId");
   const monitors = await db.monitor.findMany({
+    where: folderId ? { folderId } : undefined,
     select: { id: true, name: true, intervalSec: true, scheduleMode: true, scheduleTimes: true },
     orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }],
   });

@@ -90,7 +90,6 @@ export interface OverviewSummary {
 export interface OverviewResponse {
   folders: FolderDTO[];
   monitors: MonitorDTO[];
-  summary: OverviewSummary;
 }
 
 export interface DailyBucket {
