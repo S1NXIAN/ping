@@ -20,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { api, ApiError, formatInterval, normalizeUrl, parseInterval } from "@/lib/ping-client";
 import type { FolderDTO, MonitorDTO, ScheduleMode } from "@/lib/ping-types";
@@ -75,7 +74,10 @@ function browserTimezone(): string {
 
 type FieldErrors = { url?: string; slow?: string; keyword?: string; interval?: string; times?: string };
 
-/** Top-aligned label with a compact "?" tooltip instead of helper paragraphs. */
+/** Top-aligned label with a tap/keyboard-revealable hint instead of helper
+ *  paragraphs (keeps the dialog scroll-free). A hover-only tooltip was a defect:
+ *  touch has no hover, so the meaning was unreachable there (DESIGN.md —
+ *  "Touch reads labels, not tooltips"). */
 function FieldLabel({
   htmlFor,
   hint,
@@ -85,26 +87,40 @@ function FieldLabel({
   hint?: string;
   children: React.ReactNode;
 }) {
+  const [hintOpen, setHintOpen] = useState(false);
+  const hintId = `${htmlFor}-hint`;
   return (
-    <div className="flex items-center gap-1">
-      <Label htmlFor={htmlFor} className="text-sm font-medium leading-none">
-        {children}
-      </Label>
+    <div>
+      <div className="flex items-center gap-1">
+        <Label htmlFor={htmlFor} className="text-sm font-medium leading-none">
+          {children}
+        </Label>
+        {hint && (
+          <button
+            type="button"
+            aria-label="More information"
+            aria-expanded={hintOpen}
+            aria-controls={hintId}
+            onClick={() => setHintOpen((v) => !v)}
+            // Hit area grown toward the 44px touch floor (the
+            // schedule-times-editor precedent): the 16px glyph alone is far
+            // below it. Vertical only + a 4px horizontal bleed fills the
+            // label gap without overlapping the label, so a tap meant for the
+            // label still focuses its field.
+            className="relative grid size-4 place-items-center rounded-none text-[10px] font-bold text-muted-foreground/60 transition-colors before:absolute before:-inset-y-[14px] before:-inset-x-1 before:content-[''] hover:bg-secondary hover:text-foreground focus-visible:bg-secondary focus-visible:text-foreground focus-ring"
+          >
+            ?
+          </button>
+        )}
+      </div>
       {hint && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              aria-label="More information"
-              className="grid size-4 place-items-center rounded-none text-[10px] font-bold text-muted-foreground/60 transition-colors hover:bg-secondary hover:text-foreground focus-visible:bg-secondary focus-visible:text-foreground focus-ring"
-            >
-              ?
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-56">
-            {hint}
-          </TooltipContent>
-        </Tooltip>
+        <p
+          id={hintId}
+          hidden={!hintOpen}
+          className="mt-1 text-xs leading-relaxed text-muted-foreground"
+        >
+          {hint}
+        </p>
       )}
     </div>
   );
@@ -398,8 +414,10 @@ export function AddMonitorDialog({
         </DialogDescription>
 
         <form onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col">
-          {/* scrollable body — visible fields fit without scrolling by default */}
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-4 pt-1 sm:px-5">
+          {/* Scrollable body. pt-3.5 clears the ? button's 14px hit-area
+              bleed, which the container would otherwise clip on the first
+              row; the visible fields still fit without scrolling. */}
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-4 pt-3.5 sm:px-5">
             <div className="space-y-2">
               <FieldLabel htmlFor="m-url" hint="Full URL to check — https:// is added for you.">
                 URL *
@@ -461,7 +479,7 @@ export function AddMonitorDialog({
               <div className="space-y-2">
                 <FieldLabel
                   htmlFor="m-interval"
-                  hint="An interval repeats every N seconds; times of day run at fixed clock times daily."
+                  hint="An interval repeats on a cadence you pick (minutes to hours); times of day run at fixed clock times daily."
                 >
                   Schedule
                 </FieldLabel>
@@ -697,7 +715,7 @@ export function AddMonitorDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <FieldLabel htmlFor="m-slow" hint="Up checks slower than this show as slow.">
+                  <FieldLabel htmlFor="m-slow" hint="A monitor shows as slow when its recent up checks average above this.">
                     <span className="inline-flex items-center gap-1.5">
                       <Gauge className="size-3.5 text-muted-foreground" aria-hidden="true" />
                       Slow threshold ms
