@@ -133,6 +133,11 @@ export function MonitorCard({
 
   const isDragging = dnd?.draggingId === monitor.id;
 
+  // Icon shows the action a click performs (PinOff = "unpin"), matching the
+  // ⌘K palette; the same pair labels the card button and the phone menu item.
+  const PinIcon = monitor.pinned ? PinOff : Pin;
+  const pinLabel = monitor.pinned ? "Unpin" : "Pin to top";
+
   async function runAction(key: string, fn: () => Promise<unknown>, success: string) {
     setBusyAction(key);
     try {
@@ -436,20 +441,15 @@ export function MonitorCard({
                 }}
                 disabled={busyAction === "pin"}
                 aria-label={monitor.pinned ? "Unpin monitor" : "Pin to top"}
-                title={monitor.pinned ? "Unpin" : "Pin to top"}
+                title={pinLabel}
                 className={cn(
-                  // Hidden below sm, where the menu carries Pin instead.
                   "ml-auto h-11 w-11 hover:bg-secondary max-sm:hidden sm:ml-0 sm:h-8 sm:w-8",
                   monitor.pinned
                     ? "text-primary hover:text-primary"
                     : "text-muted-foreground/60 hover:text-primary",
                 )}
               >
-                {monitor.pinned ? (
-                  <Pin className="size-4" aria-hidden="true" />
-                ) : (
-                  <PinOff className="size-4" aria-hidden="true" />
-                )}
+                <PinIcon className="size-4" aria-hidden="true" />
               </Button>
               <Button
                 variant="ghost"
@@ -506,8 +506,8 @@ export function MonitorCard({
                     onClick={() => void pinToggle()}
                     className="sm:hidden"
                   >
-                    {monitor.pinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
-                    {monitor.pinned ? "Unpin" : "Pin to top"}
+                    <PinIcon className="size-4" />
+                    {pinLabel}
                   </DropdownMenuItem>
 
                   {folders.length > 0 && (
