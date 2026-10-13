@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useOverview } from "@/hooks/use-overview";
+import { useCardReorder } from "@/hooks/use-card-reorder";
 import { api, formatUptime, timeAgo, uptimeTone } from "@/lib/ping-client";
 import type { AdminIncidentDTO, FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
@@ -182,9 +183,13 @@ export function DashboardView({
   // as the card's dialog (the palette itself can't host a confirm step).
   const [paletteDelete, setPaletteDelete] = useState<{ id: string; name: string } | null>(null);
 
-  // drag-and-drop reorder (manual sort only)
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [preview, setPreview] = useState<MonitorDTO[] | null>(null);
+  // drag-and-drop reorder (manual sort only) — the hook owns pointer tracking,
+  // the live preview, and the FLIP motion; this view only persists the result.
+  const listRef = useRef<HTMLDivElement | null>(null);
+  // The menu's Move up/down steps through the visible order, which `visible`
+  // computes further down; a ref bridges it without re-creating `dnd` every
+  // render (that would churn the cards' props).
+  const visibleRef = useRef<MonitorDTO[]>([]);
   const committingRef = useRef(false);
 
   // `data?.monitors ?? []` and `data?.folders ?? []` allocate fresh arrays every
@@ -192,6 +197,81 @@ export function DashboardView({
   const monitors = useMemo(() => data?.monitors ?? [], [data]);
   const folders = useMemo(() => data?.folders ?? [], [data]);
   const summary = data?.summary;
+
+  // ---------- reorder / pin engine ----------
+
+  /**
+   * After moving `movedId` inside `list`, decides whether it should be
+   * pinned: the pinned zone is the block of OTHER pinned monitors at the
+   * top — dropping strictly inside it pins the card, landing at or below
+   * the boundary (first unpinned slot) unpins it.
+   */
+  function pinnedSetAfterMove(list: MonitorDTO[], movedId: string): Set<string> {
+    const pinned = new Set(list.filter((m) => m.pinned).map((m) => m.id));
+    const idx = list.findIndex((m) => m.id === movedId);
+    if (idx >= 0) {
+      const otherPinned = list.filter((m) => m.id !== movedId && m.pinned).length;
+      if (idx < otherPinned) pinned.add(movedId);
+      else pinned.delete(movedId);
+    }
+    return pinned;
+  }
+
+  /** Persists an order (and pin set) to the server, then refreshes. Returns a
+   *  promise so callers can hold optimistic state until the fresh order lands. */
+  const commitOrder = useCallback(
+    async (list: MonitorDTO[], movedId: string) => {
+      if (committingRef.current) return;
+      committingRef.current = true;
+      const ids = list.map((m) => m.id);
+      const pinned = pinnedSetAfterMove(list, movedId);
+      try {
+        await api("/api/monitors/reorder", {
+          method: "PATCH",
+          body: JSON.stringify({ ids, pinnedIds: [...pinned] }),
+        });
+        const before = monitors.find((m) => m.id === movedId)?.pinned ?? false;
+        if (before !== pinned.has(movedId)) {
+          toast({
+            description: pinned.has(movedId)
+              ? "Moved into the pinned zone — pinned to top"
+              : "Moved below the pinned zone — unpinned",
+          });
+        }
+      } catch (e) {
+        toast({
+          description: e instanceof Error ? e.message : "Could not save the new order",
+          variant: "destructive",
+        });
+      } finally {
+        committingRef.current = false;
+        // Await the refetch: callers hold optimistic state until the fresh
+        // order has landed, so the list never flashes the stale order.
+        await refresh(true);
+      }
+    },
+    // pinnedSetAfterMove is pure; monitors/toast/refresh are the real deps.
+    [monitors, refresh, toast],
+  );
+
+  const reorder = useCardReorder<MonitorDTO>({
+    items: monitors,
+    containerRef: listRef,
+    enabled: sortMode === "manual" && monitors.length > 1,
+    onCommit: (next, movedId) => commitOrder(next, movedId),
+  });
+
+  // contract handed to each card (manual sort only)
+  const dnd: CardDnd | null =
+    sortMode === "manual" && monitors.length > 1
+      ? {
+          draggingId: reorder.draggingId,
+          start: reorder.start,
+          // Steps through the VISIBLE order, so a filtered view moves past the
+          // neighbour the operator can actually see.
+          move: (id, dir) => reorder.move(id, dir, visibleRef.current.map((m) => m.id)),
+        }
+      : null;
 
   // 24h fleet floor — a mean hides outliers; "worst" is the honest companion
   // readout (min over the same monitors the API averages, nulls excluded).
@@ -238,7 +318,7 @@ export function DashboardView({
 
   // the manual-order list: server order (pinned → position), or the live
   // drag preview while reordering
-  const manualList = preview ?? monitors;
+  const manualList = reorder.preview ?? monitors;
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -293,6 +373,8 @@ export function DashboardView({
     return list;
   }, [manualList, activeFolder, query, sortMode]);
 
+  visibleRef.current = visible;
+
   const folderStats = useMemo(() => {
     const map = new Map<string, { total: number; down: number }>();
     for (const f of folders) map.set(f.id, { total: 0, down: 0 });
@@ -333,87 +415,6 @@ export function DashboardView({
       });
     }
   }
-
-  // ---------- reorder / pin engine ----------
-
-  /**
-   * After moving `movedId` inside `list`, decides whether it should be
-   * pinned: the pinned zone is the block of OTHER pinned monitors at the
-   * top — dropping strictly inside it pins the card, landing at or below
-   * the boundary (first unpinned slot) unpins it.
-   */
-  function pinnedSetAfterMove(list: MonitorDTO[], movedId: string): Set<string> {
-    const pinned = new Set(list.filter((m) => m.pinned).map((m) => m.id));
-    const idx = list.findIndex((m) => m.id === movedId);
-    if (idx >= 0) {
-      const otherPinned = list.filter((m) => m.id !== movedId && m.pinned).length;
-      if (idx < otherPinned) pinned.add(movedId);
-      else pinned.delete(movedId);
-    }
-    return pinned;
-  }
-
-  /** Persists an order (and pin set) to the server, then refreshes. */
-  async function commitOrder(list: MonitorDTO[], movedId: string | null) {
-    if (committingRef.current) return;
-    committingRef.current = true;
-    const ids = list.map((m) => m.id);
-    const pinned = movedId
-      ? pinnedSetAfterMove(list, movedId)
-      : new Set(list.filter((m) => m.pinned).map((m) => m.id));
-    try {
-      await api("/api/monitors/reorder", {
-        method: "PATCH",
-        body: JSON.stringify({ ids, pinnedIds: [...pinned] }),
-      });
-      if (movedId) {
-        const before = monitors.find((m) => m.id === movedId)?.pinned ?? false;
-        if (before !== pinned.has(movedId)) {
-          toast({
-            description: pinned.has(movedId)
-              ? "Moved into the pinned zone — pinned to top"
-              : "Moved below the pinned zone — unpinned",
-          });
-        }
-      }
-    } catch (e) {
-      toast({
-        description: e instanceof Error ? e.message : "Could not save the new order",
-        variant: "destructive",
-      });
-    } finally {
-      committingRef.current = false;
-      setPreview(null);
-      setDragId(null);
-      void refresh(true);
-    }
-  }
-
-  // contract handed to each card (manual sort only)
-  const dnd: CardDnd | null =
-    sortMode === "manual" && monitors.length > 0
-      ? {
-          isDragging: dragId != null,
-          onDragStart: (id) => setDragId(id),
-          onDragOverCard: (targetId) => {
-            if (!dragId || dragId === targetId) return;
-            setPreview((prev) => {
-              const list = prev ?? monitors;
-              const from = list.findIndex((m) => m.id === dragId);
-              const to = list.findIndex((m) => m.id === targetId);
-              if (from < 0 || to < 0 || from === to) return list;
-              const next = [...list];
-              const [moved] = next.splice(from, 1);
-              next.splice(to, 0, moved);
-              return next;
-            });
-          },
-          onDragEnd: () => {
-            if (!dragId) return;
-            void commitOrder(preview ?? monitors, dragId);
-          },
-        }
-      : null;
 
   async function logout() {
     try {
@@ -819,7 +820,8 @@ export function DashboardView({
 
           {sortMode === "manual" && monitors.length > 1 && (
             <p className="-mt-1 text-[11px] text-muted-foreground/80">
-              Drag the <span className="text-muted-foreground">⠿</span> handle to reorder.
+              Drag the <span className="text-muted-foreground">⠿</span> handle to reorder,
+              or use <span className="text-muted-foreground">⋮ → Reorder</span> on any card.
               Pin a monitor to keep it at the top.
             </p>
           )}
@@ -881,8 +883,20 @@ export function DashboardView({
                   : "This folder is empty — add a monitor or move one here."}
             </div>
           ) : (
-            <div className="space-y-2.5">
-              {visible.map((m) => (
+            <div
+              ref={listRef}
+              className={cn("relative space-y-2.5", reorder.draggingId && "select-none")}
+            >
+              {/* Insertion indicator — where the dragged card will land. Only
+                  while dragging, so the resting list carries no extra chrome. */}
+              {reorder.indicatorY != null && (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 z-10 h-0.5 bg-primary"
+                  style={{ top: reorder.indicatorY }}
+                />
+              )}
+              {visible.map((m, mi) => (
                 <MonitorCard
                   key={m.id}
                   monitor={m}
@@ -897,7 +911,9 @@ export function DashboardView({
                   onCheckNow={() => refresh(true)}
                   onViewIncidents={() => setIncidentsOpen(true)}
                   downSince={downSinceByMonitor.get(m.id) ?? null}
-                  canReorder={sortMode === "manual" && manualList.length > 1}
+                  canReorder={sortMode === "manual" && visible.length > 1}
+                  canMoveUp={mi > 0}
+                  canMoveDown={mi < visible.length - 1}
                   dnd={dnd}
                 />
               ))}

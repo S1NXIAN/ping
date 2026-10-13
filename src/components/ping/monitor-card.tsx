@@ -3,6 +3,8 @@
 import { useState } from "react";
 import {
   Activity,
+  ArrowDown,
+  ArrowUp,
   ExternalLink,
   Folder,
   FolderInput,
@@ -72,12 +74,14 @@ function formatDownFor(startedAt: string): string {
   return `${Math.floor(h / 24)}d ${h % 24}h`;
 }
 
-/** Drag-and-drop contract owned by the dashboard (manual sort mode only). */
+/** Drag-reorder contract owned by the dashboard (manual sort mode only). */
 export interface CardDnd {
-  isDragging: boolean;
-  onDragStart: (id: string) => void;
-  onDragOverCard: (id: string) => void;
-  onDragEnd: () => void;
+  /** The monitor currently being dragged, or null. */
+  draggingId: string | null;
+  /** Begin a drag from the card's handle. */
+  start: (id: string, e: React.PointerEvent) => void;
+  /** Step this card one slot up (-1) or down (1) via the menu. */
+  move: (id: string, dir: -1 | 1) => void;
 }
 
 export function MonitorCard({
@@ -93,6 +97,8 @@ export function MonitorCard({
    *  or null when none is known — null never becomes a guess. */
   downSince,
   canReorder,
+  canMoveUp,
+  canMoveDown,
   dnd,
 }: {
   monitor: MonitorDTO;
@@ -105,13 +111,15 @@ export function MonitorCard({
   onDeleted: () => void;
   onCheckNow: () => void;
   canReorder: boolean;
+  /** False at the ends of the visible list — the menu items disable there. */
+  canMoveUp: boolean;
+  canMoveDown: boolean;
   dnd: CardDnd | null;
 }) {
   const { toast } = useToast();
   const [checking, setChecking] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [dragArmed, setDragArmed] = useState(false);
 
   const status: MonitorStatus = monitorStatus(monitor);
 
@@ -123,7 +131,7 @@ export function MonitorCard({
 
   const statusTone = monitorStatusTone(status, degraded);
 
-  const beingDragged = dnd?.isDragging === true && dragArmed;
+  const isDragging = dnd?.draggingId === monitor.id;
 
   async function runAction(key: string, fn: () => Promise<unknown>, success: string) {
     setBusyAction(key);
@@ -200,40 +208,10 @@ export function MonitorCard({
     <>
       <div
         role="group"
+        data-monitor-id={monitor.id}
         onClick={() => {
-          if (dnd?.isDragging || dragArmed) return;
+          if (dnd?.draggingId) return;
           onOpen();
-        }}
-        draggable={!!dnd && canReorder && dragArmed}
-        onDragStart={(e) => {
-          if (!dnd || !canReorder) {
-            e.preventDefault();
-            return;
-          }
-          // real drags only start on draggable elements (armed via the
-          // handle); accepting any dispatched dragstart is harmless
-          e.dataTransfer.effectAllowed = "move";
-          try {
-            e.dataTransfer.setData("text/plain", monitor.id);
-          } catch {
-            /* some browsers require data — ignore failures */
-          }
-          dnd.onDragStart(monitor.id);
-        }}
-        onDragOver={(e) => {
-          if (!dnd || !dnd.isDragging) return;
-          e.preventDefault();
-          e.dataTransfer.dropEffect = "move";
-          dnd.onDragOverCard(monitor.id);
-        }}
-        onDrop={(e) => {
-          // The browser fires dragend on the source right after a drop —
-          // commit happens there, so here we only allow the drop.
-          e.preventDefault();
-        }}
-        onDragEnd={() => {
-          setDragArmed(false);
-          dnd?.onDragEnd();
         }}
         className={cn(
           "ping-fade-up group relative cursor-pointer rounded-lg border bg-card p-3 outline-none transition-colors sm:p-5 @container",
@@ -246,8 +224,11 @@ export function MonitorCard({
           monitor.pinned &&
             "border-primary/35 bg-primary/[0.03] hover:border-primary/50 hover:bg-primary/[0.05]",
           status === "down" && monitor.pinned && "border-down/40 bg-down/[0.04]",
-          beingDragged && "opacity-40",
-          dnd?.isDragging && !dragArmed && "transition-transform",
+          // Lifted card: it follows the pointer (transform set imperatively) and
+          // reads as picked up through light, not a drop shadow — the design
+          // system's Light-Not-Shadow rule. z-20 keeps it above its siblings.
+          isDragging &&
+            "z-20 cursor-grabbing border-primary/60 bg-card will-change-transform shadow-[inset_0_1px_0_0_rgba(255,255,255,0.14)]",
         )}
         aria-label={`Monitor ${monitor.name}, status ${
           degraded ? "slow" : statusWord(status)
@@ -264,15 +245,11 @@ export function MonitorCard({
               aria-label={`Reorder ${monitor.name}`}
               title="Drag to reorder"
               onClick={(e) => e.stopPropagation()}
-              onPointerDown={() => setDragArmed(true)}
-              onPointerUp={() => setDragArmed(false)}
-              onPointerCancel={() => setDragArmed(false)}
-              onBlur={() => setDragArmed(false)}
-              draggable={false}
+              onPointerDown={(e) => dnd?.start(monitor.id, e)}
               className={cn(
-                "mt-1 hidden size-6 shrink-0 cursor-grab touch-none place-items-center rounded-none text-muted-foreground/50 transition-colors active:cursor-grabbing sm:grid",
+                "mt-1 hidden size-6 shrink-0 cursor-grab touch-none place-items-center rounded-none text-muted-foreground/50 transition-colors sm:grid",
                 "hover:text-foreground focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                dragArmed && "text-foreground",
+                isDragging && "cursor-grabbing text-foreground",
               )}
             >
               <GripVertical className="size-4" aria-hidden="true" />
@@ -290,7 +267,7 @@ export function MonitorCard({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (dnd?.isDragging || dragArmed) return;
+                  if (dnd?.draggingId) return;
                   onOpen();
                 }}
                 title={`Open details for ${monitor.name}`}
@@ -534,6 +511,30 @@ export function MonitorCard({
                         ))}
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
+                  )}
+
+                  <DropdownMenuSeparator />
+                  {/* Reorder by menu — the touch and keyboard path. The grip
+                      handle above is desktop-only, so without this a phone has
+                      no way to reorder. Disabled at the ends of the list. */}
+                  {canReorder && (
+                    <>
+                      <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+                        Reorder
+                      </DropdownMenuLabel>
+                      <DropdownMenuItem
+                        disabled={!canMoveUp}
+                        onClick={() => dnd?.move(monitor.id, -1)}
+                      >
+                        <ArrowUp className="size-4" /> Move up
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={!canMoveDown}
+                        onClick={() => dnd?.move(monitor.id, 1)}
+                      >
+                        <ArrowDown className="size-4" /> Move down
+                      </DropdownMenuItem>
+                    </>
                   )}
 
                   <DropdownMenuSeparator />
