@@ -1,9 +1,10 @@
 // Times-of-day scheduling: a monitor that checks at fixed clock times every
-// day, interpreted in its own IANA timezone.
+// day, interpreted in the zone stored when its schedule was last edited (the
+// editing browser's zone — there is no per-monitor picker).
 //
-// The times are stored as zero-padded "HH:MM" wall-clock strings in the
-// monitor's own zone (never as instants) — so they survive a timezone change
-// or a DST shift as the times the user actually typed. Turning a wall clock
+// The times are stored as zero-padded "HH:MM" wall-clock strings (never as
+// instants) — so they survive a DST shift as the times the user actually
+// typed. Re-saving in another zone re-reads them there. Turning a wall clock
 // into an instant needs Intl: there is no arithmetic shortcut across a DST
 // boundary, and doing it by hand silently breaks twice a year.
 
