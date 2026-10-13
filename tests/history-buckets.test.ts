@@ -73,6 +73,7 @@ test("an empty bucket is skipped, never fabricated", async () => {
   });
 
   const body = await (await get(monitorId)).json();
+  expect(body.downsampled).toBe(true);
   expect(body.points).toEqual([
     { t: base.getTime(), ms: 100, s: "up" },
     { t: later.getTime(), ms: 300, s: "up" },
@@ -82,14 +83,17 @@ test("an empty bucket is skipped, never fabricated", async () => {
 test("a bucket holding a failed check is reported as down", async () => {
   const { monitorId, get } = await setup();
   const base = new Date(Date.now() - 600_000);
+  // The up checks are slow (1000 ms) so a bug that counted the failed check as
+  // a 0 ms sample would divide 400000 by 401 (998) instead of 400 (1000) — the
+  // assertion below pins the average to the up checks alone.
   await db.check.createMany({
     data: [
-      ...upChecks(monitorId, base, DENSE - 1),
+      ...upChecks(monitorId, base, DENSE - 1, 1000),
       { monitorId, status: "down", statusCode: 503, checkedAt: new Date(base.getTime() + 1) },
     ],
   });
 
   const body = await (await get(monitorId)).json();
-  // The bucket averages only its up checks, but the point is flagged down.
-  expect(body.points).toEqual([{ t: base.getTime(), ms: 100, s: "down" }]);
+  expect(body.downsampled).toBe(true);
+  expect(body.points).toEqual([{ t: base.getTime(), ms: 1000, s: "down" }]);
 });
