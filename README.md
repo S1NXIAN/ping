@@ -102,7 +102,9 @@ bun run dev            # http://localhost:3000
 ```
 
 Set `DATABASE_URL` in `.env` (e.g. `file:./db/custom.db`).
-Optional env: `CRON_SECRET` — when set, `/api/cron/tick` requires `?token=<secret>`.
+The deploy blueprint sets `CRON_SECRET`, so `/api/cron/tick` requires a token
+(`?token=<secret>` or the `x-cron-token` header). Locally, set it too if the
+tick URL is reachable by anyone else; leave it unset to disable the check.
 On Render, `RENDER_EXTERNAL_URL` (set by the platform) is used as the
 Self-monitor's origin.
 
@@ -110,7 +112,8 @@ Self-monitor's origin.
 
 Use **render.yaml** (New → Blueprint) or create a Node web service manually
 with build `bun install && bunx prisma generate && bun run build` and start
-`bunx prisma db push --accept-data-loss && bun run start`.
+`bunx prisma db push --accept-data-loss && bun run start`. The blueprint sets
+`CRON_SECRET`; a manual service should set it too (see below).
 
 **Honest caveats** (see render.yaml comments too):
 
@@ -142,10 +145,14 @@ with build `bun install && bunx prisma generate && bun run build` and start
    Each tick runs **every monitor whose interval has elapsed** — one external
    scheduler drives everything.
 3. Scheduler options:
-   - **GitHub Actions** — `.github/workflows/ping.yml` in any public repo
-     (free), with a `PING_URL` repository secret. See the YAML below.
-   - **cron-job.org / UptimeRobot free tier** — hit the tick URL on a schedule.
-   - **Plain cron** on any box: `*/10 * * * * curl -fsS https://…/api/cron/tick`.
+   - **GitHub Actions** — this repo ships
+     [`.github/workflows/keep-alive.yml`](.github/workflows/keep-alive.yml);
+     set its `PING_URL` and `PING_TOKEN` repository secrets. See below.
+   - **cron-job.org / UptimeRobot free tier** — hit the tick URL on a schedule
+     with `CRON_SECRET` as the token (query `?token=` or header `x-cron-token`).
+   - **Plain cron** on any box — cron's `sh` has no shell environment, so put
+     the literal secret in the crontab (not `$CRON_SECRET`):
+     `*/10 * * * * curl -fsS -H "x-cron-token: <secret>" https://…/api/cron/tick`.
 
 The tick endpoint returns a JSON summary (`{"ran":3,"up":3,"down":0,…}`), and
 `/api/health` is a dependency-free alternative that only wakes the service
@@ -153,24 +160,13 @@ without triggering checks.
 
 ### GitHub Actions keep-alive workflow
 
-Add this file as `.github/workflows/ping.yml` in any repository, then create a
-`PING_URL` secret with your PING origin (no trailing slash, no `/api` path).
-Free on public repositories; GitHub's cron can drift a few minutes, which is
-fine here since each tick only runs checks that are actually due.
-
-```yaml
-name: PING keep-alive
-on:
-  schedule:
-    - cron: "*/10 * * * *" # every 10 minutes (GitHub may drift a few)
-  workflow_dispatch: # allows a manual run
-jobs:
-  tick:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Tick PING (runs all due checks)
-        run: curl -fsS --max-time 90 "${{ secrets.PING_URL }}/api/cron/tick" || true
-```
+[`.github/workflows/keep-alive.yml`](.github/workflows/keep-alive.yml) is the
+source of truth — read it there. To use it, create two repository secrets:
+`PING_URL` (your PING origin, no trailing slash, no `/api` path) and
+`PING_TOKEN` (the `CRON_SECRET` value Render generated — Dashboard → your
+service → Environment). Free on public repositories; GitHub's cron can drift a
+few minutes, which is fine here since each tick only runs checks that are
+actually due.
 
 ## Architecture (small on purpose)
 
@@ -200,4 +196,4 @@ jobs:
 | `GET /api/render-status` | live status from status.render.com (5 min cache) |
 | `GET /api/export`, `POST /api/import` | backup / restore (monitors, folders) |
 | `GET /api/health` | public keep-alive ping, no DB access |
-| `GET/POST /api/cron/tick` | run all due checks (optional `CRON_SECRET`) |
+| `GET/POST /api/cron/tick` | run all due checks (token when `CRON_SECRET` set) |

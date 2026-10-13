@@ -4,10 +4,14 @@
 #   1. Deploy PING (see render.yaml).
 #   2. Add a repository secret named PING_URL with the deployment origin,
 #      e.g. https://ping-xxxx.onrender.com   (no trailing slash, no /api path).
+#   3. Add a repository secret named PING_TOKEN with the CRON_SECRET value
+#      Render generated for the service (Dashboard → Environment).
 #
 # Every run hits PING's /api/cron/tick endpoint, which:
 #   - counts as inbound traffic (keeps the Render free instance awake), and
 #   - runs every monitor whose check interval has elapsed.
+#
+# The token is sent as the x-cron-token header so it stays out of the URL.
 #
 # Free on public repositories. GitHub cron can drift by a few minutes —
 # that's fine here, since the tick only runs checks that are actually due.
@@ -24,5 +28,7 @@ jobs:
     steps:
       - name: Tick PING (runs all due checks)
         run: |
-          curl -fsS --max-time 90 "${{ secrets.PING_URL }}/api/cron/tick" \
-            || echo "::warning::PING tick failed — is PING_URL set and the service up?"
+          curl -fsS --max-time 90 \
+            -H "x-cron-token: ${{ secrets.PING_TOKEN }}" \
+            "${{ secrets.PING_URL }}/api/cron/tick" \
+            || echo "::warning::PING tick failed — are PING_URL and PING_TOKEN set and the service up?"

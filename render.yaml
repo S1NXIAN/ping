@@ -32,9 +32,12 @@ services:
         value: 0.0.0.0
       - key: BUN_VERSION
         value: 1.4.2
-      # Optional: require ?token=<secret> on /api/cron/tick (keep-alive)
-      # - key: CRON_SECRET
-      #   generateValue: true
+      # Require a token on /api/cron/tick so a stranger who finds the URL
+      # cannot make PING fetch every monitor (including LAN/localhost targets).
+      # Render generates the value; copy it into the keep-alive workflow's
+      # PING_TOKEN repository secret (see README).
+      - key: CRON_SECRET
+        generateValue: true
     # Paid plan only — re-enable for durable SQLite storage:
     # disk:
     #   name: ping-data
