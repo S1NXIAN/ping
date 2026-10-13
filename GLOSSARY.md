@@ -77,12 +77,12 @@ _Avoid_: recurring, periodic
 
 **Times-of-day schedule**:
 A monitor checks at fixed clock times (e.g. 1:00 PM, 3:00 AM) every day,
-interpreted in its own timezone.
+interpreted in the browser's timezone (stored per monitor, refreshed on edit).
 _Avoid_: scheduled, cron, time-based
 
 **Scheduled instant**:
 The moment a times-of-day schedule says a check should run, as an absolute
-point in time. Derived from the clock times and the monitor's timezone.
+point in time. Derived from the clock times and the monitor's stored timezone.
 _Avoid_: slot, due time
 
 **Bounded catch-up**:

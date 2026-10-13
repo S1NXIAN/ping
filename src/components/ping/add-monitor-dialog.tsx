@@ -150,10 +150,10 @@ export function AddMonitorDialog({
   const [intervalSec, setIntervalSec] = useState("300");
   // "custom" replaces the preset select with a free-text H/M field.
   const [intervalCustom, setIntervalCustom] = useState(false);
-  // Times-of-day mode: a list of "HH:MM" clock times in a chosen IANA zone.
+  // Times-of-day mode: a list of "HH:MM" clock times, read in the viewer's
+  // own IANA zone (browserTimezone(), never a picked one).
   const [scheduleMode, setScheduleMode] = useState<ScheduleMode>("interval");
   const [times, setTimes] = useState<string[]>([]);
-  const [timezone, setTimezone] = useState("");
   const [method, setMethod] = useState<"GET" | "HEAD">("GET");
   const [account, setAccount] = useState("");
   const [keywordMode, setKeywordMode] = useState<"off" | "contains" | "excludes">("off");
@@ -189,7 +189,6 @@ export function AddMonitorDialog({
       setAccount(initial.account ?? "");
       setScheduleMode(initial.scheduleMode);
       setTimes(initial.scheduleTimes);
-      setTimezone(initial.timezone ?? browserTimezone());
       setKeywordMode(initial.keyword ? initial.keywordMode : "off");
       setKeyword(initial.keyword ?? "");
       setSlowThreshold(initial.slowThresholdMs != null ? String(initial.slowThresholdMs) : "");
@@ -210,7 +209,6 @@ export function AddMonitorDialog({
       setAccount("");
       setScheduleMode("interval");
       setTimes([]);
-      setTimezone(browserTimezone());
       setKeywordMode("off");
       setKeyword("");
       setSlowThreshold("");
@@ -279,12 +277,9 @@ export function AddMonitorDialog({
       else intervalSeconds = parsed.seconds;
     }
 
-    // Times-of-day mode needs at least one time and a zone, or the monitor
-    // would silently never run.
-    if (scheduleMode === "times") {
-      if (times.length === 0) next.times = "Add at least one time";
-      else if (!timezone) next.times = "Pick a timezone";
-    }
+    // Times-of-day mode needs at least one time, or the monitor would
+    // silently never run. The zone is the viewer's own, always set.
+    if (scheduleMode === "times" && times.length === 0) next.times = "Add at least one time";
 
     setFieldErrors(next);
     if (Object.values(next).some(Boolean)) {
@@ -300,7 +295,7 @@ export function AddMonitorDialog({
       url: normalized,
       scheduleMode,
       scheduleTimes: scheduleMode === "times" ? times.join(",") : null,
-      timezone: scheduleMode === "times" ? timezone : null,
+      timezone: scheduleMode === "times" ? browserTimezone() : null,
       method,
       folderId: folderId === "none" ? null : folderId,
       account: account.trim(),
@@ -627,13 +622,11 @@ export function AddMonitorDialog({
                 <div className="sm:col-span-2">
                   <ScheduleTimesEditor
                     times={times}
-                    timezone={timezone}
                     error={fieldErrors.times}
                     onChange={(next) => {
                       setTimes(next);
                       clearError("times");
                     }}
-                    onTimezoneChange={setTimezone}
                   />
                 </div>
               )}

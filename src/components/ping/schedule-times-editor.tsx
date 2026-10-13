@@ -1,17 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronsUpDown, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  CommandDialog,
-  CommandEmpty,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { Label } from "@/components/ui/label";
-import { MAX_SCHEDULE_TIMES, IANA_TIMEZONES, hasTimeAt } from "@/lib/schedule";
+import { MAX_SCHEDULE_TIMES, hasTimeAt } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 
 /** "HH:MM" (24h) -> the "h:mm AM/PM" a person reads. */
@@ -23,25 +16,20 @@ export function timeLabel(hhmm: string): string {
 }
 
 /**
- * The times-of-day editor: a list of clock times plus the zone they're read
- * in. Times are wall-clock strings ("HH:MM"), never instants, so they survive
- * a timezone change or a DST shift as the times the user actually typed.
+ * The times-of-day editor: a list of clock times read in the viewer's own
+ * zone. Times are wall-clock strings ("HH:MM"), never instants, so they
+ * survive a DST shift as the times the user actually typed.
  */
 export function ScheduleTimesEditor({
   times,
-  timezone,
   error,
   onChange,
-  onTimezoneChange,
 }: {
   times: string[];
-  timezone: string;
   error?: string;
   onChange: (times: string[]) => void;
-  onTimezoneChange: (tz: string) => void;
 }) {
   const atCap = times.length >= MAX_SCHEDULE_TIMES;
-  const [pickerOpen, setPickerOpen] = useState(false);
   // Set when an edit is refused because that clock time is already on the
   // list — shown next to the field so the reverted value isn't a mystery.
   const [duplicate, setDuplicate] = useState<string | null>(null);
@@ -172,54 +160,13 @@ export function ScheduleTimesEditor({
             No times yet — add at least one, e.g. 1:00 PM.
           </p>
         )}
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="m-timezone" className="text-sm font-medium leading-none">
-          Timezone
-        </Label>
-        <Button
-          id="m-timezone"
-          type="button"
-          variant="outline"
-          onClick={() => setPickerOpen(true)}
-          className="h-11 w-full justify-between text-xs font-normal sm:h-9"
-          aria-label={`Timezone: ${timezone.replace(/_/g, " ")}`}
-        >
-          <span className="truncate">{timezone.replace(/_/g, " ")}</span>
-          <ChevronsUpDown className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
-        </Button>
-        {/* 400+ zones need search, so the picker is the same CommandDialog the
-            palette uses rather than a 400-row dropdown. */}
-        <CommandDialog
-          open={pickerOpen}
-          onOpenChange={setPickerOpen}
-          title="Timezone"
-          description="Search for a timezone"
-        >
-          <CommandInput placeholder="Search timezones…" />
-          <CommandList className="max-h-72">
-            <CommandEmpty>No timezone found.</CommandEmpty>
-            {IANA_TIMEZONES.map((tz) => (
-              <CommandItem
-                key={tz}
-                value={tz}
-                onSelect={() => {
-                  onTimezoneChange(tz);
-                  setPickerOpen(false);
-                }}
-              >
-                {tz.replace(/_/g, " ")}
-              </CommandItem>
-            ))}
-          </CommandList>
-        </CommandDialog>
-        {/* The times are wall clock, so the label is what the user reads. */}
-        <p className="text-xs text-muted-foreground">
-          {times.length > 0
-            ? `Runs at ${times.map(timeLabel).join(", ")} — ${timezone.replace(/_/g, " ")}`
-            : `Times are read in ${timezone.replace(/_/g, " ")}`}
-        </p>
+        {/* The times are wall clock in the viewer's own zone, so the label is
+            exactly what the user reads. */}
+        {times.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            Runs at {times.map(timeLabel).join(", ")}
+          </p>
+        )}
       </div>
 
       {error && (
