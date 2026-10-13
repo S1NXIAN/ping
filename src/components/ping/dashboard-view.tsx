@@ -205,9 +205,9 @@ export function DashboardView({
 
   // The Scope (GLOSSARY.md): the whole Fleet on "All monitors", one Folder
   // otherwise. The search query never changes it — search filters the list,
-  // not the instrument. The stat strip and header pills read this, so they
-  // always agree with each other and with the active Folder. Undefined while
-  // loading keeps the "—" placeholder rather than a misleading zero.
+  // not the instrument. The stat strip reads this, so it always agrees with
+  // the active Folder. Undefined while loading keeps the "—" placeholder
+  // rather than a misleading zero.
   const scopedMonitors = useMemo(
     () => (activeFolder === "all" ? monitors : monitors.filter((m) => m.folderId === activeFolder)),
     [monitors, activeFolder],
@@ -215,6 +215,13 @@ export function DashboardView({
   const summary = useMemo(
     () => (data ? summarize(scopedMonitors) : undefined),
     [data, scopedMonitors],
+  );
+  // The header counts are deliberately Fleet-wide, never scoped: the sticky
+  // header answers "is anything down anywhere?" at every width, and the folder
+  // dock tints a down folder's icon rose to point at where.
+  const fleetSummary = useMemo(
+    () => (data ? summarize(monitors) : undefined),
+    [data, monitors],
   );
 
   // ---------- reorder / pin engine ----------
@@ -465,26 +472,29 @@ export function DashboardView({
                 ⌘K
               </kbd>
             </Button>
-            {summary && (
+            {fleetSummary && (
               <>
                 {/* Fleet health survives the <md header squeeze: the full pills
                     only fit from md up, so phones get the same truth as one
                     compact chip (critique 2026-09-16 P2 — "is anything down?"
                     never required scrolling to the stat quadrants). Numbers
-                    tint only when real — zero stays neutral, the idle rule. */}
+                    tint only when real — zero stays neutral, the idle rule.
+                    These counts are Fleet-wide, never scoped to the active
+                    Folder: the header is the always-on "is anything down
+                    anywhere?" answer; the folder dock points at where. */}
                 <div
                   className="flex h-6 items-center gap-1.5 rounded-none border border-border bg-muted/40 px-2 text-[11px] tabular-nums md:hidden"
-                  aria-label={`${summary.up} live, ${summary.down} down${summary.degraded ? `, ${summary.degraded} slow` : ""}`}
+                  aria-label={`${fleetSummary.up} live, ${fleetSummary.down} down${fleetSummary.degraded ? `, ${fleetSummary.degraded} slow` : ""}`}
                 >
-                  <span className={summary.up > 0 ? "text-up" : "text-muted-foreground"} aria-hidden="true">
-                    {summary.up}↑
+                  <span className={fleetSummary.up > 0 ? "text-up" : "text-muted-foreground"} aria-hidden="true">
+                    {fleetSummary.up}↑
                   </span>
-                  <span className={summary.down > 0 ? "text-down" : "text-muted-foreground"} aria-hidden="true">
-                    {summary.down}↓
+                  <span className={fleetSummary.down > 0 ? "text-down" : "text-muted-foreground"} aria-hidden="true">
+                    {fleetSummary.down}↓
                   </span>
-                  {summary.degraded > 0 && (
+                  {fleetSummary.degraded > 0 && (
                     <span className="text-warn" aria-hidden="true">
-                      {summary.degraded}~
+                      {fleetSummary.degraded}~
                     </span>
                   )}
                 </div>
@@ -493,10 +503,10 @@ export function DashboardView({
                 {/* Header pills tint only when the count is real (the paused
                     pill's idle pattern): a rose "0 down" was a false alarm —
                     color encodes state, and zero is not a state. */}
-                {headerPill("live", summary.up, summary.up > 0 ? "up" : "neutral")}
-                {headerPill("down", summary.down, summary.down > 0 ? "down" : "neutral")}
-                {summary.degraded > 0 && headerPill("slow", summary.degraded, "warn")}
-                {summary.paused > 0 && headerPill("paused", summary.paused, "neutral")}
+                {headerPill("live", fleetSummary.up, fleetSummary.up > 0 ? "up" : "neutral")}
+                {headerPill("down", fleetSummary.down, fleetSummary.down > 0 ? "down" : "neutral")}
+                {fleetSummary.degraded > 0 && headerPill("slow", fleetSummary.degraded, "warn")}
+                {fleetSummary.paused > 0 && headerPill("paused", fleetSummary.paused, "neutral")}
                 </div>
               </>
             )}
