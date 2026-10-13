@@ -47,6 +47,12 @@ export interface DerivedIncident {
  * final sub-streak, the first check recorded after its last down (the exact
  * closing time; null = still ongoing). The output is identical to the full
  * scan, but the work is bounded no matter how much history is kept.
+ *
+ * Cost ceiling: worst case is MAX_STREAKS_PER_MONITOR (40) × 2 queries ×
+ * MAX_MONITORS (200) ≈ 16,000 queries for one incidents view. That matters at
+ * the 200-monitor fleet cap, where a flapping fleet issues thousands of tiny
+ * queries per view; it does not change the algorithm, only its visibility.
+ * See issue #25.
  */
 export async function deriveIncidents(
   monitors: {
