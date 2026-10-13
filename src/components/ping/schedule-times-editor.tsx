@@ -117,7 +117,10 @@ export function ScheduleTimesEditor({
                   in every engine. pointer-events-none lets the click fall
                   through to the control beneath. whitespace-nowrap is load-
                   bearing: without it "10:00 AM" wraps to a second line and
-                  the fixed chip height clips it. */}
+                  the fixed chip height clips it. The ring is spelled out, not
+                  `peer-focus-visible:focus-ring`: a peer variant on the
+                  utility nests a second :focus-visible on this sibling and
+                  would only fire when the sibling itself is focused. */}
               <div
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-0 flex items-center whitespace-nowrap rounded-md border border-input pl-2 pr-5 text-xs tabular-nums peer-focus-visible:border-ring peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50"
@@ -134,7 +137,7 @@ export function ScheduleTimesEditor({
                 // grown VERTICALLY only (28px -> 44px, the touch floor): growing
                 // it sideways would reach ~40% across a 92px chip and steal
                 // clicks meant for the time, and would bleed into the row gap.
-                className="absolute right-0.5 top-1/2 z-10 grid size-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground/50 transition-colors before:absolute before:-inset-y-2 before:content-[''] hover:text-down focus-visible:text-down focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="absolute right-0.5 top-1/2 z-10 grid size-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground/50 transition-colors before:absolute before:-inset-y-2 before:content-[''] hover:text-down focus-visible:text-down focus-ring"
               >
                 <X className="size-3.5" aria-hidden="true" />
               </button>

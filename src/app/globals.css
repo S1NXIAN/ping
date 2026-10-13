@@ -117,6 +117,16 @@
   }
 }
 
+/*
+ * The one focus ring — 3px Signal White at 50% + the border brightening to
+ * white. Every interactive element uses it (DESIGN.md, Buttons/Inputs); the
+ * semantic overrides layer on top — destructive buttons and `aria-invalid`
+ * fields re-color the ring, and the two busy-surface sites add a ring-offset.
+ */
+@utility focus-ring {
+  @apply focus-visible:outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50;
+}
+
 /* ---------- PING custom utilities ---------- */
 
 /*

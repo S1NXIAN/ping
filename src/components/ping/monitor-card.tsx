@@ -215,7 +215,7 @@ export function MonitorCard({
         }}
         className={cn(
           "ping-fade-up group relative cursor-pointer rounded-lg border bg-card p-3 outline-none transition-colors sm:p-5 @container",
-          "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40",
+          "focus-ring",
           status === "down" && "border-down/30 hover:border-down/50",
           degraded &&
             "border-warn/30 hover:border-warn/50 hover:bg-warn/[0.03]",
@@ -248,7 +248,7 @@ export function MonitorCard({
               onPointerDown={(e) => dnd?.start(monitor.id, e)}
               className={cn(
                 "mt-1 hidden size-6 shrink-0 cursor-grab touch-none place-items-center rounded-none text-muted-foreground/50 transition-colors sm:grid",
-                "hover:text-foreground focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                "hover:text-foreground focus-visible:text-foreground focus-ring",
                 isDragging && "cursor-grabbing text-foreground",
               )}
             >
@@ -271,7 +271,7 @@ export function MonitorCard({
                   onOpen();
                 }}
                 title={`Open details for ${monitor.name}`}
-                className="max-w-full truncate rounded-none font-medium leading-tight text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+                className="max-w-full truncate rounded-none font-medium leading-tight text-foreground outline-none focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
               >
                 {monitor.name}
               </button>
@@ -406,7 +406,7 @@ export function MonitorCard({
                     onViewIncidents();
                   }}
                   title="Open the incidents timeline — down periods stitched from real checks"
-                  className="-my-2 inline-flex min-h-11 items-center rounded-none px-0.5 font-medium underline-offset-2 transition-colors hover:text-down hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                  className="-my-2 inline-flex min-h-11 items-center rounded-none px-0.5 font-medium underline-offset-2 transition-colors hover:text-down hover:underline focus-ring"
                 >
                   View incident
                 </button>

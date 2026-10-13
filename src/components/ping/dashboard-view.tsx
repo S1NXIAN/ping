@@ -512,7 +512,7 @@ export function DashboardView({
             onClick={() => setActiveFolder("all")}
             className={cn(
               "flex items-center gap-2.5 rounded-md border-l px-2.5 py-2.5 text-sm transition-colors",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+              "focus-ring",
               activeFolder === "all"
                 ? "border-primary bg-secondary font-medium text-foreground"
                 : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
@@ -534,7 +534,7 @@ export function DashboardView({
                   onClick={() => setActiveFolder(f.id)}
                   className={cn(
                     "flex w-full items-center gap-2.5 rounded-md border-l px-2.5 py-2.5 text-sm transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+                    "focus-ring",
                     active
                       ? "border-primary bg-secondary font-medium text-foreground"
                       : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
@@ -576,7 +576,7 @@ export function DashboardView({
 
           <button
             onClick={() => setFolderDialog({ open: true, mode: "create" })}
-            className="mt-1 flex items-center gap-2 rounded-md px-2.5 py-2 text-sm text-muted-foreground/80 transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+            className="mt-1 flex items-center gap-2 rounded-md px-2.5 py-2 text-sm text-muted-foreground/80 transition-colors hover:bg-secondary/60 hover:text-foreground focus-ring"
           >
             <FolderPlus className="size-4" aria-hidden="true" />
             New folder
@@ -595,7 +595,7 @@ export function DashboardView({
               onClick={() => setActiveFolder("all")}
               className={cn(
                 "inline-flex min-h-11 shrink-0 items-center rounded-none border px-3 py-1.5 text-xs font-medium transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+                "focus-ring",
                 activeFolder === "all"
                   ? "border-primary/40 bg-primary/15 text-foreground"
                   : "border-border bg-card text-muted-foreground hover:text-foreground",
@@ -611,7 +611,7 @@ export function DashboardView({
                   onClick={() => setActiveFolder(f.id)}
                   className={cn(
                     "flex min-h-11 shrink-0 items-center gap-1.5 rounded-none border px-3 py-1.5 text-xs font-medium transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+                    "focus-ring",
                     activeFolder === f.id
                       ? "border-primary/40 bg-primary/15 text-foreground"
                       : "border-border bg-card text-muted-foreground hover:text-foreground",
@@ -624,7 +624,7 @@ export function DashboardView({
             })}
             <button
               onClick={() => setFolderDialog({ open: true, mode: "create" })}
-              className="flex min-h-11 shrink-0 items-center gap-1 rounded-none border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+              className="flex min-h-11 shrink-0 items-center gap-1 rounded-none border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground focus-ring"
               aria-label="New folder"
             >
               <FolderPlus className="size-3" /> New
@@ -714,7 +714,7 @@ export function DashboardView({
               {query && (
                 <button
                   onClick={() => setQuery("")}
-                  className="absolute right-2.5 top-1/2 -mx-3.5 -translate-y-1/2 p-3.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                  className="absolute right-2.5 top-1/2 -mx-3.5 -translate-y-1/2 p-3.5 text-muted-foreground transition-colors hover:text-foreground focus-ring"
                   aria-label="Clear search"
                 >
                   <X className="size-4" />
@@ -809,14 +809,14 @@ export function DashboardView({
               <button
                 onClick={() => refresh()}
                 disabled={refreshing}
-                className="inline-flex min-h-11 shrink-0 items-center border border-down/40 px-3 text-xs font-medium transition-colors hover:bg-down/15 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                className="inline-flex min-h-11 shrink-0 items-center border border-down/40 px-3 text-xs font-medium transition-colors hover:bg-down/15 disabled:opacity-60 focus-ring"
               >
                 {refreshing ? "Checking…" : "Try again"}
               </button>
               {error.includes("Unauthorized") && (
                 <button
                   onClick={onLogout}
-                  className="shrink-0 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                  className="shrink-0 underline underline-offset-2 focus-ring"
                 >
                   sign in again
                 </button>
@@ -900,7 +900,7 @@ export function DashboardView({
         <button
           onClick={() => setAddOpen(true)}
           aria-label="New monitor"
-          className="fixed bottom-20 right-4 z-40 flex size-14 items-center justify-center rounded-none bg-primary text-primary-foreground shadow-xl shadow-primary/30 transition-transform hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 sm:hidden"
+          className="fixed bottom-20 right-4 z-40 flex size-14 items-center justify-center rounded-none bg-primary text-primary-foreground shadow-xl shadow-primary/30 transition-transform hover:scale-105 active:scale-95 focus-ring focus-visible:ring-offset-2 sm:hidden"
         >
           <Plus className="size-6" />
         </button>

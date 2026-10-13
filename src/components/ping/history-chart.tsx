@@ -291,7 +291,7 @@ export function HistoryChart({
                a stale tooltip after the finger lifts and a scroll takeover
                never leaves one behind either. Mouse keeps hover semantics —
                click-to-focus must not dismiss an active reading. */
-            className="w-full touch-pan-y select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+            className="w-full touch-pan-y select-none focus-ring"
             style={{ height: 190 }}
             role="img"
             tabIndex={0}

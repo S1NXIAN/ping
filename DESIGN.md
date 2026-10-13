@@ -237,7 +237,7 @@ Sharp corners are the system's signature: every radius token is forced to 0px (`
 - **Outline:** Input Charcoal at 30% over paper, hairline border, Ash White text; hover fills Accent Charcoal.
 - **Ghost:** transparent until hovered, then Accent Charcoal wash; used for icon actions (refresh, menu, ⋮).
 - **Toolbar state encoding:** outline tools tint when their state is live — Alarm Rose wash + count when 30-day incidents exist. Silent when idle: color only ever carries state.
-- **Focus:** 3px Signal White ring at 50% (`ring-[3px] ring-ring/50`) — visible on every interactive element.
+- **Focus:** the one `focus-ring` utility — 3px Signal White ring at 50% (`ring-[3px] ring-ring/50`) — visible on every interactive element.
 
 ### Pills
 - **Style:** the recurring status chip — 10px/500 text, 2px×8px padding, sharp corners, a Hairline-strength colored border at ~25–40% alpha over a 6–15% alpha wash of the same hue (e.g. up-pill: `border-emerald/30 bg-emerald/10 text-emerald`).
@@ -254,7 +254,7 @@ Sharp corners are the system's signature: every radius token is forced to 0px (`
 
 ### Inputs / Fields
 - **Style:** Input Charcoal at 30% fill, 1px Input Charcoal border, sharp corners, 36px tall, Ash White 14px text.
-- **Focus:** 3px Signal White ring at 50% + border brightens to white; the caret and selection (#ffffff29) stay white.
+- **Focus:** `focus-ring` — 3px Signal White ring at 50% + border brightens to white; the caret and selection (#ffffff29) stay white.
 - **Error:** destructive ring/border treatment (rose at 20–40%).
 
 ### Navigation

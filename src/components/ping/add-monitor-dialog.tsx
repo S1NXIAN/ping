@@ -385,7 +385,7 @@ export function AddMonitorDialog({
               type="button"
               onClick={() => onOpenChange(false)}
               aria-label="Close"
-              className="grid size-11 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:size-9"
+              className="grid size-11 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-ring sm:size-9"
             >
               <X className="size-4" aria-hidden="true" />
             </button>
@@ -490,7 +490,7 @@ export function AddMonitorDialog({
                         clearError("times");
                       }}
                       className={cn(
-                        "h-11 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:h-9",
+                        "h-11 text-xs font-medium transition-colors focus-ring sm:h-9",
                         // The selected segment is the DARKER one — it reads as
                         // pressed-in against the group's lighter track. Bright
                         // text carries the emphasis, not the fill.
@@ -627,7 +627,7 @@ export function AddMonitorDialog({
               onToggle={(e) => setAdvancedOpen((e.target as HTMLDetailsElement).open)}
               className="group rounded-lg border border-border/70 bg-card/40"
             >
-              <summary className="flex cursor-pointer select-none list-none items-center gap-2 px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+              <summary className="flex cursor-pointer select-none list-none items-center gap-2 px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-ring [&::-webkit-details-marker]:hidden">
                 <ChevronRight
                   className="size-4 shrink-0 transition-transform duration-200 group-open:rotate-90"
                   aria-hidden="true"
