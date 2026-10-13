@@ -8,7 +8,6 @@ import {
   ExternalLink,
   Folder,
   FolderInput,
-  Gauge,
   GripVertical,
   Loader2,
   MoreVertical,
@@ -285,17 +284,6 @@ export function MonitorCard({
               <StatusPill tone={statusTone} uppercase className="min-w-13 justify-center">
                 {checking ? "checking…" : degraded ? "slow" : statusLabel(status)}
               </StatusPill>
-              {degraded && monitor.slowThresholdMs != null && (
-                <StatusPill
-                  tone="warn"
-                  icon={Gauge}
-                  title={`Average of the recent up checks is above the ${monitor.slowThresholdMs} ms latency threshold`}
-                >
-                  {avgUpMs != null
-                    ? `avg ${formatMs(Math.round(avgUpMs))} > ${monitor.slowThresholdMs} ms`
-                    : `> ${monitor.slowThresholdMs} ms`}
-                </StatusPill>
-              )}
               {monitor.account && (
                 <StatusPill
                   tone="teal"
@@ -350,15 +338,23 @@ export function MonitorCard({
                   ? `at ${formatTimesForDisplay(monitor.scheduleTimes, monitor.timezone ?? "UTC")}`
                   : `every ${formatInterval(monitor.intervalSec)}`}
               </span>
-              {monitor.lastResponseMs != null && (
+              {/* The average, not the newest sample: the same number the slow
+                  state is judged from, so the reading and the pill agree. The
+                  `avg` label is stated in text, not a title — touch has none. */}
+              {avgUpMs != null && (
                 <span
                   className={cn(
                     "inline-flex items-center gap-1",
                     degraded && "text-warn",
                   )}
+                  title={
+                    monitor.slowThresholdMs != null
+                      ? `Average response time of the recent up checks (slow above ${monitor.slowThresholdMs} ms)`
+                      : "Average response time of the recent up checks"
+                  }
                 >
                   <Activity className="size-3" aria-hidden="true" />
-                  {formatMs(monitor.lastResponseMs)}
+                  avg {formatMs(Math.round(avgUpMs))}
                 </span>
               )}
               {monitor.stats.uptime24h != null && (
