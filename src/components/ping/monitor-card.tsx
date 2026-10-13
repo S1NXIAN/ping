@@ -54,7 +54,7 @@ import {
   timeAgo,
 } from "@/lib/ping-client";
 import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
-import { formatTimesForDisplay } from "@/lib/schedule";
+import { formatNextRun } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { StatusDot, statusLabel, statusWord } from "./status-dot";
 import { monitorStatus, averageUpResponseMs, type MonitorStatus } from "@/lib/monitor-status";
@@ -335,7 +335,7 @@ export function MonitorCard({
               </span>
               <span>
                 {monitor.scheduleMode === "times" && monitor.scheduleTimes.length > 0
-                  ? `at ${formatTimesForDisplay(monitor.scheduleTimes, monitor.timezone ?? "UTC")}`
+                  ? `next ${formatNextRun(monitor.scheduleTimes, monitor.timezone ?? "UTC")}`
                   : `every ${formatInterval(monitor.intervalSec)}`}
               </span>
               {/* The average, not the newest sample: the same number the slow

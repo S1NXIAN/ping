@@ -8,9 +8,11 @@
 import { expect, test } from "bun:test";
 import {
   MAX_SCHEDULE_TIMES,
+  formatNextRun,
   hasTimeAt,
   isTimesDue,
   mostRecentScheduledInstant,
+  nextScheduledInstant,
   nominalPeriodSec,
   parseTimes,
   zonedWallClockToUtc,
@@ -59,6 +61,31 @@ test("mostRecentScheduledInstant reaches back to yesterday before the first time
   // 03:00 Manila today = 2026-03-09 19:00 UTC.
   const now = at("2026-03-10T00:00:00Z");
   expect(mostRecentScheduledInstant(["13:00", "03:00"], "Asia/Manila", now)).toBe(at("2026-03-09T19:00:00Z"));
+});
+
+test("nextScheduledInstant finds the soonest time strictly after now", () => {
+  // Now = 2026-03-10 06:00 UTC = 14:00 Manila -> next is 03:00 Manila tomorrow.
+  const now = at("2026-03-10T06:00:00Z");
+  expect(nextScheduledInstant(["13:00", "03:00"], "Asia/Manila", now)).toBe(at("2026-03-10T19:00:00Z"));
+});
+
+test("nextScheduledInstant skips the instant exactly at now", () => {
+  // Now is exactly 13:00 Manila -> the next run is tomorrow's, not this one.
+  const now = at("2026-03-10T05:00:00Z");
+  expect(nextScheduledInstant(["13:00"], "Asia/Manila", now)).toBe(at("2026-03-11T05:00:00Z"));
+});
+
+test("nextScheduledInstant is null with no times", () => {
+  expect(nextScheduledInstant([], "Asia/Manila", at("2026-03-10T06:00:00Z"))).toBeNull();
+});
+
+test("formatNextRun reads as the next clock time, not the whole list", () => {
+  const now = at("2026-03-10T06:00:00Z"); // 14:00 Manila
+  expect(formatNextRun(["13:00", "03:00"], "Asia/Manila", now)).toBe("3:00 AM");
+  // A 12-time schedule still yields one clock time, never a flood. Here all
+  // of today's times are past, so the next is tomorrow's first.
+  const many = Array.from({ length: 12 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
+  expect(formatNextRun(many, "Asia/Manila", now)).toBe("12:00 AM");
 });
 
 test("isTimesDue fires on the first ever check", () => {

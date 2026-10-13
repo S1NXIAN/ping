@@ -157,6 +157,36 @@ export function mostRecentScheduledInstant(times: string[], timeZone: string, no
 }
 
 /**
+ * The soonest instant strictly after `nowMs`, searching today then tomorrow.
+ * Tomorrow always suffices: the largest gap between two clock times is under
+ * 24h, so the next one lands in the next day at the latest. Null when no times.
+ */
+export function nextScheduledInstant(times: string[], timeZone: string, nowMs: number): number | null {
+  if (times.length === 0) return null;
+  const candidates = [
+    ...instantsOnLocalDay(times, timeZone, nowMs, 0),
+    ...instantsOnLocalDay(times, timeZone, nowMs, 1),
+  ].sort((a, b) => a - b);
+  return candidates.find((ts) => ts > nowMs) ?? null;
+}
+
+/**
+ * The next check time as a person reads it — "1:00 PM". This is the one clock
+ * time a monitor card shows, so a 12-time schedule does not flood the card.
+ * Falls back to the configured list when nothing resolves (empty/invalid).
+ */
+export function formatNextRun(times: string[], timeZone: string, nowMs: number = Date.now()): string {
+  const ts = nextScheduledInstant(times, timeZone, nowMs);
+  if (ts == null) return formatTimesForDisplay(times, timeZone);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(ts));
+}
+
+/**
  * Is a times-of-day monitor due at `nowMs`?
  *
  * Bounded catch-up: due when the most recent scheduled instant has passed and
