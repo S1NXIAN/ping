@@ -340,12 +340,16 @@ export function MonitorCard({
               </span>
               {/* The average, not the newest sample: the same number the slow
                   state is judged from, so the reading and the pill agree. The
-                  `avg` label is stated in text, not a title — touch has none. */}
+                  `avg` label is stated in text, not a title — touch has none.
+                  Ink follows the threshold: amber over it, emerald under it,
+                  plain when no threshold is set or the monitor isn't up (a
+                  green reading on a down card would be a false signal). */}
               {avgUpMs != null && (
                 <span
                   className={cn(
                     "inline-flex items-center gap-1",
                     degraded && "text-warn",
+                    status === "up" && monitor.slowThresholdMs != null && !degraded && "text-up",
                   )}
                   title={
                     monitor.slowThresholdMs != null
