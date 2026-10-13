@@ -237,7 +237,7 @@ Sharp corners are the system's signature: every radius token is forced to 0px (`
 - **Outline:** Input Charcoal at 30% over paper, hairline border, Ash White text; hover fills Accent Charcoal.
 - **Ghost:** transparent until hovered, then Accent Charcoal wash; used for icon actions (refresh, menu, ⋮).
 - **Toolbar state encoding:** outline tools tint when their state is live — Alarm Rose wash + count when 30-day incidents exist. Silent when idle: color only ever carries state.
-- **Focus:** the one `focus-ring` utility — 3px Signal White ring at 50% (`ring-[3px] ring-focus/50`) — visible on every interactive element.
+- **Focus:** the one `focus-ring` utility — 3px Signal White ring at 50% (`ring-[3px] ring-focus/50`) — visible on every interactive element. On the solid rose destructive toast the ring goes opaque white (`ring-focus`, no alpha): white at 50% over rose measures 1.86:1, below the 3:1 non-text floor, while opaque white measures 3.67:1.
 
 ### Pills
 - **Style:** the recurring status chip — 10px/500 text, 2px×8px padding, sharp corners, a Hairline-strength colored border at ~25–40% alpha over a 6–15% alpha wash of the same hue (e.g. up-pill: `border-emerald/30 bg-emerald/10 text-emerald`).
@@ -254,7 +254,7 @@ Sharp corners are the system's signature: every radius token is forced to 0px (`
 
 ### Inputs / Fields
 - **Style:** Input Charcoal at 30% fill, 1px Input Charcoal border, sharp corners, 36px tall, Ash White 14px text.
-- **Focus:** `focus-ring` — 3px Signal White ring at 50% + border brightens to white; the caret and selection (#ffffff29) stay white. One exception: the dashboard search field keeps a quieter ring — the same white at a lower alpha (`border-primary/40 ring-primary/20`).
+- **Focus:** `focus-ring` — 3px `ring-focus/50` Signal White ring + border brightens to white; the caret and selection (#ffffff29) stay white. One exception: the dashboard search field keeps a quieter ring — the same white at a lower alpha (`border-primary/40 ring-primary/20`).
 - **Error:** destructive ring/border treatment (rose at 20–40%).
 
 ### Navigation
