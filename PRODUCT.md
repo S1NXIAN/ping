@@ -53,8 +53,8 @@ Constraints (must be preserved by future work):
 
 ## Brand Commitments
 
-- Name: **PING** (header "PING." with tagline "Live service monitoring" — unified across admin header/footer and login by the 2026-09-15 clarify pass, retitled from the earlier "honest uptime monitoring" in the 2026-10-13 live-label pass; the even earlier "uptime for Render Free" predated the platform-agnostic scope).
-- Voice: plain-spoken, honest, technical; no marketing fluff; disclaimers kept factual ("not affiliated with render.com").
+- Name: **PING**, tagline "Live service monitoring" in the header and footer. The login card does not carry the tagline — it names the product's job in one sentence instead. (Retitled from the earlier "honest uptime monitoring".)
+- Voice: plain-spoken, honest, technical; no marketing fluff; disclaimers kept factual ("not affiliated with any hosting provider").
 - The honesty contract itself is a brand commitment: no simulated data, no invented uptime numbers, ever.
 
 ## Evidence on Hand

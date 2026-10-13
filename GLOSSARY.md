@@ -22,6 +22,9 @@ is the absence of any Check yet — neither is a health verdict. These are the
 stored values; the display word for `up` is **live** (title-case "Live" in
 headline pills, lowercase "live" in dense fragments — tooltips, tables, aria
 labels), from `statusLabel`/`statusWord` in `src/components/ping/status-dot.tsx`.
+The brand tagline "Live service monitoring" is the ordinary sense of the word
+(monitoring that runs continuously), not this status — it makes no health claim
+about any monitor.
 _Avoid_: state, condition (and do not read `paused`/`pending` as health)
 
 **Slow (degraded)**:

@@ -1,4 +1,4 @@
-# PING — honest uptime monitoring
+# PING — Live service monitoring
 
 PING is a lightweight, mobile-first uptime monitor for web services. It sends
 **real HTTP requests** to the URLs you configure, on the schedule you choose,
