@@ -77,3 +77,5 @@ examples/
 *.local
 tool-results/
 .impeccable/
+# Playwright MCP browser session artifacts
+.playwright-mcp/
