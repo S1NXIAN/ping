@@ -215,7 +215,6 @@ export function MonitorCard({
         }}
         className={cn(
           "ping-fade-up group relative cursor-pointer rounded-lg border bg-card p-3 outline-none transition-colors sm:p-5 @container",
-          "focus-ring",
           status === "down" && "border-down/30 hover:border-down/50",
           degraded &&
             "border-warn/30 hover:border-warn/50 hover:bg-warn/[0.03]",

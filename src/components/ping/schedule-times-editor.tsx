@@ -123,7 +123,7 @@ export function ScheduleTimesEditor({
                   would only fire when the sibling itself is focused. */}
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 flex items-center whitespace-nowrap rounded-md border border-input pl-2 pr-5 text-xs tabular-nums peer-focus-visible:border-ring peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50"
+                className="pointer-events-none absolute inset-0 flex items-center whitespace-nowrap rounded-md border border-input pl-2 pr-5 text-xs tabular-nums peer-focus-visible:border-focus peer-focus-visible:ring-[3px] peer-focus-visible:ring-focus/50"
               >
                 {timeLabel(t)}
               </div>

@@ -96,7 +96,7 @@ function FieldLabel({
             <button
               type="button"
               aria-label="More information"
-              className="grid size-4 place-items-center rounded-none text-[10px] font-bold text-muted-foreground/60 transition-colors hover:bg-secondary hover:text-foreground focus-visible:bg-secondary focus-visible:text-foreground focus-visible:outline-none"
+              className="grid size-4 place-items-center rounded-none text-[10px] font-bold text-muted-foreground/60 transition-colors hover:bg-secondary hover:text-foreground focus-visible:bg-secondary focus-visible:text-foreground focus-ring"
             >
               ?
             </button>
@@ -543,7 +543,7 @@ export function AddMonitorDialog({
                             setIntervalSec("300");
                             clearError("interval");
                           }}
-                          className="shrink-0 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:text-foreground focus-visible:outline-none"
+                          className="shrink-0 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:text-foreground focus-ring"
                         >
                           Presets
                         </button>

@@ -22,6 +22,7 @@
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
+  --color-focus: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
@@ -119,12 +120,15 @@
 
 /*
  * The one focus ring — 3px Signal White at 50% + the border brightening to
- * white. Every interactive element uses it (DESIGN.md, Buttons/Inputs); the
- * semantic overrides layer on top — destructive buttons and `aria-invalid`
- * fields re-color the ring, and the two busy-surface sites add a ring-offset.
+ * white. Every interactive element uses it (DESIGN.md, Buttons/Inputs). The
+ * semantic overrides layer on top: destructive buttons and `aria-invalid`
+ * fields re-color the ring, and four busy-surface sites add a ring-offset.
+ * Those overrides win by source order alone — a custom utility sorts before
+ * every `focus-visible:` variant — so write an override as a `focus-visible:`
+ * (or `group-[…]`/`peer-…`) class, never as a bare utility.
  */
 @utility focus-ring {
-  @apply focus-visible:outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50;
+  @apply focus-visible:outline-none focus-visible:border-focus focus-visible:ring-[3px] focus-visible:ring-focus/50;
 }
 
 /* ---------- PING custom utilities ---------- */

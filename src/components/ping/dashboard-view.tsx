@@ -900,7 +900,7 @@ export function DashboardView({
         <button
           onClick={() => setAddOpen(true)}
           aria-label="New monitor"
-          className="fixed bottom-20 right-4 z-40 flex size-14 items-center justify-center rounded-none bg-primary text-primary-foreground shadow-xl shadow-primary/30 transition-transform hover:scale-105 active:scale-95 focus-ring focus-visible:ring-offset-2 sm:hidden"
+          className="fixed bottom-20 right-4 z-40 flex size-14 items-center justify-center rounded-none bg-primary text-primary-foreground shadow-xl shadow-primary/30 transition-transform hover:scale-105 active:scale-95 focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card sm:hidden"
         >
           <Plus className="size-6" />
         </button>
