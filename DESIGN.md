@@ -237,7 +237,7 @@ Sharp corners are the system's signature: every radius token is forced to 0px (`
 - **Primary:** Signal White fill, Soot text (`{button-primary}`); hover drops to 90% white; active presses to 0.98 scale; subtle key-light glow beneath.
 - **Outline:** Input Charcoal at 30% over paper, hairline border, Ash White text; hover fills Accent Charcoal.
 - **Ghost:** transparent until hovered, then Accent Charcoal wash; used for icon actions (refresh, menu, ⋮).
-- **Toolbar state encoding:** outline tools tint when their state is live — Alarm Rose wash + count when 30-day incidents exist. Silent when idle: color only ever carries state.
+- **Toolbar state encoding:** outline tools tint when their state is live — Alarm Rose wash + count when unseen or ongoing incidents exist. Silent when idle: color only ever carries state.
 - **Focus:** the one `focus-ring` utility — 3px Signal White ring at 50% (`ring-[3px] ring-focus/50`) — visible on every interactive element. On the solid rose destructive toast the ring goes opaque white (`ring-focus`, no alpha): white at 50% over rose measures 1.86:1, below the 3:1 non-text floor, while opaque white measures 3.67:1.
 
 ### Pills

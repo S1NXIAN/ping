@@ -47,7 +47,15 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useOverview } from "@/hooks/use-overview";
 import { useCardReorder } from "@/hooks/use-card-reorder";
-import { api, fetchIncidents, formatUptime, timeAgo, uptimeTone } from "@/lib/ping-client";
+import {
+  api,
+  fetchIncidents,
+  formatUptime,
+  newestIncidentStart,
+  timeAgo,
+  unseenIncidentCount,
+  uptimeTone,
+} from "@/lib/ping-client";
 import { pinnedSetAfterMove } from "@/lib/reorder";
 import { summarize } from "@/lib/summary";
 import type { AdminIncidentDTO, FolderDTO, MonitorDTO } from "@/lib/ping-types";
@@ -67,6 +75,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export type SortMode = "manual" | "az" | "status" | "slowest";
 const SORT_STORAGE_KEY = "ping.sort";
+// Per-device watermark: the newest incident start the operator has opened the
+// incidents sheet to see. Clears the badge's closed-incident half.
+const SEEN_STORAGE_KEY = "ping.incidents.seen";
 
 export function DashboardView({
   onLogout,
@@ -177,7 +188,35 @@ export function DashboardView({
     void loadIncidents();
   }, [loadIncidents]);
   const incidents = incidentData?.folderId === scopeFolderId ? incidentData.list : null;
-  const incidentCount = incidents?.length ?? 0;
+
+  // The badge is a nudge, not a tally: ongoing incidents always count (they
+  // keep asking until resolved), closed ones only until the sheet has been
+  // opened over them. The watermark is per device, like the sort memory, and
+  // advances only from a list that actually loaded — a failed fetch leaves it
+  // untouched, so nothing is marked seen that was never shown.
+  const [seenIncidentsAt, setSeenIncidentsAt] = useState(0);
+  const seenRef = useRef(0);
+  useEffect(() => {
+    try {
+      const v = Number(localStorage.getItem(SEEN_STORAGE_KEY)) || 0;
+      seenRef.current = v;
+      setSeenIncidentsAt(v);
+    } catch {
+      /* private browsing etc. */
+    }
+  }, []);
+  const markIncidentsViewed = useCallback((list: AdminIncidentDTO[]) => {
+    const newest = newestIncidentStart(list);
+    if (newest <= seenRef.current) return;
+    seenRef.current = newest;
+    setSeenIncidentsAt(newest);
+    try {
+      localStorage.setItem(SEEN_STORAGE_KEY, String(newest));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const incidentCount = incidents ? unseenIncidentCount(incidents, seenIncidentsAt) : 0;
 
   // Down cards' honest "down since": the ONGOING incident's real first
   // failed check (endedAt == null). No incident known → no claim, never a
@@ -837,7 +876,7 @@ export function DashboardView({
                 incidentCount > 0 &&
                   "border-down/40 bg-down/10 text-down hover:bg-down/10 hover:text-down",
               )}
-              aria-label={`Incidents and postmortem notes${incidentCount > 0 ? ` (${incidentCount} in the last 30 days)` : ""}`}
+              aria-label={`Incidents and postmortem notes${incidentCount > 0 ? ` (${incidentCount} to review)` : ""}`}
               title="Incidents — down periods over the last 30 days, with postmortem notes"
             >
               <AlertTriangle className="size-4" aria-hidden="true" />
@@ -1010,6 +1049,7 @@ export function DashboardView({
           setIncidentsOpen(o);
           if (!o) void loadIncidents();
         }}
+        onViewed={markIncidentsViewed}
         folderId={activeFolder === "all" ? null : activeFolder}
       />
 

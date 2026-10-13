@@ -37,10 +37,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function IncidentsSheet({
   open,
   onOpenChange,
+  onViewed,
   folderId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Called with the list whenever it loads while open, so the dashboard can
+   *  clear its badge's seen-incident half. Never called on a failed load. */
+  onViewed: (incidents: AdminIncidentDTO[]) => void;
   /** Active Folder to scope to; null = the whole Fleet ("All monitors"). */
   folderId: string | null;
 }) {
@@ -50,12 +54,14 @@ export function IncidentsSheet({
 
   const load = useCallback(async () => {
     try {
-      setIncidents(await fetchIncidents(folderId));
+      const list = await fetchIncidents(folderId);
+      setIncidents(list);
       setError(null);
+      onViewed(list);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load incidents");
     }
-  }, [folderId]);
+  }, [folderId, onViewed]);
 
   useEffect(() => {
     if (open) void load();
