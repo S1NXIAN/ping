@@ -1,9 +1,9 @@
 "use client";
 
 import {
-  Activity,
   AlertTriangle,
   ArrowDownAZ,
+  ArrowDownZA,
   Check,
   Folder,
   Gauge,
@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Settings,
   Trash2,
+  Zap,
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -39,8 +40,9 @@ import type { SortMode } from "./dashboard-view";
 const SORT_OPTIONS: { value: SortMode; label: string; icon: typeof MoveVertical }[] = [
   { value: "manual", label: "Manual order", icon: MoveVertical },
   { value: "az", label: "Sort A–Z", icon: ArrowDownAZ },
-  { value: "status", label: "Sort by status", icon: Activity },
+  { value: "za", label: "Sort Z–A", icon: ArrowDownZA },
   { value: "slowest", label: "Sort by slowest", icon: Gauge },
+  { value: "fastest", label: "Sort by fastest", icon: Zap },
 ];
 
 /**

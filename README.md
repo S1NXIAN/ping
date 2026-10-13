@@ -26,9 +26,10 @@ only visible by looking at PING.
   the service — searchable).
 - **Ordering** — pin monitors to the top, drag the handle to reorder
   (desktop), and switch the list between manual,
-  A–Z, and status-first sorting. Pinned monitors float to the top in every sort
-  mode; dropping a card into the pinned zone pins it automatically. Your sort
-  choice is remembered per device, and `/` (Gmail-style) jumps to the search box.
+  A–Z, Z–A, slowest, and fastest sorting. Pinned monitors float to the top in
+  every sort mode; dropping a card into the pinned zone pins it automatically.
+  Your sort choice is remembered per device, and `/` (Gmail-style) jumps to the
+  search box.
 - **Self-monitor** — on first setup (and on boot) PING creates a monitor that
   checks its own `/api/health` endpoint every 3 minutes, so you can see whether
   PING itself is up — and its own inbound traffic helps keep the instance awake.

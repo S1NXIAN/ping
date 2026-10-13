@@ -5,6 +5,7 @@ import {
   Activity,
   AlertTriangle,
   ArrowDownAZ,
+  ArrowDownZA,
   FolderPlus,
   Folder,
   Gauge,
@@ -17,6 +18,7 @@ import {
   Settings,
   X,
   XCircle,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,7 +64,7 @@ import type { AdminIncidentDTO, FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
 import { MonitorCard, type CardDnd } from "./monitor-card";
-import { monitorStatus, type MonitorStatus } from "@/lib/monitor-status";
+import { monitorStatus } from "@/lib/monitor-status";
 import { MonitorDetailSheet } from "./monitor-detail-sheet";
 import { AddMonitorDialog } from "./add-monitor-dialog";
 import { IncidentsSheet } from "./incidents-sheet";
@@ -73,7 +75,7 @@ import { StatusPill, type PillTone } from "./status-pill";
 import { InlineAlert } from "./inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export type SortMode = "manual" | "az" | "status" | "slowest";
+export type SortMode = "manual" | "az" | "za" | "slowest" | "fastest";
 const SORT_STORAGE_KEY = "ping.sort";
 // Per-device watermark: the newest incident start the operator has opened the
 // incidents sheet to see. Clears the badge's closed-incident half.
@@ -115,9 +117,9 @@ export function DashboardView({
   useEffect(() => {
     try {
       const v = localStorage.getItem(SORT_STORAGE_KEY);
-      // "za"/"fastest" were distilled away — stale stored values fall
-      // through to the manual default
-      if (v === "manual" || v === "az" || v === "status" || v === "slowest")
+      // Stale stored values (e.g. the dropped "status") fall through to the
+      // manual default.
+      if (v === "manual" || v === "az" || v === "za" || v === "slowest" || v === "fastest")
         setSortMode(v);
     } catch {
       /* private browsing etc. */
@@ -394,36 +396,29 @@ export function DashboardView({
       );
     }
 
-    if (sortMode === "status") {
-      // down first, then pending, then up, then paused; pinned wins within a rank.
-      // Presentation ordering only — the status itself comes from the shared module.
-      const STATUS_RANK: Record<MonitorStatus, number> = { down: 0, pending: 1, up: 2, paused: 3 };
-      const rank = (m: MonitorDTO) => STATUS_RANK[monitorStatus(m)];
-      return [...list].sort(
-        (a, b) => rank(a) - rank(b) || Number(b.pinned) - Number(a.pinned) || a.position - b.position,
-      );
-    }
-
-    if (sortMode === "az") {
+    if (sortMode === "az" || sortMode === "za") {
+      const dir = sortMode === "az" ? 1 : -1;
       const sorted = [...list].sort(
         (a, b) =>
-          a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }) ||
+          dir * a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }) ||
           a.position - b.position,
       );
       // pinned monitors always float to the top, even when browsing alphabetically
       return [...sorted.filter((m) => m.pinned), ...sorted.filter((m) => !m.pinned)];
     }
 
-    if (sortMode === "slowest") {
-      // by real average response time (24h), slowest first — monitors with no
-      // up checks (paused/pending/all-failed) always sink to the bottom, honestly.
+    if (sortMode === "slowest" || sortMode === "fastest") {
+      // by real average response time (24h) — slowest first, or fastest first.
+      // Monitors with no up checks (paused/pending/all-failed) always sink to
+      // the bottom, honestly: "no data" is never the fastest or the slowest.
+      const dir = sortMode === "slowest" ? -1 : 1;
       const sorted = [...list].sort((a, b) => {
         const av = a.stats.avgMs24h;
         const bv = b.stats.avgMs24h;
         if (av == null && bv == null) return a.position - b.position;
         if (av == null) return 1;
         if (bv == null) return -1;
-        return bv - av || a.position - b.position;
+        return dir * (av - bv) || a.position - b.position;
       });
       return [...sorted.filter((m) => m.pinned), ...sorted.filter((m) => !m.pinned)];
     }
@@ -828,7 +823,7 @@ export function DashboardView({
                   mirror the pattern or the 44px touch height never applies */}
               <SelectTrigger
                 aria-label="Sort monitors"
-                title="How the monitor list is ordered — manual drag order, alphabetical, status, or response time"
+                title="How the monitor list is ordered — manual drag order, A–Z, Z–A, slowest, or fastest"
                 className="w-[124px] shrink-0 text-xs data-[size=default]:h-11 sm:data-[size=default]:h-9"
               >
                 <SelectValue />
@@ -844,14 +839,19 @@ export function DashboardView({
                     <ArrowDownAZ className="size-3.5" aria-hidden="true" /> A–Z
                   </span>
                 </SelectItem>
-                <SelectItem value="status">
+                <SelectItem value="za">
                   <span className="flex items-center gap-2">
-                    <Activity className="size-3.5" aria-hidden="true" /> Status
+                    <ArrowDownZA className="size-3.5" aria-hidden="true" /> Z–A
                   </span>
                 </SelectItem>
                 <SelectItem value="slowest">
                   <span className="flex items-center gap-2">
                     <Gauge className="size-3.5" aria-hidden="true" /> Slowest
+                  </span>
+                </SelectItem>
+                <SelectItem value="fastest">
+                  <span className="flex items-center gap-2">
+                    <Zap className="size-3.5" aria-hidden="true" /> Fastest
                   </span>
                 </SelectItem>
               </SelectContent>
