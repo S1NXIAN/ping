@@ -216,8 +216,7 @@ Spacing is tight and rhythmic: 2px pill padding, 4–8px internal gaps, 14px/16p
 Flat by default; depth is light, not shadow. Surfaces separate through the charcoal scale (Soot paper → Card Charcoal → Popover Charcoal) and 1px Hairline borders. Two light effects do the work shadows would: a 1px inset top highlight (`inset 0 1px 0 0 rgba(255,255,255,0.045)`) that reads as a gentle lift on every card, and twin radial ambient glows (white at 5.5%/3.5% alpha, top-left and top-right) that suggest a lamp over the drafting table. Interactive lift is physical, not shadowed: cards rise 1px on hover; CTAs press to 0.98 scale.
 
 ### Shadow Vocabulary
-- **Card top highlight** (`box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.045)`): applied to every card surface at rest.
-- **Lifted card highlight** (`box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.14)`): the dragged card only. The resting 0.045 is too faint to separate a card that is following the cursor, so the drag state brightens the same 1px top edge — light, never a cast shadow. Paired with `border-primary/60` and a 1.015 scale.
+- **Card top highlight** (`box-shadow: inset 0 1px 0 0 rgba(255,255,255,α)`): one shape, two alphas — `0.045` at rest on every card surface, `0.14` on the card being dragged. The resting value is too faint to separate a card that is following the cursor, so the drag state brightens the same 1px top edge. Light in both cases, never a cast shadow.
 - **CTA key light** (`box-shadow: 0 1px 2px rgba(255,255,255,0.25)`): the white button's subtle glow — light emitting, not casting.
 
 ### Named Rules
@@ -249,6 +248,7 @@ Sharp corners are the system's signature: every radius token is forced to 0px (`
 - **Background:** Card Charcoal; popovers and menus step up to Popover Charcoal.
 - **Shadow Strategy:** 1px inset top highlight only (see Elevation).
 - **Border:** 1px Hairline; hover raises border to Signal White at 25% and lifts the card 1px.
+- **Drag state:** while a card is dragged it lifts on `translate3d` at 1.015 scale with `border-primary/60` and the brighter top highlight (see Elevation); it is never dimmed or ghosted.
 - **Internal Padding:** 14px vertical × 16px horizontal (stat cards); 16px for larger containers.
 - **Outage row (down cards):** while a monitor is down, the card answers "how long, and what now?" in one 11px rose line: the real down duration (from the ongoing incident's first failed check — tabular, never estimated; hidden when no incident is known rather than guessed), then `View incident` (opens the incidents sheet) as a rose text action with a ≥44px hit area.
 
