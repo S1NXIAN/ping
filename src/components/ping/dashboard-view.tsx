@@ -224,6 +224,34 @@ export function DashboardView({
     [data, monitors],
   );
 
+  // Out-of-band down signal: a backgrounded tab is otherwise blind, and the
+  // operator's whole risk is "I didn't have the dashboard open". This is not an
+  // alert (PING is display-only) — it is the same truth the open dashboard
+  // already shows, surfaced in the title and favicon. The base title is read
+  // from the document (layout.tsx) rather than duplicated, and restored on
+  // unmount so the settings view never carries the marker.
+  const downCount = fleetSummary?.down ?? 0;
+  const baseTitle = useRef<string | null>(null);
+  useEffect(() => {
+    if (baseTitle.current === null) baseTitle.current = document.title;
+    const links = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"]'));
+    // Each declared icon keeps its own format: an SVG link must not be handed
+    // a PNG (and vice versa) — the browser trusts the declared type.
+    const originalHrefs = links.map((l) => l.getAttribute("href") ?? "");
+    document.title = downCount > 0 ? `PING — ${downCount} down` : baseTitle.current;
+    links.forEach((l, i) => {
+      const isPng = (l.getAttribute("type") ?? "").includes("png");
+      l.setAttribute(
+        "href",
+        downCount > 0 ? (isPng ? "/logo-down.png" : "/logo-down.svg") : originalHrefs[i],
+      );
+    });
+    return () => {
+      document.title = baseTitle.current ?? document.title;
+      links.forEach((l, i) => l.setAttribute("href", originalHrefs[i]));
+    };
+  }, [downCount]);
+
   // ---------- reorder / pin engine ----------
 
   /** Persists an order (and pin set) to the server, then refreshes. Resolves

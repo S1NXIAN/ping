@@ -14,7 +14,7 @@ The operator: a solo developer who self-hosts PING (single password, single admi
 
 PING is a lightweight, mobile-first uptime monitor for web services on free tiers — services that spin down when idle and cold-boot on the next request. It sends real HTTP requests to configured URLs on a chosen schedule, records exactly what it observed (status codes, response times, failures), and keeps services awake by letting an external scheduler hit its tick endpoint. Success means the operator never has to guess whether a free-tier service is up, slow, or cold-booting — and never sees an invented number.
 
-PING is **display-only**: it records and shows, it never alerts. Nothing will tell the operator a service went down except opening the dashboard.
+PING is **display-only**: it records and shows, it never alerts. Its one out-of-band signal is passive and self-contained: while any monitor is down, the browser tab title and favicon carry the down count. Nothing else reaches the operator — no webhook, email, or push — so a service that goes down is still only visible by looking at PING.
 
 ## Positioning
 
@@ -49,7 +49,7 @@ Constraints (must be preserved by future work):
 - UTC day buckets everywhere (stats, bars) so views align across timezones.
 - English-only UI; no i18n requirement recorded.
 - Concurrency guards (in-flight per monitor, tick overlap) must never be removed to "fix" double triggers.
-- PING is display-only: it records and shows, it never alerts. No webhook, email, badge or push delivery exists or may be reintroduced without a product decision.
+- PING is display-only: it records and shows, it never alerts. No webhook, email or push delivery exists or may be reintroduced without a product decision. The one permitted out-of-band signal is the browser tab title and favicon down marker (product decision 2026-10-13): the same truth the open dashboard shows, surfaced peripherally, never a notification.
 
 ## Brand Commitments
 
@@ -68,7 +68,7 @@ Constraints (must be preserved by future work):
 
 1. **Honesty above all.** Show only what was really measured; gaps stay gaps; "—" beats a plausible lie.
 2. **Built for cold-boot reality.** Free-tier services sleep; waking them and measuring the truth matters more than pretending 24/7.
-3. **Display-only, by choice.** PING records and shows; it never alerts. Nothing tells the operator a service is down except opening the dashboard.
+3. **Display-only, by choice.** PING records and shows; it never alerts. The one out-of-band signal is the tab title and favicon down marker — the same truth, peripherally; nothing else tells the operator a service is down except PING itself.
 4. **One operator, zero ceremony.** Self-hosted, single password, low-maintenance; the tool must never become another service to babysit.
 5. **Platform-agnostic honesty.** Render-aware today, but any free-tier http(s) service that cold-boots is first-class.
 

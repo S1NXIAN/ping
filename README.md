@@ -7,7 +7,10 @@ history. Nothing is simulated, and no uptime number is ever shown for a window
 PING didn't actually measure.
 
 PING is **display-only**: it records and shows the truth, it never alerts.
-Nothing will tell you a service went down except opening the dashboard.
+Its one out-of-band signal is passive and stays inside the browser: while any
+monitor is down, the tab title and favicon carry the down count. Nothing else
+reaches you — no email, webhook, or push — so a service that goes down is still
+only visible by looking at PING.
 
 > PING is an independent hobby tool. It is not affiliated with or endorsed by
 > render.com.
