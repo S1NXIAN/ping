@@ -42,7 +42,7 @@ Capabilities (confirmed, shipping):
 
 Constraints (must be preserved by future work):
 
-- Single-instance assumption: in-process scheduler, in-memory login throttle, module-level concurrency guards are process-local.
+- Single-instance assumption: in-process scheduler, in-memory login throttle, globalThis-held concurrency guards are process-local.
 - SQLite only; history retention default 30 days + 1 000 checks/monitor; incident notes pruned at a fixed 32 days.
 - Min check interval 60 s (whole minutes only — `S` is not a configurable unit); max 24 hours; ≤200 monitors. A times-of-day schedule stores wall-clock times (never instants) plus the browser's IANA zone, so it survives a DST shift as the times the user typed; editing a monitor re-reads the browser's zone. A check missed while PING was asleep runs on waking, but only the most recent one.
 - Monitor URLs must be http(s) — any host, including internal targets (`localhost`, LAN names, `169.254.*` link-local) by design: creating a monitor requires the authenticated admin session, so this is not an untrusted-input path (see README trust model).

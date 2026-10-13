@@ -8,8 +8,8 @@ import { runDueChecks, runtimeState } from "@/lib/checker";
  * so pinging PING both wakes it up and performs the real checks.
  *
  * Optionally set the CRON_SECRET env var to require ?token=<secret>.
- * A 20 s global throttle stops abuse; it never blocks the in-process
- * scheduler, which shares runDueChecks' overlap guard.
+ * A 20 s global throttle stops abuse; a tick already in flight is refused
+ * by runDueChecks' overlap guard.
  */
 async function handle(req: NextRequest) {
   const secret = process.env.CRON_SECRET;

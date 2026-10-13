@@ -23,17 +23,43 @@ export interface TickResult {
   at: string;
 }
 
-/** Module-level runtime state, exposed via /api/admin/info (real values only). */
-export const runtimeState = {
-  running: false,
-  lastTickAt: null as string | null,
-  lastTick: null as TickResult | null,
-  lastTickAttemptAt: 0,
-  schedulerStarted: false,
+interface RuntimeState {
+  running: boolean;
+  lastTickAt: string | null;
+  lastTick: TickResult | null;
+  lastTickAttemptAt: number;
+  schedulerStarted: boolean;
   /** When the hourly prune job last ran, and how many checks it deleted. */
-  lastPrunedAt: null as string | null,
-  lastPrunedCount: null as number | null,
+  lastPrunedAt: string | null;
+  lastPrunedCount: number | null;
+}
+
+/**
+ * Live check-engine state — the runtime readout and the in-flight guard.
+ * Held on `globalThis`, not in module scope: Next compiles the
+ * instrumentation hook (which starts the scheduler) into a bundle separate
+ * from the route handlers, so module-level state would be one copy per bundle
+ * and the guard would not hold in the production build. Same pattern as
+ * self-monitor.ts, for the same bundler reason.
+ */
+const g = globalThis as unknown as {
+  __pingChecker?: { runtimeState: RuntimeState; inFlight: Set<string> };
 };
+const checkerState = (g.__pingChecker ??= {
+  runtimeState: {
+    running: false,
+    lastTickAt: null,
+    lastTick: null,
+    lastTickAttemptAt: 0,
+    schedulerStarted: false,
+    lastPrunedAt: null,
+    lastPrunedCount: null,
+  },
+  inFlight: new Set<string>(),
+});
+
+/** Runtime state, exposed via /api/admin/info (real values only). */
+export const runtimeState = checkerState.runtimeState;
 
 export interface RetentionPolicy {
   /** Days of check history to keep; null = keep forever. */
@@ -140,9 +166,10 @@ function keywordFailure(
  * triggers are normal (scheduler tick × manual "check now" × first check
  * after create), and without this guard they would write
  * duplicate Check rows and clobber the last-status fields via read-modify-
- * write races. Returns null when skipped.
+ * write races. Returns null when skipped. Held on `globalThis` (see
+ * checkerState) so it is one set across the scheduler and the route bundles.
  */
-const inFlight = new Set<string>();
+const inFlight = checkerState.inFlight;
 
 /** Runs one real HTTP check and persists the result. Null = skipped. */
 export async function runCheck(monitor: Monitor): Promise<Check | null> {
@@ -235,7 +262,9 @@ async function runCheckInner(monitor: Monitor): Promise<Check> {
 /**
  * Runs checks for every enabled monitor whose interval has elapsed.
  * Safe to call concurrently / repeatedly — overlapping runs return the
- * previous result, and only genuinely due monitors are checked.
+ * previous result, and only genuinely due monitors are checked. The overlap
+ * guard (runtimeState.running) and the in-flight guard are process-wide
+ * (globalThis), so the scheduler and the route handlers share one copy.
  */
 export async function runDueChecks(): Promise<TickResult> {
   if (runtimeState.running) {
