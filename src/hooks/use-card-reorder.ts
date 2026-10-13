@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { moveByStep, reorder } from "@/lib/reorder";
 
 /**
  * Pointer-based drag reorder for a vertical card list.
@@ -17,11 +18,16 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
  *
  * The pointer listeners attach synchronously inside `start` (not in an effect):
  * an effect runs a frame later, and a fast first move would be dropped.
+ *
+ * Commits are serialized on a promise chain, and each new step is computed from
+ * the optimistic order rather than the last server response. Two quick taps
+ * therefore both land instead of the second being swallowed by the first.
  */
 
-/** One rendered card: its viewport band, plus where it sits in `items`. */
+/** One rendered card: its layout band (transform-free), plus its index in `items`. */
 interface Slot {
-  top: number;
+  /** Layout offset within the list container — unaffected by the lift transform. */
+  offsetTop: number;
   height: number;
   /** Index in the full `items` array — the splice target. */
   itemIndex: number;
@@ -32,27 +38,25 @@ interface Options<T extends { id: string }> {
   items: T[];
   /** The list container; every card carries `data-monitor-id`. */
   containerRef: React.RefObject<HTMLElement | null>;
-  /** Persist the final order once, on drop. Resolves when the server's fresh
-   *  order has landed — the preview is held until then so the list never snaps
-   *  back to the stale order in the gap. */
+  /** Persist one order. Resolves once the server's fresh order has landed, so
+   *  the preview can be held until then and the list never snaps back. */
   onCommit: (next: T[], movedId: string) => Promise<void>;
-  /** Drag is available (manual sort, more than one monitor). */
+  /** Reorder is available (manual sort, more than one monitor). */
   enabled: boolean;
 }
 
 export interface CardReorder<T> {
   /** The card being dragged, or null. */
   draggingId: string | null;
-  /** Live reordered full list during a drag; null when idle. */
+  /** Live optimistic order while a reorder is in flight; null when idle. */
   preview: T[] | null;
   /** Y (px, relative to the list container) for the insertion indicator. */
   indicatorY: number | null;
   /** Start a drag from a card's handle. */
   start: (id: string, e: React.PointerEvent) => void;
-  /** Step a card one slot up/down — the keyboard- and touch-reachable path
-   *  (the grip handle is desktop-only). `order` is the visible id sequence to
-   *  step through, so a filtered view moves past its visible neighbour. */
-  move: (id: string, dir: -1 | 1, order: string[]) => void;
+  /** Step a card one slot through the visible order — the keyboard- and
+   *  touch-reachable path (the grip handle is desktop-only). */
+  move: (id: string, dir: -1 | 1, visibleIds: string[]) => void;
 }
 
 const EASE = "cubic-bezier(0.2, 0, 0, 1)";
@@ -61,6 +65,9 @@ const FLIP_MS = 190;
 const DRAG_THRESHOLD_PX = 4;
 /** How long a post-drag click is swallowed so it can't also open the card. */
 const CLICK_GUARD_MS = 250;
+/** Distance from a viewport edge at which a drag starts scrolling the page. */
+const AUTOSCROLL_MARGIN_PX = 90;
+const AUTOSCROLL_SPEED_PX = 14;
 
 export function useCardReorder<T extends { id: string }>({
   items,
@@ -75,21 +82,44 @@ export function useCardReorder<T extends { id: string }>({
   // Drag session lives in refs: pointer moves must never re-render on their own.
   const slots = useRef<Slot[]>([]);
   const draggedEl = useRef<HTMLElement | null>(null);
-  const previewRef = useRef<T[] | null>(null);
+  /** The optimistic order not yet confirmed by the server; null when settled. */
+  const optimisticRef = useRef<T[] | null>(null);
   const pointerY = useRef(0);
   const grabOffset = useRef(0);
   const slotRef = useRef(-1);
   const startSlot = useRef(-1);
   const containerTop = useRef(0);
   const moved = useRef(false);
-  /** Active pointer listeners, so a drag can be torn down from anywhere. */
+  /** Active drag teardown, so the session can be ended from anywhere. */
   const detach = useRef<(() => void) | null>(null);
+  /** Serializes commits so overlapping reorders queue instead of dropping. */
+  const chain = useRef<Promise<void>>(Promise.resolve());
   /** Card id → viewport top, for the FLIP diff between renders. */
   const lastTops = useRef(new Map<string, number>());
 
   const reduceMotion = () =>
     typeof window !== "undefined" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /** Show `list` optimistically and commit it once the in-flight one settles.
+   *  The preview clears only when this list is still the newest, so a burst of
+   *  steps holds one continuous optimistic order. */
+  const enqueue = useCallback(
+    (list: T[], movedId: string) => {
+      optimisticRef.current = list;
+      setPreview(list);
+      chain.current = chain.current
+        .then(() => onCommit(list, movedId))
+        .catch(() => undefined)
+        .then(() => {
+          if (optimisticRef.current === list) {
+            optimisticRef.current = null;
+            setPreview(null);
+          }
+        });
+    },
+    [onCommit],
+  );
 
   /** Pin the lifted card under the pointer. Its layout slot moves as the order
    *  changes, so the transform compensates by the same amount — the visual
@@ -103,38 +133,36 @@ export function useCardReorder<T extends { id: string }>({
     el.style.transform = `translate3d(0, ${dy}px, 0) scale(1.015)`;
   }, []);
 
-  /** The rendered-slot position under the pointer, from the band midpoints. */
-  const slotAt = useCallback((y: number) => {
-    const s = slots.current;
-    for (let i = 0; i < s.length; i++) {
-      if (y < s[i].top + s[i].height / 2) return i;
-    }
-    return s.length - 1;
-  }, []);
+  /** Viewport Y of a rendered slot's midpoint. Derived from the container's
+   *  current position, so it stays correct after a scroll. */
+  const slotMid = useCallback(
+    (s: Slot) => containerTop.current + s.offsetTop + s.height / 2,
+    [],
+  );
 
-  /** Step a card one slot in `order` (the visible id sequence), committing the
-   *  same way a drop does. This is the touch- and keyboard-reachable path. */
-  const move = useCallback(
-    (id: string, dir: -1 | 1, order: string[]) => {
-      if (!enabled || detach.current) return;
-      const i = order.indexOf(id);
-      const j = i + dir;
-      if (i < 0 || j < 0 || j >= order.length) return;
-      // Reorder the full list by moving `id` next to its new visible neighbour:
-      // the item it should now sit before (up) or after (down).
-      const list = items.slice();
-      const from = list.findIndex((m) => m.id === id);
-      if (from < 0) return;
-      const [moved] = list.splice(from, 1);
-      const anchorId = order[j];
-      const to = list.findIndex((m) => m.id === anchorId);
-      if (to < 0) return;
-      list.splice(dir === 1 ? to + 1 : to, 0, moved);
-
-      setPreview(list);
-      void onCommit(list, id).finally(() => setPreview(null));
+  /** The rendered-slot index under the pointer, from the band midpoints. */
+  const slotAt = useCallback(
+    (y: number) => {
+      const s = slots.current;
+      for (let i = 0; i < s.length; i++) {
+        if (y < slotMid(s[i])) return i;
+      }
+      return s.length - 1;
     },
-    [enabled, items, onCommit],
+    [slotMid],
+  );
+
+  /** Step a card one slot through the visible order, committing like a drop. */
+  const move = useCallback(
+    (id: string, dir: -1 | 1, visibleIds: string[]) => {
+      if (!enabled || detach.current) return;
+      // Base on the optimistic order when one is pending, so consecutive steps
+      // compose rather than each starting from the stale server order.
+      const next = moveByStep(optimisticRef.current ?? items, visibleIds, id, dir);
+      if (!next) return;
+      enqueue(next, id);
+    },
+    [enabled, items, enqueue],
   );
 
   const start = useCallback(
@@ -151,9 +179,8 @@ export function useCardReorder<T extends { id: string }>({
       container.querySelectorAll<HTMLElement>("[data-monitor-id]").forEach((el) => {
         const itemIndex = byId.get(el.dataset.monitorId!);
         if (itemIndex == null) return;
-        const r = el.getBoundingClientRect();
         if (el === card) draggedSlot = s.length;
-        s.push({ top: r.top, height: r.height, itemIndex });
+        s.push({ offsetTop: el.offsetTop, height: el.offsetHeight, itemIndex });
       });
       if (draggedSlot < 0) return;
 
@@ -167,19 +194,19 @@ export function useCardReorder<T extends { id: string }>({
       card.style.animation = "none";
       containerTop.current = container.getBoundingClientRect().top;
       pointerY.current = e.clientY;
-      grabOffset.current = e.clientY - s[draggedSlot].top;
+      grabOffset.current = e.clientY - (containerTop.current + s[draggedSlot].offsetTop);
       slotRef.current = draggedSlot;
       startSlot.current = draggedSlot;
       moved.current = false;
-      previewRef.current = items;
       setDraggingId(id);
       setPreview(items);
-      setIndicatorY(s[draggedSlot].top - containerTop.current);
+      setIndicatorY(s[draggedSlot].offsetTop);
       document.body.style.userSelect = "none";
 
       const onMove = (ev: PointerEvent) => {
         pointerY.current = ev.clientY;
-        const travel = ev.clientY - grabOffset.current - slots.current[startSlot.current].top;
+        const travel =
+          ev.clientY - grabOffset.current - (containerTop.current + slots.current[startSlot.current].offsetTop);
         if (!moved.current && Math.abs(travel) > DRAG_THRESHOLD_PX) moved.current = true;
         applyLift();
 
@@ -189,36 +216,53 @@ export function useCardReorder<T extends { id: string }>({
 
         // Splice the FULL list at the target's index in it, so a filtered view
         // reorders the same way an unfiltered one does.
-        const list = previewRef.current ?? items;
+        const list = optimisticRef.current ?? items;
         const from = list.findIndex((m) => m.id === id);
         const to = slots.current[next].itemIndex;
         if (from < 0 || from === to) return;
-        const copy = list.slice();
-        const [m] = copy.splice(from, 1);
-        copy.splice(to, 0, m);
-        previewRef.current = copy;
+        const copy = reorder(list, from, to);
+        optimisticRef.current = copy;
         setPreview(copy);
-        setIndicatorY(slots.current[next].top - containerTop.current);
+        setIndicatorY(slots.current[next].offsetTop);
+      };
+
+      // Keep the slot bands honest if the page scrolls mid-drag, and nudge the
+      // page when the pointer nears an edge so long lists are reachable.
+      const onScroll = () => {
+        containerTop.current = container.getBoundingClientRect().top;
+        applyLift();
+      };
+      let raf = requestAnimationFrame(function tick() {
+        const y = pointerY.current;
+        if (y < AUTOSCROLL_MARGIN_PX) window.scrollBy(0, -AUTOSCROLL_SPEED_PX);
+        else if (y > window.innerHeight - AUTOSCROLL_MARGIN_PX)
+          window.scrollBy(0, AUTOSCROLL_SPEED_PX);
+        raf = requestAnimationFrame(tick);
+      });
+
+      /** Reset everything the session touched — safe to call twice. */
+      const teardown = () => {
+        cancelAnimationFrame(raf);
+        if (draggedEl.current) draggedEl.current.style.transform = "";
+        document.body.style.userSelect = "";
+        draggedEl.current = null;
       };
 
       const finish = () => {
         detach.current?.();
         detach.current = null;
-
         const el = draggedEl.current;
-        if (el) el.style.transform = "";
-        document.body.style.userSelect = "";
-
         const dragged = moved.current;
-        const list = previewRef.current;
+        const list = optimisticRef.current;
         const changed = dragged && startSlot.current !== slotRef.current;
+        teardown();
 
         // Swallow the click the browser may fire after a drag so it can't also
         // open the detail sheet. Self-clears on the click, or after a short
         // grace period if none comes — so it can never eat a later deliberate
         // click. shortcut: a real click within CLICK_GUARD_MS of a drop is
         // ignored; too fast to hit by hand, upgrade if it ever bites.
-        if (dragged) {
+        if (dragged && el) {
           const guard = (ev: MouseEvent) => {
             ev.stopPropagation();
             ev.preventDefault();
@@ -231,32 +275,38 @@ export function useCardReorder<T extends { id: string }>({
           );
         }
 
-        draggedEl.current = null;
         setDraggingId(null);
         setIndicatorY(null);
-        if (changed && list) {
-          // Hold the preview until the server confirms, so the list never
-          // flashes the pre-drag order in the round-trip gap.
-          void onCommit(list, id).finally(() => setPreview(null));
-        } else {
-          setPreview(null);
-        }
+        if (changed && list) enqueue(list, id);
+        else if (optimisticRef.current == null) setPreview(null);
       };
 
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", finish);
       window.addEventListener("pointercancel", finish);
+      window.addEventListener("scroll", onScroll, { passive: true });
       detach.current = () => {
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", finish);
         window.removeEventListener("pointercancel", finish);
+        window.removeEventListener("scroll", onScroll);
       };
     },
-    [containerRef, enabled, items, onCommit, applyLift, slotAt],
+    [containerRef, enabled, items, enqueue, applyLift, slotAt],
   );
 
-  // A drag outliving the component (unmount mid-drag) must not leak listeners.
-  useEffect(() => () => detach.current?.(), []);
+  // A drag outliving the component (unmount mid-drag) must not leak listeners,
+  // the body's user-select lock, or a stale transform.
+  useEffect(
+    () => () => {
+      detach.current?.();
+      detach.current = null;
+      document.body.style.userSelect = "";
+      if (draggedEl.current) draggedEl.current.style.transform = "";
+      draggedEl.current = null;
+    },
+    [],
+  );
 
   // Re-pin the lifted card after React moves its DOM node, in the same frame —
   // the pointermove handler alone can run before the reorder commits.

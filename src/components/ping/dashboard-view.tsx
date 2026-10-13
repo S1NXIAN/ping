@@ -48,6 +48,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useOverview } from "@/hooks/use-overview";
 import { useCardReorder } from "@/hooks/use-card-reorder";
 import { api, formatUptime, timeAgo, uptimeTone } from "@/lib/ping-client";
+import { pinnedSetAfterMove } from "@/lib/reorder";
 import type { AdminIncidentDTO, FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
@@ -186,11 +187,6 @@ export function DashboardView({
   // drag-and-drop reorder (manual sort only) — the hook owns pointer tracking,
   // the live preview, and the FLIP motion; this view only persists the result.
   const listRef = useRef<HTMLDivElement | null>(null);
-  // The menu's Move up/down steps through the visible order, which `visible`
-  // computes further down; a ref bridges it without re-creating `dnd` every
-  // render (that would churn the cards' props).
-  const visibleRef = useRef<MonitorDTO[]>([]);
-  const committingRef = useRef(false);
 
   // `data?.monitors ?? []` and `data?.folders ?? []` allocate fresh arrays every
   // render; memoise on `data` so the derived maps below stay stable.
@@ -200,29 +196,12 @@ export function DashboardView({
 
   // ---------- reorder / pin engine ----------
 
-  /**
-   * After moving `movedId` inside `list`, decides whether it should be
-   * pinned: the pinned zone is the block of OTHER pinned monitors at the
-   * top — dropping strictly inside it pins the card, landing at or below
-   * the boundary (first unpinned slot) unpins it.
-   */
-  function pinnedSetAfterMove(list: MonitorDTO[], movedId: string): Set<string> {
-    const pinned = new Set(list.filter((m) => m.pinned).map((m) => m.id));
-    const idx = list.findIndex((m) => m.id === movedId);
-    if (idx >= 0) {
-      const otherPinned = list.filter((m) => m.id !== movedId && m.pinned).length;
-      if (idx < otherPinned) pinned.add(movedId);
-      else pinned.delete(movedId);
-    }
-    return pinned;
-  }
-
-  /** Persists an order (and pin set) to the server, then refreshes. Returns a
-   *  promise so callers can hold optimistic state until the fresh order lands. */
+  /** Persists an order (and pin set) to the server, then refreshes. Resolves
+   *  once the fresh order has landed — the hook holds its optimistic preview
+   *  until then, so the list never flashes the stale order. Overlapping calls
+   *  are serialized by the hook, not dropped. */
   const commitOrder = useCallback(
     async (list: MonitorDTO[], movedId: string) => {
-      if (committingRef.current) return;
-      committingRef.current = true;
       const ids = list.map((m) => m.id);
       const pinned = pinnedSetAfterMove(list, movedId);
       try {
@@ -244,13 +223,9 @@ export function DashboardView({
           variant: "destructive",
         });
       } finally {
-        committingRef.current = false;
-        // Await the refetch: callers hold optimistic state until the fresh
-        // order has landed, so the list never flashes the stale order.
         await refresh(true);
       }
     },
-    // pinnedSetAfterMove is pure; monitors/toast/refresh are the real deps.
     [monitors, refresh, toast],
   );
 
@@ -260,18 +235,6 @@ export function DashboardView({
     enabled: sortMode === "manual" && monitors.length > 1,
     onCommit: (next, movedId) => commitOrder(next, movedId),
   });
-
-  // contract handed to each card (manual sort only)
-  const dnd: CardDnd | null =
-    sortMode === "manual" && monitors.length > 1
-      ? {
-          draggingId: reorder.draggingId,
-          start: reorder.start,
-          // Steps through the VISIBLE order, so a filtered view moves past the
-          // neighbour the operator can actually see.
-          move: (id, dir) => reorder.move(id, dir, visibleRef.current.map((m) => m.id)),
-        }
-      : null;
 
   // 24h fleet floor — a mean hides outliers; "worst" is the honest companion
   // readout (min over the same monitors the API averages, nulls excluded).
@@ -373,7 +336,16 @@ export function DashboardView({
     return list;
   }, [manualList, activeFolder, query, sortMode]);
 
-  visibleRef.current = visible;
+  // contract handed to each card (manual sort only) — declared after `visible`
+  // so Move up/down steps through the order the operator can actually see
+  const dnd: CardDnd | null =
+    sortMode === "manual" && visible.length > 1
+      ? {
+          draggingId: reorder.draggingId,
+          start: reorder.start,
+          move: (id, dir) => reorder.move(id, dir, visible.map((m) => m.id)),
+        }
+      : null;
 
   const folderStats = useMemo(() => {
     const map = new Map<string, { total: number; down: number }>();
