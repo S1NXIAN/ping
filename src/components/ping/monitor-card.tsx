@@ -361,16 +361,6 @@ export function MonitorCard({
                   {formatMs(monitor.lastResponseMs)}
                 </span>
               )}
-              {monitor.lastStatusCode != null && (
-                <span
-                  className={cn(
-                    "tabular-nums",
-                    monitor.lastStatusCode >= 400 ? "text-down" : "text-up",
-                  )}
-                >
-                  HTTP {monitor.lastStatusCode}
-                </span>
-              )}
               {monitor.stats.uptime24h != null && (
                 <span>
                   24h <span className="tabular-nums text-foreground/80">{formatUptime(monitor.stats.uptime24h)}</span>
