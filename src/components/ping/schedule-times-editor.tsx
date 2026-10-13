@@ -160,13 +160,6 @@ export function ScheduleTimesEditor({
             No times yet — add at least one, e.g. 1:00 PM.
           </p>
         )}
-        {/* The times are wall clock in the viewer's own zone, so the label is
-            exactly what the user reads. */}
-        {times.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            Runs at {times.map(timeLabel).join(", ")}
-          </p>
-        )}
       </div>
 
       {error && (
