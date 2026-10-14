@@ -43,6 +43,8 @@ language, framework, or repo. Where a repo states a more specific rule, that rul
 
 ## 6. Comments and docs
 
-- A comment explains a reason the code cannot express itself.
+- Most code gets no comment.
+- A comment explains a reason the code cannot express itself; one that restates the name,
+  signature, type, or the line below it adds nothing — the code already says it.
 - A non-obvious decision is recorded where it is made, linked to its issue or ADR rather
   than restated.
