@@ -213,30 +213,31 @@ async function runCheckInner(monitor: Monitor): Promise<Check> {
   // One transaction for both writes: a process kill (a free-tier spin-down
   // can land mid-check) must not leave the history row recorded while the
   // card's headline status still shows the previous check.
-  return db.$transaction(async (tx) => {
-    const check = await tx.check.create({
-      data: {
-        monitorId: monitor.id,
-        status,
-        statusCode,
-        responseMs,
-        error: error ? error.slice(0, 200) : null,
-      },
-    });
-
-    await tx.monitor.update({
+  //
+  // Array form, not the interactive callback: SQLite has one writer, and the
+  // scheduler runs MAX_CONCURRENCY checks at once. The callback form holds the
+  // write lock across round-trips, so sibling checks that finish together fail
+  // with P2028 and their real results are discarded. The array form is one
+  // atomic batch with no lock held between statements — same guarantee, no
+  // collision. The timestamp is computed here so both rows carry the same one.
+  const checkedAt = new Date();
+  const errorText = error ? error.slice(0, 200) : null;
+  const [check] = await db.$transaction([
+    db.check.create({
+      data: { monitorId: monitor.id, status, statusCode, responseMs, error: errorText, checkedAt },
+    }),
+    db.monitor.update({
       where: { id: monitor.id },
       data: {
-        lastCheckAt: check.checkedAt,
+        lastCheckAt: checkedAt,
         lastStatus: status,
         lastStatusCode: statusCode,
         lastResponseMs: responseMs,
-        lastError: error ? error.slice(0, 200) : null,
+        lastError: errorText,
       },
-    });
-
-    return check;
-  });
+    }),
+  ]);
+  return check;
 }
 
 /**

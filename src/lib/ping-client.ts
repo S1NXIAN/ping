@@ -214,13 +214,19 @@ export function formatInterval(seconds: number): string {
   return parts.length ? parts.join(" ") : "0s";
 }
 
-export function formatDuration(seconds: number): string {
+/** A duration as a person reads it: "45s", "10m", "3h 5m", "1d 1h".
+ *  `coarse` drops the seconds unit and pads the minutes ("<1m", "3h 05m") —
+ *  the outage reading the card and the incidents sheet share, so one outage
+ *  never reads two ways. The two surfaces used to carry near-copy formatters. */
+export function formatDuration(seconds: number, { coarse = false } = {}): string {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
+  const mm = coarse ? String(m).padStart(2, "0") : String(m);
   if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h ${mm}m`;
   if (m > 0) return `${m}m`;
+  if (coarse) return "<1m";
   return `${Math.floor(seconds)}s`;
 }
 

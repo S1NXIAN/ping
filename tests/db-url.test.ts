@@ -7,7 +7,7 @@ import { expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { resolveDatabaseUrl, databaseFileSize } from "@/lib/db-url";
+import { resolveDatabaseUrl, databaseFileSize, sqlitePoolUrl } from "@/lib/db-url";
 
 const projectRoot = process.cwd(); // has prisma/schema.prisma
 
@@ -59,6 +59,26 @@ test("skips a schema copy inside build output (.next/standalone)", () => {
   );
   expect(fromStandalone).toBe(fromDev);
   expect(fromStandalone).not.toContain(".next");
+});
+
+test("a SQLite file URL is pinned to a single connection", () => {
+  // SQLite has one writer. Prisma's default pool opens several connections,
+  // so concurrent writes contend until the transaction times out and the
+  // real result is lost. One connection serializes them instead.
+  expect(sqlitePoolUrl("file:/tmp/ping.db")).toBe("file:/tmp/ping.db?connection_limit=1");
+});
+
+test("an existing query string keeps its parameters", () => {
+  expect(sqlitePoolUrl("file:/tmp/ping.db?foo=bar")).toBe(
+    "file:/tmp/ping.db?foo=bar&connection_limit=1",
+  );
+});
+
+test("a non-SQLite URL is left unchanged", () => {
+  expect(sqlitePoolUrl("postgresql://user:pw@host/db")).toBe(
+    "postgresql://user:pw@host/db",
+  );
+  expect(sqlitePoolUrl(undefined)).toBeUndefined();
 });
 
 test("databaseFileSize reads the real file the app opens", () => {

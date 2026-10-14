@@ -25,7 +25,7 @@ beforeEach(async () => {
 // ---- POST /api/admin/password ----
 
 test("changing the password signs out every other session and issues a fresh one", async () => {
-  const { hash, salt } = hashPassword("oldpassword");
+  const { hash, salt } = await hashPassword("oldpassword");
   await db.settings.create({ data: { id: "main", passwordHash: hash, passwordSalt: salt } });
   // Two other browsers are signed in; "sess" is the caller.
   await db.session.createMany({ data: [{ token: "other-1" }, { token: "other-2" }] });
@@ -48,12 +48,12 @@ test("changing the password signs out every other session and issues a fresh one
 
   // And the stored password is the new one.
   const settings = await db.settings.findUniqueOrThrow({ where: { id: "main" } });
-  expect(verifyPassword("brandnewpass", settings.passwordHash, settings.passwordSalt)).toBe(true);
-  expect(verifyPassword("oldpassword", settings.passwordHash, settings.passwordSalt)).toBe(false);
+  expect(await verifyPassword("brandnewpass", settings.passwordHash, settings.passwordSalt)).toBe(true);
+  expect(await verifyPassword("oldpassword", settings.passwordHash, settings.passwordSalt)).toBe(false);
 });
 
 test("a wrong current password changes nothing", async () => {
-  const { hash, salt } = hashPassword("oldpassword");
+  const { hash, salt } = await hashPassword("oldpassword");
   await db.settings.create({ data: { id: "main", passwordHash: hash, passwordSalt: salt } });
 
   const { POST } = await import("@/app/api/admin/password/route");
@@ -67,7 +67,7 @@ test("a wrong current password changes nothing", async () => {
   expect(res.status).toBe(401);
   expect(await db.session.count()).toBe(1); // the caller's own session survives
   const settings = await db.settings.findUniqueOrThrow({ where: { id: "main" } });
-  expect(verifyPassword("oldpassword", settings.passwordHash, settings.passwordSalt)).toBe(true);
+  expect(await verifyPassword("oldpassword", settings.passwordHash, settings.passwordSalt)).toBe(true);
 });
 
 // ---- PATCH /api/monitors/reorder ----

@@ -47,6 +47,7 @@ import {
   api,
   ApiError,
   formatDateTime,
+  formatDuration,
   formatInterval,
   formatMs,
   formatUptime,
@@ -61,16 +62,14 @@ import { monitorStatus, averageUpResponseMs, type MonitorStatus } from "@/lib/mo
 import { StatusPill, monitorStatusTone } from "./status-pill";
 import { checksToSegments, UptimeBars } from "./uptime-bars";
 
-/** Duration since an outage began, from its real first failed check:
- *  "12m" / "3h 05m" / "1d 4h" / "<1m". */
+/** Elapsed time since an outage began, as the shared coarse duration reads it
+ *  ("<1m" / "12m" / "3h 05m"). Wrapping Date.now() keeps the impure call out
+ *  of the render expression. */
 function formatDownFor(startedAt: string): string {
-  const s = Math.max(0, (Date.now() - new Date(startedAt).getTime()) / 1000);
-  const m = Math.floor(s / 60);
-  if (m < 1) return "<1m";
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ${String(m % 60).padStart(2, "0")}m`;
-  return `${Math.floor(h / 24)}d ${h % 24}h`;
+  return formatDuration(
+    Math.max(0, (Date.now() - new Date(startedAt).getTime()) / 1000),
+    { coarse: true },
+  );
 }
 
 /** Drag-reorder contract owned by the dashboard (manual sort mode only). */

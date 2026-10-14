@@ -3,9 +3,19 @@
 // Two clocks: a token proves identity until logout or a password change (it
 // never expires), and the re-prompt window — counted from the last password
 // entry — decides whether a fresh visit auto-enters or shows the login screen.
-import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "./db";
+
+// Async scrypt (thread-pool), not scryptSync: the sync form freezes the event
+// loop for the whole hash (~65 ms), stalling every other request during a
+// login. The derived bytes are identical, so stored hashes keep verifying.
+const scryptAsync = promisify(scrypt) as (
+  password: string,
+  salt: string,
+  keylen: number,
+) => Promise<Buffer>;
 
 export const SESSION_COOKIE = "ping_session";
 
@@ -31,13 +41,13 @@ export async function getSettings() {
   return db.settings.findUnique({ where: { id: "main" } });
 }
 
-export function hashPassword(password: string, salt = randomBytes(16).toString("hex")) {
-  const hash = scryptSync(password, salt, 64).toString("hex");
+export async function hashPassword(password: string, salt = randomBytes(16).toString("hex")) {
+  const hash = (await scryptAsync(password, salt, 64)).toString("hex");
   return { hash, salt };
 }
 
-export function verifyPassword(password: string, hash: string, salt: string): boolean {
-  const candidate = scryptSync(password, salt, 64);
+export async function verifyPassword(password: string, hash: string, salt: string): Promise<boolean> {
+  const candidate = await scryptAsync(password, salt, 64);
   const expected = Buffer.from(hash, "hex");
   return candidate.length === expected.length && timingSafeEqual(candidate, expected);
 }
@@ -110,8 +120,19 @@ export async function guard(req: NextRequest): Promise<NextResponse | null> {
 // is reached, every caller is refused for the window, so one attacker can
 // briefly lock the admin out too. That is the intended trade (bounding
 // guesses beats staying reachable), not a fairness guarantee.
-const attempts = new Map<string, number[]>();
-let globalAttempts: number[] = [];
+//
+// Held on `globalThis`, not in module scope: Next compiles /api/auth/login and
+// /api/auth/setup into separate server bundles, so a module-level Map would be
+// one copy per bundle and a guess spent against one route would not count
+// against the other. Same pattern as the checker's in-flight guard.
+interface ThrottleState {
+  attempts: Map<string, number[]>;
+  globalAttempts: number[];
+}
+const throttleState = (): ThrottleState => {
+  const g = globalThis as unknown as { __pingThrottle?: ThrottleState };
+  return (g.__pingThrottle ??= { attempts: new Map<string, number[]>(), globalAttempts: [] });
+};
 const WINDOW_MS = 5 * 60_000;
 export const MAX_ATTEMPTS = 15;
 /** Attempts per window across ALL IPs — the rotating-header backstop. */
@@ -131,44 +152,47 @@ export function clientIp(req: NextRequest): string {
 
 /** Drops IPs whose every attempt is expired — one cheap pass over the Map. */
 function sweepExpired(now: number) {
-  for (const [ip, list] of attempts) {
+  for (const [ip, list] of throttleState().attempts) {
     // `every` is vacuously true on an empty list, so it already covers length 0.
     if (list.every((t) => now - t >= WINDOW_MS)) {
-      attempts.delete(ip);
+      throttleState().attempts.delete(ip);
     }
   }
 }
 
 export function tooManyAttempts(ip: string): boolean {
+  const { attempts, globalAttempts } = throttleState();
   const now = Date.now();
-  globalAttempts = globalAttempts.filter((t) => now - t < WINDOW_MS);
-  if (globalAttempts.length >= MAX_GLOBAL_ATTEMPTS) return true;
+  const live = globalAttempts.filter((t) => now - t < WINDOW_MS);
+  throttleState().globalAttempts = live;
+  if (live.length >= MAX_GLOBAL_ATTEMPTS) return true;
   const list = (attempts.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
   attempts.set(ip, list);
   return list.length >= MAX_ATTEMPTS;
 }
 
 export function recordAttempt(ip: string) {
+  const state = throttleState();
   const now = Date.now();
-  globalAttempts = globalAttempts.filter((t) => now - t < WINDOW_MS);
-  globalAttempts.push(now);
-  if (attempts.size >= MAX_TRACKED_IPS) {
+  state.globalAttempts = state.globalAttempts.filter((t) => now - t < WINDOW_MS);
+  state.globalAttempts.push(now);
+  if (state.attempts.size >= MAX_TRACKED_IPS) {
     sweepExpired(now);
     // Still at the cap after sweeping (a genuine flood of live buckets):
     // reset rather than grow — throttling degrades, memory does not.
-    if (attempts.size >= MAX_TRACKED_IPS) attempts.clear();
+    if (state.attempts.size >= MAX_TRACKED_IPS) state.attempts.clear();
   }
-  const list = (attempts.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
+  const list = (state.attempts.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
   list.push(now);
-  attempts.set(ip, list);
+  state.attempts.set(ip, list);
 }
 
 export function clearAttempts(ip: string) {
-  attempts.delete(ip);
+  throttleState().attempts.delete(ip);
 }
 
 /** Test seam: drops all throttle state so tests do not leak into each other. */
 export function resetThrottle() {
-  attempts.clear();
-  globalAttempts = [];
+  throttleState().attempts.clear();
+  throttleState().globalAttempts = [];
 }

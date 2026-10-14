@@ -8,7 +8,7 @@ import { hashPassword, SESSION_COOKIE } from "@/lib/ping-auth";
 import { MAX_MONITORS } from "@/lib/checker";
 
 async function importReq(body: unknown): Promise<NextRequest> {
-  const { hash, salt } = hashPassword("password123");
+  const { hash, salt } = await hashPassword("password123");
   await db.settings.create({
     data: { id: "main", passwordHash: hash, passwordSalt: salt },
   });

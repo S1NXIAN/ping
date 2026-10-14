@@ -34,20 +34,20 @@ afterEach(() => {
   resetThrottle(); // throttle state is process-global — never leak it across tests
 });
 
-test("a correct password verifies and a wrong one does not", () => {
-  const { hash, salt } = hashPassword("correct horse battery staple");
-  expect(verifyPassword("correct horse battery staple", hash, salt)).toBe(true);
-  expect(verifyPassword("wrong password", hash, salt)).toBe(false);
+test("a correct password verifies and a wrong one does not", async () => {
+  const { hash, salt } = await hashPassword("correct horse battery staple");
+  expect(await verifyPassword("correct horse battery staple", hash, salt)).toBe(true);
+  expect(await verifyPassword("wrong password", hash, salt)).toBe(false);
 });
 
-test("the same password hashed twice yields different hashes (random salt)", () => {
-  const a = hashPassword("same");
-  const b = hashPassword("same");
+test("the same password hashed twice yields different hashes (random salt)", async () => {
+  const a = await hashPassword("same");
+  const b = await hashPassword("same");
   expect(a.hash).not.toBe(b.hash);
   expect(a.salt).not.toBe(b.salt);
   // …but both still verify the password.
-  expect(verifyPassword("same", a.hash, a.salt)).toBe(true);
-  expect(verifyPassword("same", b.hash, b.salt)).toBe(true);
+  expect(await verifyPassword("same", a.hash, a.salt)).toBe(true);
+  expect(await verifyPassword("same", b.hash, b.salt)).toBe(true);
 });
 
 test("the session length defaults to 15 minutes when unset", async () => {
@@ -143,7 +143,7 @@ test("rotating the source IP cannot mint unlimited attempts (global ceiling)", (
 // ---- POST /api/auth/login (the route itself, not just the throttle helpers) ----
 
 test("login with the right password sets a session cookie; a wrong one does not", async () => {
-  const { hash, salt } = hashPassword("correctpassword");
+  const { hash, salt } = await hashPassword("correctpassword");
   await db.settings.create({ data: { id: "main", passwordHash: hash, passwordSalt: salt } });
   const { POST } = await import("@/app/api/auth/login/route");
 
@@ -171,7 +171,7 @@ test("login with the right password sets a session cookie; a wrong one does not"
 });
 
 test("a successful login does not count toward the global throttle ceiling", async () => {
-  const { hash, salt } = hashPassword("correctpassword");
+  const { hash, salt } = await hashPassword("correctpassword");
   await db.settings.create({ data: { id: "main", passwordHash: hash, passwordSalt: salt } });
 
   // Fill the global bucket to one below the ceiling (no hashing — the throttle

@@ -218,7 +218,7 @@ function IncidentRow({
           </StatusPill>
         )}
         <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
-          {formatDuration(Math.round(durationMs / 1000))}
+          {formatDuration(Math.round(durationMs / 1000), { coarse: true })}
         </span>
       </div>
       <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">

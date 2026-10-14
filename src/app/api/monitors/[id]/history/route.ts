@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
+import { CHECK_CSV_HEADER, checkToCsvRow, pagedChecks } from "@/lib/check-csv";
 import type { HistoryPoint, HistoryRange, MonitorHistoryResponse } from "@/lib/ping-types";
 
 type Params = { params: Promise<{ id: string }> };
@@ -18,14 +19,26 @@ function parseRange(v: string | null): HistoryRange {
   return v === "1h" || v === "24h" || v === "7d" ? v : "24h";
 }
 
-function csvEscape(v: string | number | null): string {
-  if (v == null) return "";
-  const s = String(v);
-  // A spreadsheet runs a cell starting with = + - @ (or a tab/CR) as a
-  // formula. The error cell carries the monitored host's own reason phrase,
-  // so prefix such a cell with ' to keep it inert.
-  const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
-  return /[",\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
+/** The CSV export body, streamed row by row (see check-csv.ts). */
+function csvStream(monitorId: string): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  const rows = pagedChecks(monitorId);
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode(CHECK_CSV_HEADER + "\n"));
+    },
+    async pull(controller) {
+      const { value, done } = await rows.next();
+      if (done) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(encoder.encode(checkToCsvRow(value) + "\n"));
+    },
+    async cancel() {
+      await rows.return?.(undefined);
+    },
+  });
 }
 
 export async function GET(req: NextRequest, { params }: Params) {
@@ -41,25 +54,12 @@ export async function GET(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Monitor not found" }, { status: 404 });
   }
 
-  // CSV export: full retained history (30 days), one row per recorded check.
+  // CSV export: full retained history, streamed one page at a time so a
+  // keep-forever monitor never loads its whole table into memory.
   const sp = req.nextUrl.searchParams;
   if (sp.get("format") === "csv") {
-    const rows = await db.check.findMany({
-      where: { monitorId: id },
-      orderBy: { checkedAt: "asc" },
-      select: { checkedAt: true, status: true, statusCode: true, responseMs: true, error: true },
-    });
-    const lines = [
-      "checkedAt,status,statusCode,responseMs,error",
-      ...rows.map(
-        (c) =>
-          `${c.checkedAt.toISOString()},${c.status},${csvEscape(c.statusCode)},${csvEscape(
-            c.responseMs,
-          )},${csvEscape(c.error)}`,
-      ),
-    ];
     const safeName = monitor.name.replace(/[^\w.-]+/g, "-").slice(0, 60) || "monitor";
-    return new NextResponse(lines.join("\n") + "\n", {
+    return new NextResponse(csvStream(id), {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="ping-${safeName}-checks.csv"`,

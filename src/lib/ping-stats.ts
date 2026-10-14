@@ -50,6 +50,13 @@ interface RawCheckRow {
   checkedAt: Date | number | string; // prisma sqlite stores epoch-ms INTEGER
 }
 
+/** Rows from the collapsed all-time query (total checks + first check). */
+interface AllTimeRow {
+  monitorId: string;
+  firstCheck: Date | number | string;
+  total: number;
+}
+
 function toIso(v: Date | number | string | bigint): string {
   return v instanceof Date ? v.toISOString() : new Date(Number(v)).toISOString();
 }
@@ -69,7 +76,6 @@ export function emptyStats(): MonitorStatsDTO {
     totalChecks: 0,
   };
 }
-
 export function toCheckDTO(
   c: Omit<Check, "checkedAt"> & { checkedAt: Date | number | string | bigint },
 ): CheckDTO {
@@ -93,8 +99,16 @@ export interface StatsBundle {
  * monitor, or for just `onlyMonitorIds` when given. Used by the overview and
  * (scoped to one monitor) by the detail route, so both compute a monitor's
  * stats the same way and can never disagree.
+ *
+ * `includeAllTime` controls the totalChecks/firstCheckAt pair. That query has
+ * no date bound, so under "keep forever" it scans the whole Check table; only
+ * the detail sheet shows those two values, so the 15s overview poll opts out
+ * (pass false) and gets null — "not computed", never a fabricated 0.
  */
-export async function collectMonitorStats(onlyMonitorIds?: string[]): Promise<StatsBundle> {
+export async function collectMonitorStats(
+  onlyMonitorIds?: string[],
+  { includeAllTime = true }: { includeAllTime?: boolean } = {},
+): Promise<StatsBundle> {
   const now = Date.now();
   // An empty scope means "no monitors" — return nothing rather than letting
   // Prisma.join([]) throw.
@@ -118,6 +132,7 @@ export async function collectMonitorStats(onlyMonitorIds?: string[]): Promise<St
   // latency for 24h/7d in a second. Five windowed groupBys over the same rows
   // meant five index scans of the whole window; two passes with CASE sums read
   // the rows once each. Same numbers, measured ~5x faster at the 200k ceiling.
+  // The all-time pass is skipped when not requested (see the doc above).
   const [counts, timing, downs, allTime] = await Promise.all([
     db.$queryRaw<CountsRow[]>`
       SELECT monitorId,
@@ -138,9 +153,11 @@ export async function collectMonitorStats(onlyMonitorIds?: string[]): Promise<St
     db.$queryRaw<{ monitorId: string; lastDown: Date | number | string }[]>`
       SELECT monitorId, MAX(checkedAt) AS lastDown
       FROM "Check" WHERE status = 'down' AND checkedAt >= ${t32} ${idFilter} GROUP BY monitorId`,
-    db.$queryRaw<{ monitorId: string; firstCheck: Date | number | string; total: number }[]>`
-      SELECT monitorId, MIN(checkedAt) AS firstCheck, COUNT(*) AS total
-      FROM "Check" WHERE 1=1 ${idFilter} GROUP BY monitorId`,
+    includeAllTime
+      ? db.$queryRaw<AllTimeRow[]>`
+          SELECT monitorId, MIN(checkedAt) AS firstCheck, COUNT(*) AS total
+          FROM "Check" WHERE 1=1 ${idFilter} GROUP BY monitorId`
+      : Promise.resolve([] as AllTimeRow[]),
   ]);
 
   // The most-recent-N-per-monitor window. A single window-function query
@@ -211,7 +228,7 @@ export async function collectMonitorStats(onlyMonitorIds?: string[]): Promise<St
       avgMs7d: num(t?.avg7),
       lastDownAt: downRow ? toIso(downRow.lastDown) : null,
       firstCheckAt: allRow ? toIso(allRow.firstCheck) : null,
-      totalChecks: Number(allRow?.total ?? 0),
+      totalChecks: allRow ? Number(allRow.total) : null,
     });
   }
 

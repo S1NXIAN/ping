@@ -34,7 +34,10 @@ export interface MonitorStatsDTO {
   avgMs7d: number | null;
   lastDownAt: string | null;
   firstCheckAt: string | null;
-  totalChecks: number;
+  /** All-time recorded checks. null = not computed for this pass (the fleet
+   *  overview skips the unbounded all-time scan; only the detail sheet shows
+   *  it), never a fabricated 0. */
+  totalChecks: number | null;
 }
 
 export interface MonitorDTO {

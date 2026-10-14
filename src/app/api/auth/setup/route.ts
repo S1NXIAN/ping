@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { hash, salt } = hashPassword(parsed.data.password);
+  const { hash, salt } = await hashPassword(parsed.data.password);
   await db.settings.create({ data: { id: "main", passwordHash: hash, passwordSalt: salt } });
 
   // A fresh install: the setup request's own origin is the Self-monitor's

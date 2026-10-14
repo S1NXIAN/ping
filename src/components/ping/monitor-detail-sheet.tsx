@@ -173,6 +173,10 @@ export function MonitorDetailSheet({
 
   const m = detail?.monitor ?? monitor;
   const stats = m?.stats;
+  // The all-time totals come only from the detail response: the overview DTO
+  // omits them (it skips the unbounded all-time scan), so the fallback must
+  // not render them as "0 / no checks" while the detail load is in flight.
+  const allTime = detail?.monitor.stats;
   const status: MonitorStatus = monitorStatus({
     enabled: m?.enabled ?? false,
     lastStatus: m?.lastStatus ?? null,
@@ -308,9 +312,11 @@ export function MonitorDetailSheet({
               />
             </div>
             <p className="mt-1.5 text-[11px] text-muted-foreground">
-              {stats?.totalChecks
-                ? `Based on ${stats.totalChecks.toLocaleString()} recorded checks since ${formatDateTime(stats.firstCheckAt)}. Windows with no checks show “—”.`
-                : "No checks recorded yet — uptime appears after the first real check."}
+              {allTime
+                ? allTime.totalChecks
+                  ? `Based on ${allTime.totalChecks.toLocaleString()} recorded checks since ${formatDateTime(allTime.firstCheckAt)}. Windows with no checks show “—”.`
+                  : "No checks recorded yet — uptime appears after the first real check."
+                : "Loading recorded checks…"}
             </p>
           </section>
 
@@ -366,7 +372,7 @@ export function MonitorDetailSheet({
             <StatTile label="avg (7d)" value={formatMs(stats?.avgMs7d)} />
             <StatTile label="checks (24h)" value={stats?.checks24h ?? 0} />
             <StatTile label="last failure" value={timeAgo(stats?.lastDownAt)} />
-            <StatTile label="total checks" value={(stats?.totalChecks ?? 0).toLocaleString()} />
+            <StatTile label="total checks" value={allTime ? (allTime.totalChecks ?? 0).toLocaleString() : "—"} />
           </section>
 
           {/* History table */}

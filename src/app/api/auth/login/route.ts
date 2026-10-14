@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   // Only a FAILED attempt counts toward the throttle. Counting successes too
   // would let routine logins push the global ceiling to 50 and lock everyone
   // out — the ceiling exists to bound guessing, not to punish valid use.
-  if (!verifyPassword(parsed.data.password, settings.passwordHash, settings.passwordSalt)) {
+  if (!(await verifyPassword(parsed.data.password, settings.passwordHash, settings.passwordSalt))) {
     recordAttempt(ip);
     return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
   }

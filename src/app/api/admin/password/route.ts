@@ -37,11 +37,11 @@ export async function POST(req: NextRequest) {
   if (!settings) {
     return NextResponse.json({ error: "PING is not set up yet" }, { status: 400 });
   }
-  if (!verifyPassword(parsed.data.currentPassword, settings.passwordHash, settings.passwordSalt)) {
+  if (!(await verifyPassword(parsed.data.currentPassword, settings.passwordHash, settings.passwordSalt))) {
     return NextResponse.json({ error: "Current password is incorrect" }, { status: 401 });
   }
 
-  const { hash, salt } = hashPassword(parsed.data.newPassword);
+  const { hash, salt } = await hashPassword(parsed.data.newPassword);
   await db.settings.update({
     where: { id: "main" },
     data: { passwordHash: hash, passwordSalt: salt },

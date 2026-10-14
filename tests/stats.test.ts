@@ -25,7 +25,7 @@ test("uptime and timing are computed per monitor from real checks", async () => 
     ],
   });
 
-  const { statsByMonitor } = await collectMonitorStats();
+  const { statsByMonitor } = await collectMonitorStats(undefined, { includeAllTime: true });
   const sa = statsByMonitor.get(a.id)!;
   const sb = statsByMonitor.get(b.id)!;
 
@@ -125,6 +125,45 @@ test("p95For is null with no up checks in the window", async () => {
   expect(await p95For(m.id)).toBeNull();
 });
 
+test("the fleet pass can skip the all-time totals, which are unbounded", async () => {
+  // The overview polls every 15s and never shows totalChecks/firstCheckAt;
+  // only the detail sheet does. Under "keep forever" the all-time GROUP BY
+  // scans the whole Check table, so the fleet pass opts out. Absent is null,
+  // never a fabricated 0 (a monitor with 5000 checks is not "0 checks").
+  const { collectMonitorStats } = await import("@/lib/ping-stats");
+  const m = await db.monitor.create({ data: { name: "busy", url: "https://busy.com" } });
+  await db.check.createMany({
+    data: [
+      { monitorId: m.id, status: "up", responseMs: 10 },
+      { monitorId: m.id, status: "up", responseMs: 20 },
+    ],
+  });
+
+  const { statsByMonitor } = await collectMonitorStats(undefined, { includeAllTime: false });
+  const s = statsByMonitor.get(m.id)!;
+  expect(s.totalChecks).toBeNull();
+  expect(s.firstCheckAt).toBeNull();
+  // The windowed numbers are unaffected — they are what the overview shows.
+  expect(s.checks24h).toBe(2);
+  expect(s.uptime24h).toBe(1);
+});
+
+test("the scoped (detail) pass still reports the all-time totals", async () => {
+  const { collectMonitorStats } = await import("@/lib/ping-stats");
+  const m = await db.monitor.create({ data: { name: "busy", url: "https://busy.com" } });
+  await db.check.createMany({
+    data: [
+      { monitorId: m.id, status: "up", responseMs: 10, checkedAt: new Date(1000) },
+      { monitorId: m.id, status: "up", responseMs: 20, checkedAt: new Date(2000) },
+    ],
+  });
+
+  const { statsByMonitor } = await collectMonitorStats([m.id]);
+  const s = statsByMonitor.get(m.id)!;
+  expect(s.totalChecks).toBe(2);
+  expect(s.firstCheckAt).toBe(new Date(1000).toISOString());
+});
+
 // The uptime/latency aggregates are computed with conditional aggregation in
 // two scans instead of five windowed groupBys. The VALUES must not change —
 // these pin the multi-window numbers (24h / 7d / 30d) from a worked example.
@@ -148,7 +187,7 @@ test("multi-window uptime and latency match the worked example", async () => {
     ],
   });
 
-  const { statsByMonitor } = await collectMonitorStats();
+  const { statsByMonitor } = await collectMonitorStats(undefined, { includeAllTime: true });
   const s = statsByMonitor.get(m.id)!;
   // 24h: 3/4 up
   expect(s.uptime24h).toBeCloseTo(0.75, 10);

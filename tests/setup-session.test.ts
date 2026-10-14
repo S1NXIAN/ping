@@ -29,7 +29,7 @@ test("setup stores a hashed password and issues a session", async () => {
   expect(res.headers.get("set-cookie")).toContain(SESSION_COOKIE);
   const settings = await getSettings();
   expect(settings).not.toBeNull();
-  expect(verifyPassword("a-good-password", settings!.passwordHash, settings!.passwordSalt)).toBe(true);
+  expect(await verifyPassword("a-good-password", settings!.passwordHash, settings!.passwordSalt)).toBe(true);
   // The password is never stored in the clear.
   expect(settings!.passwordHash).not.toContain("a-good-password");
   expect(await db.session.count()).toBe(1);
@@ -49,8 +49,8 @@ test("a second setup is refused — the existing password is never overwritten",
   const res = await POST(setupReq("second-password"));
   expect(res.status).toBe(400);
   const settings = await getSettings();
-  expect(verifyPassword("first-password", settings!.passwordHash, settings!.passwordSalt)).toBe(true);
-  expect(verifyPassword("second-password", settings!.passwordHash, settings!.passwordSalt)).toBe(false);
+  expect(await verifyPassword("first-password", settings!.passwordHash, settings!.passwordSalt)).toBe(true);
+  expect(await verifyPassword("second-password", settings!.passwordHash, settings!.passwordSalt)).toBe(false);
 });
 
 // ---- /api/admin/session ----

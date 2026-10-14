@@ -12,7 +12,10 @@ export async function GET(req: NextRequest) {
     // Pinned first, then the user's manual order, then oldest-created as a tiebreak.
     db.monitor.findMany({ orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }] }),
     db.folder.findMany({ orderBy: { createdAt: "asc" } }),
-    collectMonitorStats(),
+    // includeAllTime: false — the overview polls every 15s and never shows
+    // totalChecks/firstCheckAt (only the detail sheet does), so it skips the
+    // unbounded all-time scan. Those fields come back null.
+    collectMonitorStats(undefined, { includeAllTime: false }),
   ]);
 
   const folderById = new Map(folders.map((f) => [f.id, f]));

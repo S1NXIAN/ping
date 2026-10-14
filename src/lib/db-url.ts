@@ -45,6 +45,23 @@ export function resolveDatabaseUrl(
 }
 
 /**
+ * Pins a local SQLite `file:` URL to a single connection.
+ *
+ * SQLite has exactly one writer. Prisma's default pool opens several
+ * connections, so two writes that overlap make the later one wait on the write
+ * lock until its transaction times out (P2028/P1008) — and the caller's real
+ * result is discarded. The scheduler runs checks MAX_CONCURRENCY at a time and
+ * the cron tick can land on top of a create, so this collision is the normal
+ * case, not an edge case. One connection serializes the writes instead of
+ * letting them race. Absolute/relative/query-bearing file URLs all keep their
+ * existing parameters. Non-`file:` URLs are returned unchanged.
+ */
+export function sqlitePoolUrl(raw: string | undefined): string | undefined {
+  if (!raw || !raw.startsWith(FILE_PREFIX)) return raw;
+  return `${raw}${raw.includes("?") ? "&" : "?"}connection_limit=1`;
+}
+
+/**
  * Size in bytes of the SQLite file the app actually opens, or null when the
  * URL is not a local file / the file cannot be read. Resolves the path the
  * same way the server does, so the Settings readout measures the real file
