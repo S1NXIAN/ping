@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { guard } from "@/lib/ping-auth";
 import { db } from "@/lib/db";
 import { databaseFileSize } from "@/lib/db-url";
-import { MAX_CHECKS_PER_MONITOR, runtimeState } from "@/lib/checker";
+import { runtimeState } from "@/lib/checker";
+import { MAX_CHECKS_PER_MONITOR } from "@/lib/retention";
 import { TICK_INTERVAL_SEC } from "@/lib/scheduler";
 import type { AdminInfoResponse } from "@/lib/ping-types";
 

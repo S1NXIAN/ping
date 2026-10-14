@@ -236,6 +236,12 @@ export function hasTimeAt(times: string[], time: string, exceptIndex?: number): 
   return times.some((t, i) => t === time && i !== exceptIndex);
 }
 
+/** True when `s` is a zero-padded "HH:MM" clock time. The one place this
+ *  grammar lives — parseTimes and the API validation both use it. */
+export function isValidTime(s: string): boolean {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
+}
+
 /**
  * Parses the stored CSV of clock times. Sorts, dedupes, drops malformed
  * entries and caps at MAX_SCHEDULE_TIMES. Returns [] for null/empty/invalid,
@@ -246,7 +252,7 @@ export function parseTimes(input: string | null | undefined): string[] {
   const valid = input
     .split(",")
     .map((s) => s.trim())
-    .filter((s) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s));
+    .filter(isValidTime);
   return [...new Set(valid)].sort().slice(0, MAX_SCHEDULE_TIMES);
 }
 

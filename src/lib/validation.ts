@@ -8,7 +8,7 @@
 // blocking internal targets would break legitimate internal monitoring.
 import { z } from "zod";
 import { INTERVAL_MAX_SEC, INTERVAL_MIN_SEC } from "./ping-client";
-import { parseTimes, IANA_TIMEZONES } from "./schedule";
+import { parseTimes, IANA_TIMEZONES, MAX_SCHEDULE_TIMES, isValidTime } from "./schedule";
 
 /** A monitor URL: any http(s) URL, internal or public. */
 export const monitorUrlSchema = z
@@ -61,13 +61,22 @@ export const timezoneSchema = z
   .refine(isUsableTimezone, "Unknown timezone");
 
 /** Clock times as the CSV the column stores, e.g. "03:00,13:00". Rejects an
- *  empty list — a times-of-day monitor with no times would never run. */
+ *  empty list — a times-of-day monitor with no times would never run — and a
+ *  list past the cap. The cap is checked on the DISTINCT valid times, before
+ *  parseTimes drops the overflow, so a hand-edited 13-time list is refused
+ *  rather than silently stored as 12. Duplicates are not counted — parseTimes
+ *  dedupes them, so a repeated value is not a real overflow. */
 export const scheduleTimesSchema = z
   .string()
   .trim()
   .min(1, "Add at least one time")
-  .transform((v) => parseTimes(v).join(","))
-  .refine((v) => v.length > 0, "Add at least one valid time (HH:MM)");
+  .refine(
+    (v) => new Set(v.split(",").map((s) => s.trim()).filter(isValidTime)).size <= MAX_SCHEDULE_TIMES,
+    `At most ${MAX_SCHEDULE_TIMES} times`,
+  )
+  .transform((v) => parseTimes(v))
+  .refine((v) => v.length > 0, "Add at least one valid time (HH:MM)")
+  .transform((v) => v.join(","));
 
 /** The three schedule fields, shared by create and patch so both accept the
  *  same shape. Times mode requires both a time list and a timezone. */

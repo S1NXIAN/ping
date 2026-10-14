@@ -3,7 +3,7 @@
 // expected to keep, so each policy is pinned by a worked example.
 import { beforeEach, expect, test } from "bun:test";
 import { db, resetDb } from "./helpers/test-db";
-import { MAX_CHECKS_PER_MONITOR } from "@/lib/checker";
+import { MAX_CHECKS_PER_MONITOR } from "@/lib/retention";
 
 async function setRetention(days: number | null) {
   await db.settings.create({
@@ -16,7 +16,7 @@ beforeEach(async () => {
 });
 
 test("the default policy caps a monitor at the newest 1000 checks", async () => {
-  const { pruneChecks } = await import("@/lib/checker");
+  const { pruneChecks } = await import("@/lib/retention");
   const m = await db.monitor.create({ data: { name: "svc", url: "https://svc.example.com" } });
   const base = Date.now();
   await db.check.createMany({
@@ -36,7 +36,7 @@ test("the default policy caps a monitor at the newest 1000 checks", async () => 
 });
 
 test("an explicit N-day policy deletes only checks older than N days", async () => {
-  const { pruneChecks } = await import("@/lib/checker");
+  const { pruneChecks } = await import("@/lib/retention");
   const m = await db.monitor.create({ data: { name: "svc", url: "https://svc.example.com" } });
   const now = Date.now();
   await db.check.createMany({
@@ -55,7 +55,7 @@ test("an explicit N-day policy deletes only checks older than N days", async () 
 });
 
 test("keep-forever (0) deletes no checks at all", async () => {
-  const { pruneChecks } = await import("@/lib/checker");
+  const { pruneChecks } = await import("@/lib/retention");
   const m = await db.monitor.create({ data: { name: "svc", url: "https://svc.example.com" } });
   await db.check.createMany({
     data: [

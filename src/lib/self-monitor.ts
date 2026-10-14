@@ -12,15 +12,15 @@
 // separated from the database part so the edge cases are testable alone.
 import type { NextRequest } from "next/server";
 import { db } from "./db";
-import { nextMonitorPosition } from "./checker";
+import { nextMonitorPosition } from "./monitor-order";
 
-export const SELF_MONITOR_NAME = "PING";
+const SELF_MONITOR_NAME = "PING";
 /** 3 minutes — cheap, and frequent enough to count as inbound keep-alive. */
 export const SELF_MONITOR_INTERVAL_SEC = 180;
 /** Deterministic id: a second create with the same id fails on the primary
  *  key, so concurrent creators (boot vs. setup vs. a duplicated instance)
  *  can never insert two Self-monitors. */
-export const SELF_MONITOR_ID = "self-monitor";
+const SELF_MONITOR_ID = "self-monitor";
 
 /**
  * The health URL for a deployment origin, or null when the origin is blank.

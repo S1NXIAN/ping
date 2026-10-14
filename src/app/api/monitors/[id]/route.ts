@@ -5,12 +5,12 @@ import { guard } from "@/lib/ping-auth";
 import { KEYWORD_MAX_LENGTH } from "@/lib/checker";
 import { monitorUrlSchema, intervalSecSchema, scheduleFields, scheduleError, methodKeywordError } from "@/lib/validation";
 import {
+  collectMonitorStats,
   dailyBuckets,
   toCheckDTO,
   toMonitorDTO,
   p95For,
   emptyStats,
-  RECENT_CHECKS,
 } from "@/lib/ping-stats";
 import { disableSelfMonitor } from "@/lib/self-monitor";
 import type { MonitorDetailResponse } from "@/lib/ping-types";
@@ -27,103 +27,28 @@ export async function GET(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Monitor not found" }, { status: 404 });
   }
 
-  const now = Date.now();
-  const H24 = 86400_000;
-  const since24 = new Date(now - H24);
-  const since7d = new Date(now - 7 * H24);
-  const since30d = new Date(now - 30 * H24);
-  // "Last down" bounded to the incident lookback (32 d): keeps the query
-  // cheap under keep-forever retention; older downs can't surface in the UI.
-  const sinceDowns = new Date(now - 32 * H24);
+  // All aggregates in one shared pass — the SAME collectMonitorStats the
+  // overview uses, scoped to this monitor. Computing them here by hand was a
+  // second copy of the uptime/latency rules that could drift from the card's.
+  const [folder, checks, daily, p95, bundle] = await Promise.all([
+    monitor.folderId
+      ? db.folder.findUnique({ where: { id: monitor.folderId } })
+      : null,
+    db.check.findMany({
+      where: { monitorId: id },
+      orderBy: { checkedAt: "desc" },
+      take: 100,
+    }),
+    dailyBuckets(id),
+    p95For(id),
+    collectMonitorStats([id]),
+  ]);
 
-  // All aggregates in one parallel round — 24h stats come from SQL groupBys,
-  // not from the 100-check slice below (a 60 s interval only covers ~100
-  // minutes, so "24h" computed from it would be a lie).
-  const [folder, checks, daily, p95, c24, t24, c7, c30, t7, lastDown, firstCheck, totalChecks] =
-    await Promise.all([
-      monitor.folderId
-        ? db.folder.findUnique({ where: { id: monitor.folderId } })
-        : null,
-      db.check.findMany({
-        where: { monitorId: id },
-        orderBy: { checkedAt: "desc" },
-        take: 100,
-      }),
-      dailyBuckets(id),
-      p95For(id),
-      db.check.groupBy({
-        by: ["status"],
-        where: { monitorId: id, checkedAt: { gte: since24 } },
-        _count: { _all: true },
-      }),
-      db.check.groupBy({
-        by: ["status"],
-        where: { monitorId: id, checkedAt: { gte: since24 }, status: "up" },
-        _avg: { responseMs: true },
-        _min: { responseMs: true },
-        _max: { responseMs: true },
-      }),
-      db.check.groupBy({
-        by: ["status"],
-        where: { monitorId: id, checkedAt: { gte: since7d } },
-        _count: { _all: true },
-      }),
-      db.check.groupBy({
-        by: ["status"],
-        where: { monitorId: id, checkedAt: { gte: since30d } },
-        _count: { _all: true },
-      }),
-      db.check.groupBy({
-        by: ["status"],
-        where: { monitorId: id, checkedAt: { gte: since7d }, status: "up" },
-        _avg: { responseMs: true },
-      }),
-      db.check.findFirst({
-        where: { monitorId: id, status: "down", checkedAt: { gte: sinceDowns } },
-        orderBy: { checkedAt: "desc" },
-        select: { checkedAt: true },
-      }),
-      db.check.findFirst({
-        where: { monitorId: id },
-        orderBy: { checkedAt: "asc" },
-        select: { checkedAt: true },
-      }),
-      db.check.count({ where: { monitorId: id } }),
-    ]);
-
-  // Build the same stats shape the overview uses, but scoped to this monitor.
   const recent = checks.map(toCheckDTO);
-
-  const up24 = c24.find((r) => r.status === "up")?._count._all ?? 0;
-  const total24 = c24.reduce((acc, r) => acc + r._count._all, 0);
-  const timing24 = t24.find((r) => r.status === "up");
-  const up7 = c7.find((r) => r.status === "up")?._count._all ?? 0;
-  const total7 = c7.reduce((acc, r) => acc + r._count._all, 0);
-  const up30 = c30.find((r) => r.status === "up")?._count._all ?? 0;
-  const total30 = c30.reduce((acc, r) => acc + r._count._all, 0);
-
-  const stats = {
-    ...emptyStats(),
-    uptime24h: total24 > 0 ? up24 / total24 : null,
-    checks24h: total24,
-    avgMs24h: timing24?._avg.responseMs ?? null,
-    minMs24h: timing24?._min.responseMs ?? null,
-    maxMs24h: timing24?._max.responseMs ?? null,
-    uptime7d: total7 > 0 ? up7 / total7 : null,
-    uptime30d: total30 > 0 ? up30 / total30 : null,
-    avgMs7d: t7.find((r) => r.status === "up")?._avg.responseMs ?? null,
-    lastDownAt: lastDown?.checkedAt.toISOString() ?? null,
-    firstCheckAt: firstCheck?.checkedAt.toISOString() ?? null,
-    totalChecks,
-  };
-
-  // The card bars' window is the last RECENT_CHECKS checks within 48h. The
-  // detail sheet's slow state must read that same window, or a long-interval
-  // monitor would disagree with its own card.
-  const since48h = new Date(now - 2 * H24);
-  const recentWindow = recent
-    .filter((c) => new Date(c.checkedAt).getTime() >= since48h.getTime())
-    .slice(0, RECENT_CHECKS);
+  const stats = bundle.statsByMonitor.get(id) ?? emptyStats();
+  // The slow-state window is the same recent-checks window the card shows, and
+  // collectMonitorStats already narrowed it to RECENT_CHECKS within 48h.
+  const recentWindow = bundle.recentByMonitor.get(id) ?? [];
 
   const body: MonitorDetailResponse = {
     monitor: toMonitorDTO(monitor, folder, stats, recentWindow),

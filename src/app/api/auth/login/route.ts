@@ -23,23 +23,28 @@ export async function POST(req: NextRequest) {
       { status: 429 },
     );
   }
-  recordAttempt(ip);
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
+    recordAttempt(ip);
     return NextResponse.json({ error: "Password is required" }, { status: 400 });
   }
 
   const settings = await getSettings();
   if (!settings) {
+    recordAttempt(ip);
     return NextResponse.json(
       { error: "PING is not set up yet — create a password first" },
       { status: 400 },
     );
   }
 
+  // Only a FAILED attempt counts toward the throttle. Counting successes too
+  // would let routine logins push the global ceiling to 50 and lock everyone
+  // out — the ceiling exists to bound guessing, not to punish valid use.
   if (!verifyPassword(parsed.data.password, settings.passwordHash, settings.passwordSalt)) {
+    recordAttempt(ip);
     return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
   }
 

@@ -4,15 +4,13 @@ import type { Check, Monitor } from "@prisma/client";
 import { db } from "./db";
 import { isTimesDue, parseTimes } from "./schedule";
 
-export const CHECK_TIMEOUT_MS = 15_000;
-export const MAX_CONCURRENCY = 5;
-export const RETENTION_DAYS = 30;
-export const MAX_CHECKS_PER_MONITOR = 1000;
+const CHECK_TIMEOUT_MS = 15_000;
+const MAX_CONCURRENCY = 5;
 /** Hard cap on monitors — matches the import limit; keeps tick duration and
  *  DB size sane on a free-tier instance. */
 export const MAX_MONITORS = 200;
 /** How much of a response body a keyword check is willing to read. */
-export const KEYWORD_BODY_LIMIT_BYTES = 256 * 1024;
+const KEYWORD_BODY_LIMIT_BYTES = 256 * 1024;
 export const KEYWORD_MAX_LENGTH = 200;
 
 export interface TickResult {
@@ -61,29 +59,7 @@ const checkerState = (g.__pingChecker ??= {
 /** Runtime state, exposed via /api/admin/info (real values only). */
 export const runtimeState = checkerState.runtimeState;
 
-export interface RetentionPolicy {
-  /** Days of check history to keep; null = keep forever. */
-  days: number | null;
-  /** Apply the per-monitor cap (only in the default policy). */
-  cap: boolean;
-}
-
-/**
- * Resolves the configured retention policy from Settings:
- *   retentionDays = null → default: 30 days + 1,000 checks/monitor cap
- *   retentionDays = 0    → keep forever (no check deletion at all)
- *   retentionDays = N    → keep N days, no cap (explicit user choice)
- */
-export async function getRetentionPolicy(): Promise<RetentionPolicy> {
-  const s = await db.settings.findUnique({
-    where: { id: "main" },
-    select: { retentionDays: true },
-  });
-  if (s?.retentionDays == null) return { days: RETENTION_DAYS, cap: true };
-  if (s.retentionDays === 0) return { days: null, cap: false };
-  return { days: s.retentionDays, cap: false };
-}
-
+/** Maps a fetch/network failure to a short human-readable reason. */
 function describeError(e: unknown): string {
   const err = e as { name?: string; message?: string; cause?: { code?: string } };
   const name = err?.name ?? "";
@@ -336,59 +312,4 @@ export async function runDueChecks(): Promise<TickResult> {
   } finally {
     runtimeState.running = false;
   }
-}
-
-/**
- * Prunes old checks according to the configured retention policy (see
- * getRetentionPolicy) and drops expired sessions. Operational hygiene rows
- * (sessions) are always cleaned — only check history respects the retention
- * setting.
- */
-export async function pruneChecks(): Promise<{ deleted: number }> {
-  const policy = await getRetentionPolicy();
-  let deleted = 0;
-
-  if (policy.days != null) {
-    const cutoff = new Date(Date.now() - policy.days * 24 * 60 * 60 * 1000);
-    const old = await db.check.deleteMany({ where: { checkedAt: { lt: cutoff } } });
-    deleted += old.count;
-  }
-
-  if (policy.cap) {
-    const monitors = await db.monitor.findMany({ select: { id: true } });
-    for (const m of monitors) {
-      const count = await db.check.count({ where: { monitorId: m.id } });
-      if (count > MAX_CHECKS_PER_MONITOR) {
-        const keep = await db.check.findMany({
-          where: { monitorId: m.id },
-          orderBy: { checkedAt: "desc" },
-          take: MAX_CHECKS_PER_MONITOR,
-          select: { id: true },
-        });
-        const r = await db.check.deleteMany({
-          where: { monitorId: m.id, id: { notIn: keep.map((k) => k.id) } },
-        });
-        deleted += r.count;
-      }
-    }
-  }
-
-  // Incident notes older than the incident lookback can never match a derived
-  // incident again — tied to the fixed lookback, not the retention setting.
-  await db.incidentNote.deleteMany({
-    where: { startedAt: { lt: new Date(Date.now() - (RETENTION_DAYS + 2) * 86400_000) } },
-  });
-
-  runtimeState.lastPrunedAt = new Date().toISOString();
-  runtimeState.lastPrunedCount = deleted;
-  return { deleted };
-}
-
-/** Next free manual-order position for a new monitor (appends at the end).
- *  Accepts a transaction client so an import can compute it inside its tx. */
-export async function nextMonitorPosition(
-  client: Pick<typeof db, "monitor"> = db,
-): Promise<number> {
-  const agg = await client.monitor.aggregate({ _max: { position: true } });
-  return (agg._max.position ?? -1) + 1;
 }

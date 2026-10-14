@@ -1,7 +1,8 @@
 // PING background scheduler: checks due monitors every 30 s and prunes
 // old data hourly. Started once from instrumentation.ts and guarded so
 // hot reloads never spawn duplicates.
-import { pruneChecks, runDueChecks, runtimeState } from "./checker";
+import { runDueChecks, runtimeState } from "./checker";
+import { pruneChecks } from "./retention";
 
 export const TICK_INTERVAL_SEC = 30;
 

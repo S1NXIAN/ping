@@ -118,3 +118,31 @@ test("a bad schedule in one monitor rejects the whole file before writing", asyn
   expect(await db.monitor.count()).toBe(0);
   expect(await db.folder.count()).toBe(0);
 });
+
+// A hand-edited export with more clock times than the cap must be refused, not
+// silently truncated: parseTimes drops the extras, so importing 13 times would
+// leave the operator believing all 13 are set. The editor already prevents it.
+test("importing more clock times than the cap is refused, not silently truncated", async () => {
+  const { MAX_SCHEDULE_TIMES } = await import("@/lib/schedule");
+  const many = Array.from({ length: MAX_SCHEDULE_TIMES + 1 }, (_, i) =>
+    `${String(i).padStart(2, "0")}:00`,
+  ).join(",");
+  const { POST } = await import("@/app/api/import/route");
+  const res = await POST(
+    await importReq({
+      app: "PING",
+      version: 1,
+      monitors: [
+        {
+          name: "busy",
+          url: "https://busy.example.com",
+          scheduleMode: "times",
+          scheduleTimes: many,
+          timezone: "Asia/Manila",
+        },
+      ],
+    }),
+  );
+  expect(res.status).toBe(400);
+  expect(await db.monitor.count()).toBe(0);
+});

@@ -10,7 +10,7 @@ import { MAX_MONITORS } from "./checker";
 import { nominalPeriodSec, parseTimes } from "./schedule";
 import type { AdminIncidentDTO } from "./ping-types";
 
-export const INCIDENT_WINDOW_DAYS = 30;
+const INCIDENT_WINDOW_DAYS = 30;
 export const MAX_INCIDENTS = 15;
 /** Ongoing incidents are exempt from MAX_INCIDENTS so a long outage is never
  *  dropped for newer ones. Each monitor yields at most one ongoing incident,
@@ -158,17 +158,23 @@ export async function deriveIncidents(
         for (const sub of subStreaks) {
           const subStart = sub.rows[0].t;
           const subLast = sub.rows[sub.rows.length - 1].t;
-          // Closing check: a splitting up (exact recovery time) or the first
-          // check after the last down (up = recovered; far-future = gap).
-          // No following check at all → the incident is still ongoing.
+          // Closing check. A splitting up already gave the exact recovery
+          // time; otherwise the first check after the last down decides it.
+          // An UP closes the incident at that observed recovery time (we did
+          // see it come back, even late). A following DOWN must NOT close it —
+          // that would fabricate an outage duration across the sleep gap we
+          // never observed; the incident ends at its own last down instead (a
+          // later down is its own streak, so only the final streak can be
+          // ongoing). No following check at all → still ongoing.
           let endedAt: number | null = sub.closedByUpAt;
           if (endedAt == null) {
             const boundary = await db.check.findFirst({
               where: { monitorId: monitor.id, checkedAt: { gt: new Date(subLast) } },
-              select: { checkedAt: true },
+              select: { checkedAt: true, status: true },
               orderBy: { checkedAt: "asc" },
             });
-            endedAt = boundary ? boundary.checkedAt.getTime() : null;
+            if (!boundary) endedAt = null;
+            else endedAt = boundary.status === "up" ? boundary.checkedAt.getTime() : subLast;
           }
 
           incidents.push({

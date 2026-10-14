@@ -189,3 +189,50 @@ test("the exempt ongoing set is bounded by the fleet cap, not a small fixed numb
   // A cap below that would hide a real current outage — the bug this guards.
   expect(MAX_ONGOING_INCIDENTS).toBe(MAX_MONITORS);
 });
+
+test("a sleep gap between two down checks never fabricates one long incident", async () => {
+  const { deriveIncidents } = await import("@/lib/incidents");
+  const m = await db.monitor.create({
+    data: { name: "svc", url: "https://svc.example.com", intervalSec: 300 },
+  });
+  const now = Date.now();
+  // One down, then PING asleep for 2h (far past 3x the 5-min interval), then
+  // another down. The service was still failing, but PING observed nothing in
+  // between — so the two must not be stitched into one two-hour outage.
+  await db.check.createMany({
+    data: [
+      { monitorId: m.id, status: "down", statusCode: 503, checkedAt: new Date(now - 2 * 3_600_000) },
+      { monitorId: m.id, status: "down", statusCode: 503, checkedAt: new Date(now) },
+    ],
+  });
+  const incidents = await deriveIncidents([m]);
+  expect(incidents.length).toBe(2);
+  // The older incident ends at its OWN last down check (zero-length here), not
+  // at the later down across the gap.
+  const older = incidents.find((i) => i.endedAt != null)!;
+  expect(new Date(older.endedAt!).getTime()).toBe(new Date(older.startedAt).getTime());
+  // The newer down, with nothing after it, is the ongoing one.
+  const ongoing = incidents.filter((i) => i.endedAt == null);
+  expect(ongoing.length).toBe(1);
+});
+
+test("a recovery observed after a sleep still closes the incident at the up check", async () => {
+  const { deriveIncidents } = await import("@/lib/incidents");
+  const m = await db.monitor.create({
+    data: { name: "svc", url: "https://svc.example.com", intervalSec: 300 },
+  });
+  const now = Date.now();
+  // Down, PING asleep, then an UP two hours later. We DID observe the service
+  // come back, so the incident ends at that real recovery time — not at the
+  // last down (which would hide the recovery), and not at some invented middle.
+  await db.check.createMany({
+    data: [
+      { monitorId: m.id, status: "down", statusCode: 503, checkedAt: new Date(now - 2 * 3_600_000) },
+      { monitorId: m.id, status: "up", statusCode: 200, checkedAt: new Date(now) },
+    ],
+  });
+  const incidents = await deriveIncidents([m]);
+  expect(incidents.length).toBe(1);
+  expect(incidents[0].endedAt).not.toBeNull();
+  expect(new Date(incidents[0].endedAt!).getTime()).toBe(now);
+});

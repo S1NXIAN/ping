@@ -51,6 +51,10 @@ export function IncidentsSheet({
   const { toast } = useToast();
   const [incidents, setIncidents] = useState<AdminIncidentDTO[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The clock for "ongoing" durations. Read in an effect (not during render)
+  // so a re-render never produces a different number from the same props, and
+  // ticked while open so a long outage's duration stays honest.
+  const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(async () => {
     try {
@@ -64,7 +68,11 @@ export function IncidentsSheet({
   }, [folderId, onViewed]);
 
   useEffect(() => {
-    if (open) void load();
+    if (!open) return;
+    setNow(Date.now());
+    void load();
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
   }, [open, load]);
 
   async function saveNote(inc: AdminIncidentDTO, note: string) {
@@ -106,8 +114,6 @@ export function IncidentsSheet({
       });
     }
   }
-
-  const now = Date.now();
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

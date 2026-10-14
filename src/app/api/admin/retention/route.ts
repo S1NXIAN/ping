@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
-import { pruneChecks, runtimeState } from "@/lib/checker";
+import { runtimeState } from "@/lib/checker";
+import { pruneChecks } from "@/lib/retention";
 import type { RetentionResponse } from "@/lib/ping-types";
 
 async function responseBody(): Promise<RetentionResponse> {

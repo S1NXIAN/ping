@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
-import { nextMonitorPosition, KEYWORD_MAX_LENGTH, MAX_MONITORS } from "@/lib/checker";
+import { KEYWORD_MAX_LENGTH, MAX_MONITORS } from "@/lib/checker";
+import { nextMonitorPosition } from "@/lib/monitor-order";
 import { monitorUrlSchema, intervalSecSchema, scheduleModeSchema, scheduleTimesSchema, timezoneSchema, scheduleError, methodKeywordError } from "@/lib/validation";
 import type { ImportResult } from "@/lib/ping-types";
 

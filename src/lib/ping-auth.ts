@@ -102,10 +102,18 @@ export async function guard(req: NextRequest): Promise<NextResponse | null> {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
-// ---- naive in-memory login throttling (per IP, 5 min window) ----
+// ---- naive in-memory login throttling (per IP + a global ceiling) ----
+// Two buckets, because the per-IP one is keyed on a caller-supplied header
+// (x-forwarded-for). An attacker rotating that header gets a fresh per-IP
+// bucket each request, so the per-IP cap alone would never fire — the global
+// ceiling is what actually bounds guesses. The per-IP bucket stays for
+// fairness (one noisy client cannot lock everyone else out).
 const attempts = new Map<string, number[]>();
+let globalAttempts: number[] = [];
 const WINDOW_MS = 5 * 60_000;
-const MAX_ATTEMPTS = 15;
+export const MAX_ATTEMPTS = 15;
+/** Attempts per window across ALL IPs — the rotating-header backstop. */
+export const MAX_GLOBAL_ATTEMPTS = 50;
 /** Hard caps: the Map can never grow without bound, even under floods of
  *  spoofed XFF values (entries only get pruned when their IP returns). */
 const MAX_TRACKED_IPS = 2048;
@@ -113,7 +121,7 @@ const MAX_TRACKED_IPS = 2048;
 export function clientIp(req: NextRequest): string {
   // NOTE: trusts the proxy-supplied x-forwarded-for (Render sets it to the
   // real client). A chained/spoofed XFF can rotate throttle buckets — the
-  // MAX_ATTEMPTS per bucket and the global cap bound the damage either way.
+  // MAX_ATTEMPTS per bucket and the global ceiling bound the damage either way.
   const fwd = req.headers.get("x-forwarded-for");
   if (fwd) return fwd.split(",")[0].trim();
   return "local";
@@ -131,14 +139,17 @@ function sweepExpired(now: number) {
 
 export function tooManyAttempts(ip: string): boolean {
   const now = Date.now();
+  globalAttempts = globalAttempts.filter((t) => now - t < WINDOW_MS);
+  if (globalAttempts.length >= MAX_GLOBAL_ATTEMPTS) return true;
   const list = (attempts.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
   attempts.set(ip, list);
-  if (list.length >= MAX_ATTEMPTS) return true;
-  return false;
+  return list.length >= MAX_ATTEMPTS;
 }
 
 export function recordAttempt(ip: string) {
   const now = Date.now();
+  globalAttempts = globalAttempts.filter((t) => now - t < WINDOW_MS);
+  globalAttempts.push(now);
   if (attempts.size >= MAX_TRACKED_IPS) {
     sweepExpired(now);
     // Still at the cap after sweeping (a genuine flood of live buckets):
@@ -152,4 +163,10 @@ export function recordAttempt(ip: string) {
 
 export function clearAttempts(ip: string) {
   attempts.delete(ip);
+}
+
+/** Test seam: drops all throttle state so tests do not leak into each other. */
+export function resetThrottle() {
+  attempts.clear();
+  globalAttempts = [];
 }
