@@ -70,3 +70,29 @@ test("keep-forever (0) deletes no checks at all", async () => {
   expect(deleted).toBe(0);
   expect(await db.check.count({ where: { monitorId: m.id } })).toBe(2);
 });
+
+// Incident postmortem notes are keyed to a derived incident's exact start, and
+// a derived incident never reaches further back than the lookback window — so a
+// note older than the lookback can never match again and is pruned. This is a
+// different clock from the retention setting: it must hold even when history is
+// kept forever.
+test("a note past the incident lookback is pruned; a note inside it is kept", async () => {
+  const { pruneChecks } = await import("@/lib/retention");
+  const { INCIDENT_LOOKBACK_DAYS } = await import("@/lib/incidents");
+  const m = await db.monitor.create({ data: { name: "svc", url: "https://svc.example.com" } });
+  const now = Date.now();
+  const days = (d: number) => new Date(now - d * 86400_000);
+  // One day either side of the lookback boundary.
+  await db.incidentNote.createMany({
+    data: [
+      { monitorId: m.id, startedAt: days(INCIDENT_LOOKBACK_DAYS + 1), note: "too old" },
+      { monitorId: m.id, startedAt: days(INCIDENT_LOOKBACK_DAYS - 1), note: "still in range" },
+    ],
+  });
+  await setRetention(0); // keep check history forever — notes are pruned anyway
+
+  await pruneChecks();
+
+  const left = await db.incidentNote.findMany({ select: { note: true } });
+  expect(left.map((n) => n.note)).toEqual(["still in range"]);
+});

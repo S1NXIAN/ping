@@ -44,17 +44,18 @@ export async function GET(req: NextRequest, { params }: Params) {
     collectMonitorStats([id]),
   ]);
 
-  const recent = checks.map(toCheckDTO);
+  // The sheet's check table: the 100 newest recorded checks (any status).
+  const latestChecks = checks.map(toCheckDTO);
   const stats = bundle.statsByMonitor.get(id) ?? emptyStats();
-  // The slow-state window is the same recent-checks window the card shows, and
-  // collectMonitorStats already narrowed it to RECENT_CHECKS within 48h.
+  // The slow-state window is the same recent-checks window the card shows
+  // (RECENT_CHECKS within 48h), which collectMonitorStats already narrowed.
   const recentWindow = bundle.recentByMonitor.get(id) ?? [];
 
   const body: MonitorDetailResponse = {
     monitor: toMonitorDTO(monitor, folder, stats, recentWindow),
     p95Ms24h: p95,
     daily,
-    checks: recent,
+    checks: latestChecks,
   };
   return NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });
 }

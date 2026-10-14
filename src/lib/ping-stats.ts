@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "./db";
 import { parseTimes } from "./schedule";
 import { isDegraded } from "./monitor-status";
+import { INCIDENT_LOOKBACK_DAYS } from "./incidents";
 import type { CheckDTO, DailyBucket, MonitorDTO, MonitorStatsDTO } from "./ping-types";
 
 const H24 = 24 * 60 * 60 * 1000;
@@ -90,7 +91,7 @@ export interface StatsBundle {
 /**
  * Collects stats + the most recent checks (RECENT_CHECKS within 48h) for every
  * monitor, or for just `onlyMonitorIds` when given. Used by the overview and
- * (scoped to one monitor) by the detail endpoint, so both compute a monitor's
+ * (scoped to one monitor) by the detail route, so both compute a monitor's
  * stats the same way and can never disagree.
  */
 export async function collectMonitorStats(onlyMonitorIds?: string[]): Promise<StatsBundle> {
@@ -103,10 +104,10 @@ export async function collectMonitorStats(onlyMonitorIds?: string[]): Promise<St
   const t24 = now - H24;
   const t7 = now - 7 * H24;
   const t30 = now - 30 * H24;
-  // "Last down" is only ever displayed/needed within the incident lookback
-  // (30 d + buffer) — older downs can't surface anywhere in the UI, so the
-  // lookup stays bounded even under the keep-forever retention policy.
-  const t32 = now - 32 * H24;
+  // "Last down" is only ever displayed/needed within the incident lookback —
+  // older downs can't surface anywhere in the UI, so the lookup stays bounded
+  // even under the keep-forever retention policy.
+  const t32 = now - INCIDENT_LOOKBACK_DAYS * H24;
   const since48hMs = now - 2 * H24; // raw SQL compares against epoch-ms INTEGER
   // Scope every query to the requested monitors (all of them by default).
   const idFilter = onlyMonitorIds

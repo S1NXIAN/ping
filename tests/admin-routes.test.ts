@@ -105,8 +105,18 @@ test("reorder rejects a pinned id that is not in the order", async () => {
 
 // ---- POST /api/admin/retention ----
 
-test("retention 'set' stores the policy and 'prune' deletes old checks", async () => {
+test("retention 'set' stores the policy", async () => {
   await db.settings.create({ data: { id: "main", passwordHash: "h", passwordSalt: "s" } });
+
+  const { POST } = await import("@/app/api/admin/retention/route");
+  const res = await POST(await authed("/api/admin/retention", { action: "set", days: 30 }));
+
+  expect(res.status).toBe(200);
+  expect((await db.settings.findUniqueOrThrow({ where: { id: "main" } })).retentionDays).toBe(30);
+});
+
+test("retention 'prune' deletes checks older than the policy", async () => {
+  await db.settings.create({ data: { id: "main", passwordHash: "h", passwordSalt: "s", retentionDays: 30 } });
   const m = await db.monitor.create({ data: { name: "svc", url: "https://svc.com" } });
   await db.check.createMany({
     data: [
@@ -116,12 +126,9 @@ test("retention 'set' stores the policy and 'prune' deletes old checks", async (
   });
 
   const { POST } = await import("@/app/api/admin/retention/route");
-  const setRes = await POST(await authed("/api/admin/retention", { action: "set", days: 30 }));
-  expect(setRes.status).toBe(200);
-  expect((await db.settings.findUniqueOrThrow({ where: { id: "main" } })).retentionDays).toBe(30);
+  const res = await POST(await authed("/api/admin/retention", { action: "prune" }));
 
-  const pruneRes = await POST(await authed("/api/admin/retention", { action: "prune" }));
-  expect(pruneRes.status).toBe(200);
-  expect((await pruneRes.json()).deleted).toBe(1);
+  expect(res.status).toBe(200);
+  expect((await res.json()).deleted).toBe(1);
   expect(await db.check.count()).toBe(1); // only the recent check survives
 });

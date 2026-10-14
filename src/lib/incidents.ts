@@ -11,6 +11,11 @@ import { nominalPeriodSec, parseTimes } from "./schedule";
 import type { AdminIncidentDTO } from "./ping-types";
 
 const INCIDENT_WINDOW_DAYS = 30;
+/** How far back the two lookups that must outlive the derivation window reach:
+ *  the "last down" stat and the incident-note prune. The extra days are slack
+ *  so a note or down recorded just before the window edge is not dropped while
+ *  its incident can still be derived (which uses INCIDENT_WINDOW_DAYS). */
+export const INCIDENT_LOOKBACK_DAYS = INCIDENT_WINDOW_DAYS + 2;
 export const MAX_INCIDENTS = 15;
 /** Ongoing incidents are exempt from MAX_INCIDENTS so a long outage is never
  *  dropped for newer ones. Each monitor yields at most one ongoing incident,

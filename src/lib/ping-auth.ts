@@ -106,8 +106,10 @@ export async function guard(req: NextRequest): Promise<NextResponse | null> {
 // Two buckets, because the per-IP one is keyed on a caller-supplied header
 // (x-forwarded-for). An attacker rotating that header gets a fresh per-IP
 // bucket each request, so the per-IP cap alone would never fire — the global
-// ceiling is what actually bounds guesses. The per-IP bucket stays for
-// fairness (one noisy client cannot lock everyone else out).
+// ceiling is what actually bounds guesses. It fails closed: once the ceiling
+// is reached, every caller is refused for the window, so one attacker can
+// briefly lock the admin out too. That is the intended trade (bounding
+// guesses beats staying reachable), not a fairness guarantee.
 const attempts = new Map<string, number[]>();
 let globalAttempts: number[] = [];
 const WINDOW_MS = 5 * 60_000;

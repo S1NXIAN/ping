@@ -4,6 +4,7 @@
 // behaviour, this for how long history is kept).
 import { db } from "./db";
 import { runtimeState } from "./checker";
+import { INCIDENT_LOOKBACK_DAYS } from "./incidents";
 
 /** Default days of check history to keep (the "default" policy). */
 const RETENTION_DAYS = 30;
@@ -69,9 +70,9 @@ export async function pruneChecks(): Promise<{ deleted: number }> {
   }
 
   // Incident notes older than the incident lookback can never match a derived
-  // incident again — tied to the fixed lookback, not the retention setting.
+  // incident again — tied to that fixed window, not the retention setting.
   await db.incidentNote.deleteMany({
-    where: { startedAt: { lt: new Date(Date.now() - (RETENTION_DAYS + 2) * 86400_000) } },
+    where: { startedAt: { lt: new Date(Date.now() - INCIDENT_LOOKBACK_DAYS * 86400_000) } },
   });
 
   runtimeState.lastPrunedAt = new Date().toISOString();

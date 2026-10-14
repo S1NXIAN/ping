@@ -110,7 +110,7 @@ test("p95For ignores down checks and checks outside the 24h window", async () =>
     data: [
       { monitorId: m.id, status: "up", responseMs: 10, checkedAt: new Date(now - 60_000) },
       { monitorId: m.id, status: "up", responseMs: 20, checkedAt: new Date(now - 120_000) },
-      // A huge failed sample and a huge old sample must not move the number.
+      // A huge failed check and a huge old check must not move the number.
       { monitorId: m.id, status: "down", statusCode: 503, responseMs: 99999, checkedAt: new Date(now - 180_000) },
       { monitorId: m.id, status: "up", responseMs: 88888, checkedAt: new Date(now - 40 * 3600_000) },
     ],

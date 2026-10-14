@@ -4,22 +4,26 @@
 // These are the only things standing between a stranger and every monitor, so
 // the failure directions matter: a wrong password must fail, a valid token
 // must authenticate, and a lapsed window must not.
-import { afterEach, expect, setSystemTime, test } from "bun:test";
+import { afterEach, beforeEach, expect, setSystemTime, test } from "bun:test";
 import { NextRequest } from "next/server";
 import { db, resetDb } from "./helpers/test-db";
 import {
   createSession,
   getSessionMinutes,
   hashPassword,
+  MAX_ATTEMPTS,
+  MAX_GLOBAL_ATTEMPTS,
   MAX_SESSIONS,
+  recordAttempt,
   requireAuth,
+  resetThrottle,
   SESSION_COOKIE,
   SESSION_DEFAULT_MINUTES,
   SESSION_PRESETS,
+  tooManyAttempts,
   verifyPassword,
   windowOpen,
 } from "@/lib/ping-auth";
-import { beforeEach } from "bun:test";
 
 beforeEach(async () => {
   await resetDb();
@@ -27,6 +31,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   setSystemTime();
+  resetThrottle(); // throttle state is process-global — never leak it across tests
 });
 
 test("a correct password verifies and a wrong one does not", () => {
@@ -116,14 +121,7 @@ test("logins cap the stored sessions at the newest 20", async () => {
 // must actually bound guesses. A per-IP bucket alone is defeated by rotating
 // the x-forwarded-for header (the caller controls it), so a process-wide
 // ceiling backs it up.
-import { MAX_ATTEMPTS, MAX_GLOBAL_ATTEMPTS, tooManyAttempts, recordAttempt, resetThrottle } from "@/lib/ping-auth";
-
-afterEach(() => {
-  resetThrottle(); // throttle state is process-global — never leak it across tests
-});
-
 test("one IP is refused after MAX_ATTEMPTS attempts in the window", () => {
-  resetThrottle();
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
     expect(tooManyAttempts("1.2.3.4")).toBe(false);
     recordAttempt("1.2.3.4");
@@ -132,7 +130,6 @@ test("one IP is refused after MAX_ATTEMPTS attempts in the window", () => {
 });
 
 test("rotating the source IP cannot mint unlimited attempts (global ceiling)", () => {
-  resetThrottle();
   // Each IP stays under its own per-IP cap, but the fleet-wide total is bounded.
   for (let i = 0; i < MAX_GLOBAL_ATTEMPTS; i++) {
     const ip = `10.0.0.${i}`;
@@ -146,7 +143,6 @@ test("rotating the source IP cannot mint unlimited attempts (global ceiling)", (
 // ---- POST /api/auth/login (the route itself, not just the throttle helpers) ----
 
 test("login with the right password sets a session cookie; a wrong one does not", async () => {
-  resetThrottle();
   const { hash, salt } = hashPassword("correctpassword");
   await db.settings.create({ data: { id: "main", passwordHash: hash, passwordSalt: salt } });
   const { POST } = await import("@/app/api/auth/login/route");
@@ -174,21 +170,25 @@ test("login with the right password sets a session cookie; a wrong one does not"
   expect(await db.session.count()).toBe(1); // no new session issued
 });
 
-test("successful logins do not count toward the throttle (no self-lockout)", async () => {
-  resetThrottle();
+test("a successful login does not count toward the global throttle ceiling", async () => {
   const { hash, salt } = hashPassword("correctpassword");
   await db.settings.create({ data: { id: "main", passwordHash: hash, passwordSalt: salt } });
-  const { POST } = await import("@/app/api/auth/login/route");
 
-  // More successful logins than the global ceiling — all must be allowed.
-  for (let i = 0; i < MAX_GLOBAL_ATTEMPTS + 5; i++) {
-    const res = await POST(
-      new NextRequest("http://localhost/api/auth/login", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ password: "correctpassword" }),
-      }),
-    );
-    expect(res.status).toBe(200);
-  }
+  // Fill the global bucket to one below the ceiling (no hashing — the throttle
+  // helpers are cheap), then log in once. If the successful login counted, the
+  // bucket would reach the ceiling and refuse a brand-new IP.
+  for (let i = 0; i < MAX_GLOBAL_ATTEMPTS - 1; i++) recordAttempt(`filler-${i}`);
+  expect(tooManyAttempts("fresh-ip")).toBe(false);
+
+  const { POST } = await import("@/app/api/auth/login/route");
+  const res = await POST(
+    new NextRequest("http://localhost/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password: "correctpassword" }),
+    }),
+  );
+  expect(res.status).toBe(200);
+  // The bucket is still one below the ceiling — the success added nothing.
+  expect(tooManyAttempts("another-fresh-ip")).toBe(false);
 });
