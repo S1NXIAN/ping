@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
-import { KEYWORD_MAX_LENGTH } from "@/lib/checker";
-import { monitorUrlSchema, intervalSecSchema, scheduleFields, scheduleError, methodKeywordError } from "@/lib/validation";
+import { monitorUrlSchema, intervalSecSchema, scheduleFields, scheduleError, methodKeywordError, keywordSchema, slowThresholdMsSchema } from "@/lib/validation";
 import {
   collectMonitorStats,
   dailyBuckets,
@@ -70,20 +69,10 @@ const patchSchema = z.object({
   pinned: z.boolean().optional(),
   account: z.string().trim().max(60, "Account label is too long (60 chars max)").nullish(),
   /** Keyword check: body must contain (or not contain) this string; null clears (off). */
-  keyword: z
-    .string()
-    .trim()
-    .min(1, "Keyword cannot be empty — clear the field to turn the check off")
-    .max(KEYWORD_MAX_LENGTH, `Keyword is too long (${KEYWORD_MAX_LENGTH} chars max)`)
-    .nullish(),
+  keyword: keywordSchema,
   keywordMode: z.enum(["contains", "excludes"]).optional(),
   /** Latency threshold in ms; null clears (off). */
-  slowThresholdMs: z
-    .number()
-    .int()
-    .min(50, "Threshold must be at least 50 ms")
-    .max(30000, "Threshold must be at most 30000 ms")
-    .nullish(),
+  slowThresholdMs: slowThresholdMsSchema,
   ...scheduleFields,
 });
 
@@ -133,9 +122,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     data.scheduleTimes = nextMode === "times" ? (nextTimes ?? null) : null;
     data.timezone = nextMode === "times" ? (nextZone ?? null) : null;
   }
-  // absent → untouched; null or "" → off; string → set
+  // absent → untouched; null → off; string → set (an empty string is rejected
+  // by keywordSchema, so it never reaches here)
   if (keyword !== undefined) {
-    data.keyword = keyword === "" ? null : keyword ?? null;
+    data.keyword = keyword ?? null;
   }
   if (keywordMode !== undefined) {
     data.keywordMode = keywordMode;

@@ -9,6 +9,7 @@ import { expect, test } from "bun:test";
 import {
   MAX_SCHEDULE_TIMES,
   formatNextRun,
+  formatTimesForDisplay,
   hasTimeAt,
   isTimesDue,
   mostRecentScheduledInstant,
@@ -91,6 +92,25 @@ test("formatNextRun reads as the next clock time, not the whole list", () => {
 test("isTimesDue fires on the first ever check", () => {
   const now = at("2026-03-10T06:00:00Z");
   expect(isTimesDue(["13:00", "03:00"], "Asia/Manila", null, now)).toBe(true);
+});
+
+test("an unreadable stored timezone degrades to UTC instead of crashing", () => {
+  // A zone that was valid when saved can stop resolving after a tzdata/ICU
+  // change across a redeploy. Intl throws RangeError for it; every reader of
+  // the clock times must fall back rather than take the tick (and the card)
+  // down with it. UTC is the documented fallback.
+  const now = at("2026-03-10T06:00:00Z"); // 06:00 UTC
+  expect(mostRecentScheduledInstant(["13:00", "03:00"], "Not/AZone", now)).toBe(
+    at("2026-03-10T03:00:00Z"),
+  );
+  expect(nextScheduledInstant(["13:00", "03:00"], "Not/AZone", now)).toBe(
+    at("2026-03-10T13:00:00Z"),
+  );
+  expect(formatNextRun(["13:00", "03:00"], "Not/AZone", now)).toBe("1:00 PM");
+  expect(formatTimesForDisplay(["13:00", "03:00"], "Not/AZone")).toBe("3:00 AM, 1:00 PM");
+  // A monitor with an unreadable zone still gets judged due, not skipped.
+  // At 06:00 UTC the latest 03:00 slot has passed; a last check before it is due.
+  expect(isTimesDue(["03:00", "13:00"], "Not/AZone", at("2026-03-10T02:00:00Z"), now)).toBe(true);
 });
 
 test("isTimesDue does not fire twice for the same instant", () => {

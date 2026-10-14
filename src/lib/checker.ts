@@ -11,7 +11,6 @@ const MAX_CONCURRENCY = 5;
 export const MAX_MONITORS = 200;
 /** How much of a response body a keyword check is willing to read. */
 const KEYWORD_BODY_LIMIT_BYTES = 256 * 1024;
-export const KEYWORD_MAX_LENGTH = 200;
 
 export interface TickResult {
   ran: number;
@@ -211,28 +210,33 @@ async function runCheckInner(monitor: Monitor): Promise<Check> {
   }
 
   const responseMs = Math.round(performance.now() - started);
-  const check = await db.check.create({
-    data: {
-      monitorId: monitor.id,
-      status,
-      statusCode,
-      responseMs,
-      error: error ? error.slice(0, 200) : null,
-    },
-  });
+  // One transaction for both writes: a process kill (a free-tier spin-down
+  // can land mid-check) must not leave the history row recorded while the
+  // card's headline status still shows the previous check.
+  return db.$transaction(async (tx) => {
+    const check = await tx.check.create({
+      data: {
+        monitorId: monitor.id,
+        status,
+        statusCode,
+        responseMs,
+        error: error ? error.slice(0, 200) : null,
+      },
+    });
 
-  await db.monitor.update({
-    where: { id: monitor.id },
-    data: {
-      lastCheckAt: check.checkedAt,
-      lastStatus: status,
-      lastStatusCode: statusCode,
-      lastResponseMs: responseMs,
-      lastError: error ? error.slice(0, 200) : null,
-    },
-  });
+    await tx.monitor.update({
+      where: { id: monitor.id },
+      data: {
+        lastCheckAt: check.checkedAt,
+        lastStatus: status,
+        lastStatusCode: statusCode,
+        lastResponseMs: responseMs,
+        lastError: error ? error.slice(0, 200) : null,
+      },
+    });
 
-  return check;
+    return check;
+  });
 }
 
 /**

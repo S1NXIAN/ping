@@ -193,4 +193,6 @@ function useToast() {
   }
 }
 
-export { useToast, toast }
+// `toast` is used by the hook's return, not imported directly — keep it
+// module-private. (Re-vendoring the shadcn template would re-export it.)
+export { useToast }

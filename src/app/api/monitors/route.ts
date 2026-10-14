@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
-import { runCheck, KEYWORD_MAX_LENGTH, MAX_MONITORS } from "@/lib/checker";
+import { runCheck, MAX_MONITORS } from "@/lib/checker";
 import { nextMonitorPosition } from "@/lib/monitor-order";
-import { monitorUrlSchema, intervalSecSchema, scheduleFields, scheduleError, methodKeywordError } from "@/lib/validation";
+import { monitorUrlSchema, intervalSecSchema, scheduleFields, scheduleError, methodKeywordError, keywordSchema, slowThresholdMsSchema } from "@/lib/validation";
 import { emptyStats, toMonitorDTO } from "@/lib/ping-stats";
 
 const createSchema = z.object({
@@ -20,24 +20,16 @@ const createSchema = z.object({
     .nullish()
     .transform((v) => (v && v.length > 0 ? v : null)),
   /** Keyword check: body must contain (or not contain) this string; null/absent = off. */
-  keyword: z
-    .string()
-    .trim()
-    .min(1, "Keyword cannot be empty — clear the field to turn the check off")
-    .max(KEYWORD_MAX_LENGTH, `Keyword is too long (${KEYWORD_MAX_LENGTH} chars max)`)
-    .nullish()
-    .transform((v) => (v && v.length > 0 ? v : null)),
+  keyword: keywordSchema,
   keywordMode: z.enum(["contains", "excludes"]).optional(),
   /** Latency threshold in ms; null/absent = off. */
-  slowThresholdMs: z
-    .number()
-    .int()
-    .min(50, "Threshold must be at least 50 ms")
-    .max(30000, "Threshold must be at most 30000 ms")
-    .nullish()
-    .transform((v) => (v == null || Number.isNaN(v) ? null : v)),
+  slowThresholdMs: slowThresholdMsSchema,
   ...scheduleFields,
 });
+
+/** Thrown inside the create transaction when the fleet is at the cap, so the
+ *  whole transaction rolls back and the route answers 400. */
+class MonitorLimitError extends Error {}
 
 export async function POST(req: NextRequest) {
   const unauthorized = await guard(req);
@@ -72,14 +64,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Same cap as import: keeps tick duration and DB size honest on free tier.
-  const existing = await db.monitor.count();
-  if (existing >= MAX_MONITORS) {
-    return NextResponse.json(
-      { error: `Monitor limit reached (${MAX_MONITORS}) — delete one before adding more` },
-      { status: 400 },
-    );
-  }
-
+  // The count and the create are one transaction, so two concurrent requests
+  // at the boundary cannot both read one-below-the-cap and both create.
   let displayName = name;
   if (!displayName) {
     try {
@@ -89,25 +75,40 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // New monitors append at the end of the manual order.
-  const position = await nextMonitorPosition();
-  const monitor = await db.monitor.create({
-    data: {
-      name: displayName,
-      url,
-      folderId: folderId ?? null,
-      intervalSec: intervalSec ?? 300,
-      method: method ?? "GET",
-      account,
-      keyword,
-      keywordMode: keywordMode ?? "contains",
-      slowThresholdMs: slowThresholdMs ?? null,
-      scheduleMode: scheduleMode ?? "interval",
-      scheduleTimes: scheduleMode === "times" ? (scheduleTimes ?? null) : null,
-      timezone: scheduleMode === "times" ? (timezone ?? null) : null,
-      position,
-    },
-  });
+  let monitor;
+  try {
+    monitor = await db.$transaction(async (tx) => {
+      if ((await tx.monitor.count()) >= MAX_MONITORS) {
+        throw new MonitorLimitError();
+      }
+      // New monitors append at the end of the manual order.
+      return tx.monitor.create({
+        data: {
+          name: displayName,
+          url,
+          folderId: folderId ?? null,
+          intervalSec: intervalSec ?? 300,
+          method: method ?? "GET",
+          account,
+          keyword,
+          keywordMode: keywordMode ?? "contains",
+          slowThresholdMs: slowThresholdMs ?? null,
+          scheduleMode: scheduleMode ?? "interval",
+          scheduleTimes: scheduleMode === "times" ? (scheduleTimes ?? null) : null,
+          timezone: scheduleMode === "times" ? (timezone ?? null) : null,
+          position: await nextMonitorPosition(tx),
+        },
+      });
+    });
+  } catch (e) {
+    if (e instanceof MonitorLimitError) {
+      return NextResponse.json(
+        { error: `Monitor limit reached (${MAX_MONITORS}) — delete one before adding more` },
+        { status: 400 },
+      );
+    }
+    throw e;
+  }
 
   // First real check runs right away in the background — the UI polls
   // the overview and will show the genuine result when it lands. (A null

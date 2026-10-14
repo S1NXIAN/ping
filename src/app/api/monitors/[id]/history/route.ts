@@ -21,7 +21,11 @@ function parseRange(v: string | null): HistoryRange {
 function csvEscape(v: string | number | null): string {
   if (v == null) return "";
   const s = String(v);
-  return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+  // A spreadsheet runs a cell starting with = + - @ (or a tab/CR) as a
+  // formula. The error cell carries the monitored host's own reason phrase,
+  // so prefix such a cell with ' to keep it inert.
+  const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  return /[",\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
 
 export async function GET(req: NextRequest, { params }: Params) {

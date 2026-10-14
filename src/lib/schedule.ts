@@ -11,16 +11,26 @@
 /** Max clock times per monitor — bounds the schedule and the tick work. */
 export const MAX_SCHEDULE_TIMES = 12;
 
-/** Every IANA zone this runtime knows. Built once — the list is static.
- *  Empty when the runtime lacks Intl.supportedValuesOf, so callers must treat
- *  an empty list as "no picker available" rather than "no valid zones". */
-export const IANA_TIMEZONES: string[] = (() => {
+/** Memoised: probing a zone builds an Intl formatter (~0.3ms), and partsInZone
+ *  runs inside a DST bisect loop — so the probe must not repeat per call. */
+const zoneValidity = new Map<string, boolean>();
+
+/** True when Intl can actually format in this zone. Tested by use, not list
+ *  membership: an alias (Asia/Calcutta) is valid though supportedValuesOf
+ *  omits it, and a once-valid zone can stop resolving after an ICU update. */
+export function isUsableTimezone(timeZone: string): boolean {
+  const cached = zoneValidity.get(timeZone);
+  if (cached !== undefined) return cached;
+  let ok: boolean;
   try {
-    return typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
+    new Intl.DateTimeFormat("en-US", { timeZone });
+    ok = true;
   } catch {
-    return [];
+    ok = false;
   }
-})();
+  zoneValidity.set(timeZone, ok);
+  return ok;
+}
 
 const MS_PER_MIN = 60_000;
 const MIN_PER_DAY = 1440;
@@ -28,10 +38,13 @@ const MIN_PER_DAY = 1440;
 /** The wall-clock parts of an instant, as read in some timezone. */
 type Parts = { year: number; month: number; day: number; hour: number; minute: number; second: number };
 
-/** The wall-clock parts of `ts` as seen in `timeZone`. */
+/** The wall-clock parts of `ts` as seen in `timeZone`. A zone the runtime
+ *  cannot format (a stored zone gone stale after a tzdata/ICU change) falls
+ *  back to UTC: the monitor keeps checking and the card keeps rendering
+ *  instead of the whole tick — and the whole dashboard — throwing. */
 function partsInZone(ts: number, timeZone: string): Parts {
   const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone,
+    timeZone: usableZone(timeZone),
     hour12: false,
     year: "numeric",
     month: "2-digit",
@@ -53,6 +66,13 @@ function partsInZone(ts: number, timeZone: string): Parts {
     minute: p.minute,
     second: p.second,
   };
+}
+
+/** A zone Intl can actually format in, else UTC — so a stale stored zone
+ *  degrades instead of throwing and taking the whole tick (and the dashboard)
+ *  down with it. */
+function usableZone(timeZone: string): string {
+  return isUsableTimezone(timeZone) ? timeZone : "UTC";
 }
 
 /** The zone's UTC offset at `ts`, in ms (local = UTC + offset). */
@@ -180,7 +200,7 @@ export function formatNextRun(times: string[], timeZone: string, nowMs: number =
   const ts = nextScheduledInstant(times, timeZone, nowMs);
   if (ts == null) return formatTimesForDisplay(times, timeZone);
   return new Intl.DateTimeFormat("en-US", {
-    timeZone,
+    timeZone: usableZone(timeZone),
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
@@ -265,7 +285,7 @@ export function formatTimesForDisplay(times: string[], timeZone: string): string
       // then read it back with a fixed locale — the label is zone-correct.
       const ts = zonedWallClockToUtc(2026, 1, 1, h, m, timeZone);
       return new Intl.DateTimeFormat("en-US", {
-        timeZone,
+        timeZone: usableZone(timeZone),
         hour: "numeric",
         minute: "2-digit",
         hour12: true,

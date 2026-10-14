@@ -8,7 +8,30 @@
 // blocking internal targets would break legitimate internal monitoring.
 import { z } from "zod";
 import { INTERVAL_MAX_SEC, INTERVAL_MIN_SEC } from "./ping-client";
-import { parseTimes, IANA_TIMEZONES, MAX_SCHEDULE_TIMES, isValidTime } from "./schedule";
+import { parseTimes, isUsableTimezone, MAX_SCHEDULE_TIMES, isValidTime } from "./schedule";
+
+/** Max keyword length, shared by the schema below. A validation limit, so it
+ *  lives with the other input rules rather than in the check engine. */
+const KEYWORD_MAX_LENGTH = 200;
+
+/** Keyword check: body must contain (or not contain) this string; null/absent
+ *  = off. Shared by create, edit and import so all three reject the same
+ *  values — an empty string is refused (clearing is done by sending null). */
+export const keywordSchema = z
+  .string()
+  .trim()
+  .min(1, "Keyword cannot be empty — clear the field to turn the check off")
+  .max(KEYWORD_MAX_LENGTH, `Keyword is too long (${KEYWORD_MAX_LENGTH} chars max)`)
+  .nullish();
+
+/** Optional latency threshold in ms; null/absent = off. Shared by create,
+ *  edit and import so the bounds cannot drift between the three boundaries. */
+export const slowThresholdMsSchema = z
+  .number()
+  .int()
+  .min(50, "Threshold must be at least 50 ms")
+  .max(30000, "Threshold must be at most 30000 ms")
+  .nullish();
 
 /** A monitor URL: any http(s) URL, internal or public. */
 export const monitorUrlSchema = z
@@ -36,24 +59,8 @@ export const intervalSecSchema = z
 /** How a monitor's cadence is defined. */
 export const scheduleModeSchema = z.enum(["interval", "times"]);
 
-/** Every IANA zone this runtime can format in. Sourced from the one list in
- *  lib/schedule.ts so the editor, the picker and validation never drift. */
-const IANA_ZONES = new Set(IANA_TIMEZONES);
-
-/** True when the runtime can actually format in this zone. Tested by use
- *  rather than by list membership: resolvedOptions().timeZone can return an
- *  alias (e.g. Asia/Calcutta) that supportedValuesOf omits. */
-function isUsableTimezone(tz: string): boolean {
-  if (IANA_ZONES.has(tz)) return true;
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: tz });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** An IANA timezone the runtime can actually format in. */
+/** An IANA timezone the runtime can actually format in. The probe lives in
+ *  lib/schedule.ts, which also uses it to fall back to UTC at read time. */
 export const timezoneSchema = z
   .string()
   .trim()

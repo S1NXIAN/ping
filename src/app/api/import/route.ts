@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
-import { KEYWORD_MAX_LENGTH, MAX_MONITORS } from "@/lib/checker";
+import { MAX_MONITORS } from "@/lib/checker";
 import { nextMonitorPosition } from "@/lib/monitor-order";
-import { monitorUrlSchema, intervalSecSchema, scheduleModeSchema, scheduleTimesSchema, timezoneSchema, scheduleError, methodKeywordError } from "@/lib/validation";
+import { monitorUrlSchema, intervalSecSchema, scheduleModeSchema, scheduleTimesSchema, timezoneSchema, scheduleError, methodKeywordError, keywordSchema, slowThresholdMsSchema } from "@/lib/validation";
 import type { ImportResult } from "@/lib/ping-types";
 
 const schema = z.object({
@@ -19,27 +19,20 @@ const schema = z.object({
         intervalSec: intervalSecSchema.default(300),
         enabled: z.boolean().default(true),
         account: z.string().trim().max(60).nullish().transform((v) => (v && v.length > 0 ? v : null)),
-        keyword: z
-          .string()
-          .trim()
-          .min(1)
-          .max(KEYWORD_MAX_LENGTH)
-          .nullish()
-          .transform((v) => (v && v.length > 0 ? v : null)),
+        keyword: keywordSchema,
         keywordMode: z.enum(["contains", "excludes"]).default("contains"),
-        slowThresholdMs: z
-          .number()
-          .int()
-          .min(50)
-          .max(30000)
-          .nullish()
-          .transform((v) => (v == null || Number.isNaN(v) ? null : v)),
+        slowThresholdMs: slowThresholdMsSchema,
         folder: z.string().trim().max(40).nullish(),
         // Schedule mode. Absent in exports written before times-of-day existed,
         // so both are optional and default to the interval behaviour.
         scheduleMode: scheduleModeSchema.optional(),
         scheduleTimes: scheduleTimesSchema.nullish(),
         timezone: timezoneSchema.nullish(),
+        // Pin state and manual order. Absent in exports written before they
+        // were carried, so an old file imports with a fresh monitor's defaults
+        // (unpinned, appended at the end).
+        pinned: z.boolean().default(false),
+        position: z.number().int().min(0).optional(),
       }),
     )
     .max(200),
@@ -133,6 +126,11 @@ export async function POST(req: NextRequest) {
             skipped += 1;
             continue;
           }
+          // Restore the export's manual order and pin state; a monitor whose
+          // file has no position (an older export) appends past everything seen
+          // so far, so it never collides with an imported position.
+          const position = m.position ?? nextPosition;
+          nextPosition = Math.max(nextPosition, position + 1);
           await tx.monitor.create({
             data: {
               name: m.name,
@@ -148,10 +146,10 @@ export async function POST(req: NextRequest) {
               scheduleTimes: m.scheduleMode === "times" ? (m.scheduleTimes ?? null) : null,
               timezone: m.scheduleMode === "times" ? (m.timezone ?? null) : null,
               folderId: m.folder ? (folderIds.get(m.folder) ?? null) : null,
-              position: nextPosition,
+              pinned: m.pinned,
+              position,
             },
           });
-          nextPosition += 1;
           existingUrls.add(m.url);
           created += 1;
         }

@@ -30,6 +30,8 @@ export async function GET(req: NextRequest) {
       scheduleMode: m.scheduleMode === "times" ? "times" : "interval",
       scheduleTimes: m.scheduleTimes,
       timezone: m.timezone,
+      pinned: m.pinned,
+      position: m.position,
       folder: folders.find((f) => f.id === m.folderId)?.name ?? null,
     })),
   };
