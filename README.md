@@ -78,7 +78,8 @@ only visible by looking at PING.
   last password entry** (no sliding, no idle detection): inside it a fresh
   visit skips the password, after it the next visit asks again. An open tab is
   never interrupted. Choose the window in Settings. Changing the password
-  signs out every other session.
+  signs out every other session. Three failed logins lock sign-in for three
+  minutes (in-memory, so a restart clears it).
 - **Keep-awake strategy** — an external scheduler hits `/api/cron/tick`, which
   both wakes PING and runs every due check (see below).
 - **Import/export** — your monitor configuration as JSON.

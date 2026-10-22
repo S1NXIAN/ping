@@ -8,9 +8,11 @@ import { afterEach, beforeEach, expect, setSystemTime, test } from "bun:test";
 import { NextRequest } from "next/server";
 import { db, resetDb } from "./helpers/test-db";
 import {
+  clearAttempts,
   createSession,
   getSessionMinutes,
   hashPassword,
+  LOCKOUT_MS,
   MAX_ATTEMPTS,
   MAX_GLOBAL_ATTEMPTS,
   MAX_SESSIONS,
@@ -129,6 +131,43 @@ test("one IP is refused after MAX_ATTEMPTS attempts in the window", () => {
   expect(tooManyAttempts("1.2.3.4")).toBe(true);
 });
 
+test("the third failure starts a full LOCKOUT_MS cooldown", () => {
+  const start = Date.now();
+  setSystemTime(new Date(start));
+  recordAttempt("2.3.4.5");
+  setSystemTime(new Date(start + 60_000));
+  recordAttempt("2.3.4.5");
+  setSystemTime(new Date(start + 120_000));
+  recordAttempt("2.3.4.5"); // crosses the limit here
+  expect(tooManyAttempts("2.3.4.5")).toBe(true);
+  // Still locked one millisecond before the cooldown ends…
+  setSystemTime(new Date(start + 120_000 + LOCKOUT_MS - 1));
+  expect(tooManyAttempts("2.3.4.5")).toBe(true);
+  // …and open again at the boundary.
+  setSystemTime(new Date(start + 120_000 + LOCKOUT_MS));
+  expect(tooManyAttempts("2.3.4.5")).toBe(false);
+});
+
+test("failures older than the window do not count toward the limit", () => {
+  const start = Date.now();
+  setSystemTime(new Date(start));
+  recordAttempt("6.7.8.9");
+  setSystemTime(new Date(start + 61_000));
+  recordAttempt("6.7.8.9");
+  // The first failure is now older than the window, so the next one is only
+  // the second live failure — no lockout.
+  setSystemTime(new Date(start + 181_000));
+  recordAttempt("6.7.8.9");
+  expect(tooManyAttempts("6.7.8.9")).toBe(false);
+});
+
+test("a successful login clears the failure run for the IP", () => {
+  for (let i = 0; i < MAX_ATTEMPTS; i++) recordAttempt("7.8.9.10");
+  expect(tooManyAttempts("7.8.9.10")).toBe(true);
+  clearAttempts("7.8.9.10");
+  expect(tooManyAttempts("7.8.9.10")).toBe(false);
+});
+
 test("rotating the source IP cannot mint unlimited attempts (global ceiling)", () => {
   // Each IP stays under its own per-IP cap, but the fleet-wide total is bounded.
   for (let i = 0; i < MAX_GLOBAL_ATTEMPTS; i++) {
@@ -168,6 +207,30 @@ test("login with the right password sets a session cookie; a wrong one does not"
   );
   expect(bad.status).toBe(401);
   expect(await db.session.count()).toBe(1); // no new session issued
+});
+
+test("the login route refuses the fourth attempt with 429 and Retry-After", async () => {
+  setSystemTime(new Date("2026-01-01T00:00:00Z"));
+  const { hash, salt } = await hashPassword("correctpassword");
+  await db.settings.create({ data: { id: "main", passwordHash: hash, passwordSalt: salt } });
+  const { POST } = await import("@/app/api/auth/login/route");
+
+  const attempt = () =>
+    POST(
+      new NextRequest("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password: "wrongpassword" }),
+      }),
+    );
+
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    expect((await attempt()).status).toBe(401);
+  }
+  const blocked = await attempt();
+  expect(blocked.status).toBe(429);
+  expect(blocked.headers.get("retry-after")).toBe(String(LOCKOUT_MS / 1000));
+  expect((await blocked.json()).error).toBe("Too many attempts — try again in 3 minutes");
 });
 
 test("a successful login does not count toward the global throttle ceiling", async () => {

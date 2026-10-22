@@ -112,31 +112,45 @@ export async function guard(req: NextRequest): Promise<NextResponse | null> {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
-// ---- naive in-memory login throttling (per IP + a global ceiling) ----
+// ---- in-memory login throttling (per IP + a global ceiling) ----
 // Two buckets, because the per-IP one is keyed on a caller-supplied header
 // (x-forwarded-for). An attacker rotating that header gets a fresh per-IP
 // bucket each request, so the per-IP cap alone would never fire — the global
 // ceiling is what actually bounds guesses. It fails closed: once the ceiling
-// is reached, every caller is refused for the window, so one attacker can
+// is reached, every caller is refused for the cooldown, so one attacker can
 // briefly lock the admin out too. That is the intended trade (bounding
 // guesses beats staying reachable), not a fairness guarantee.
+//
+// Policy: MAX_ATTEMPTS failures inside WINDOW_MS lock the bucket for
+// LOCKOUT_MS, counted from the failure that crossed the limit — not from the
+// first one — so the wait is always the full cooldown.
 //
 // Held on `globalThis`, not in module scope: Next compiles /api/auth/login and
 // /api/auth/setup into separate server bundles, so a module-level Map would be
 // one copy per bundle and a guess spent against one route would not count
 // against the other. Same pattern as the checker's in-flight guard.
-interface ThrottleState {
-  attempts: Map<string, number[]>;
-  globalAttempts: number[];
+interface ThrottleBucket {
+  /** Failure timestamps in the current run, pruned to WINDOW_MS. */
+  failures: number[];
+  /** Epoch ms until which this bucket refuses attempts; 0 = open. */
+  blockedUntil: number;
 }
+interface ThrottleState {
+  attempts: Map<string, ThrottleBucket>;
+  global: ThrottleBucket;
+}
+const emptyBucket = (): ThrottleBucket => ({ failures: [], blockedUntil: 0 });
 const throttleState = (): ThrottleState => {
-  const g = globalThis as unknown as { __pingThrottle?: ThrottleState };
-  return (g.__pingThrottle ??= { attempts: new Map<string, number[]>(), globalAttempts: [] });
+  // V2: the previous shape used timestamp arrays, and a dev server can carry
+  // the old object across a hot reload — a fresh key avoids reading that shape.
+  const g = globalThis as unknown as { __pingThrottleV2?: ThrottleState };
+  return (g.__pingThrottleV2 ??= { attempts: new Map(), global: emptyBucket() });
 };
-const WINDOW_MS = 5 * 60_000;
-export const MAX_ATTEMPTS = 15;
+const WINDOW_MS = 3 * 60_000;
+export const MAX_ATTEMPTS = 3;
+export const LOCKOUT_MS = 3 * 60_000;
 /** Attempts per window across ALL IPs — the rotating-header backstop. */
-export const MAX_GLOBAL_ATTEMPTS = 50;
+export const MAX_GLOBAL_ATTEMPTS = 3;
 /** Hard caps: the Map can never grow without bound, even under floods of
  *  spoofed XFF values (entries only get pruned when their IP returns). */
 const MAX_TRACKED_IPS = 2048;
@@ -150,49 +164,83 @@ export function clientIp(req: NextRequest): string {
   return "local";
 }
 
-/** Drops IPs whose every attempt is expired — one cheap pass over the Map. */
+/** Drops IPs with no live failures and no active lockout — one pass over the Map. */
 function sweepExpired(now: number) {
-  for (const [ip, list] of throttleState().attempts) {
-    // `every` is vacuously true on an empty list, so it already covers length 0.
-    if (list.every((t) => now - t >= WINDOW_MS)) {
-      throttleState().attempts.delete(ip);
-    }
+  const { attempts } = throttleState();
+  for (const [ip, bucket] of attempts) {
+    if (bucket.blockedUntil > now) continue;
+    if (bucket.blockedUntil !== 0) bucket.blockedUntil = 0;
+    bucket.failures = bucket.failures.filter((t) => now - t < WINDOW_MS);
+    if (bucket.failures.length === 0) attempts.delete(ip);
   }
 }
 
+/** True while a bucket is locked; clears it once the cooldown has elapsed. */
+function bucketBlocked(bucket: ThrottleBucket, now: number): boolean {
+  if (bucket.blockedUntil === 0) return false;
+  if (now < bucket.blockedUntil) return true;
+  bucket.blockedUntil = 0;
+  bucket.failures = [];
+  return false;
+}
+
 export function tooManyAttempts(ip: string): boolean {
-  const { attempts, globalAttempts } = throttleState();
+  const { attempts, global } = throttleState();
   const now = Date.now();
-  const live = globalAttempts.filter((t) => now - t < WINDOW_MS);
-  throttleState().globalAttempts = live;
-  if (live.length >= MAX_GLOBAL_ATTEMPTS) return true;
-  const list = (attempts.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
-  attempts.set(ip, list);
-  return list.length >= MAX_ATTEMPTS;
+  if (bucketBlocked(global, now)) return true;
+  const bucket = attempts.get(ip);
+  return bucket ? bucketBlocked(bucket, now) : false;
+}
+
+/** Records one failed attempt; locks the bucket when the limit is crossed. */
+function recordFailure(bucket: ThrottleBucket, now: number) {
+  if (bucket.blockedUntil !== 0) {
+    if (now < bucket.blockedUntil) return; // already locked — don't extend it
+    bucket.blockedUntil = 0;
+    bucket.failures = [];
+  }
+  bucket.failures = bucket.failures.filter((t) => now - t < WINDOW_MS);
+  bucket.failures.push(now);
+  if (bucket.failures.length >= MAX_ATTEMPTS) {
+    bucket.blockedUntil = now + LOCKOUT_MS;
+    bucket.failures = [];
+  }
 }
 
 export function recordAttempt(ip: string) {
   const state = throttleState();
   const now = Date.now();
-  state.globalAttempts = state.globalAttempts.filter((t) => now - t < WINDOW_MS);
-  state.globalAttempts.push(now);
+  recordFailure(state.global, now);
   if (state.attempts.size >= MAX_TRACKED_IPS) {
     sweepExpired(now);
     // Still at the cap after sweeping (a genuine flood of live buckets):
     // reset rather than grow — throttling degrades, memory does not.
     if (state.attempts.size >= MAX_TRACKED_IPS) state.attempts.clear();
   }
-  const list = (state.attempts.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
-  list.push(now);
-  state.attempts.set(ip, list);
+  const bucket = state.attempts.get(ip) ?? emptyBucket();
+  recordFailure(bucket, now);
+  state.attempts.set(ip, bucket);
+}
+
+/** Remaining cooldown for this caller (or the global ceiling), in ms. */
+export function retryAfterMs(ip: string): number {
+  const { attempts, global } = throttleState();
+  const now = Date.now();
+  const until = Math.max(global.blockedUntil, attempts.get(ip)?.blockedUntil ?? 0);
+  return until > now ? until - now : 0;
 }
 
 export function clearAttempts(ip: string) {
-  throttleState().attempts.delete(ip);
+  const state = throttleState();
+  state.attempts.delete(ip);
+  // A successful login ends the failure run. Leaving earlier failures behind
+  // would make the next typo the one that crosses a 3-attempt ceiling.
+  state.global = emptyBucket();
 }
 
 /** Test seam: drops all throttle state so tests do not leak into each other. */
 export function resetThrottle() {
-  throttleState().attempts.clear();
-  throttleState().globalAttempts = [];
+  const state = throttleState();
+  state.attempts.clear();
+  state.global = emptyBucket();
 }
