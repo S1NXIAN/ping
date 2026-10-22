@@ -56,7 +56,7 @@ import {
 import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { formatNextRun } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
-import { StatusDot, statusLabel, statusWord } from "./status-dot";
+import { statusLabel, statusWord } from "./status-dot";
 import { monitorStatus, averageUpResponseMs, type MonitorStatus } from "@/lib/monitor-status";
 import { StatusPill, monitorStatusTone } from "./status-pill";
 import { checksToSegments, UptimeBars } from "./uptime-bars";
@@ -235,6 +235,13 @@ export function MonitorCard({
           degraded ? "slow" : statusWord(status)
         }`}
       >
+        <StatusPill
+          tone={statusTone}
+          uppercase
+          className="absolute left-0 top-0 z-10 min-w-13 justify-center border-t-0 border-l-0"
+        >
+          {checking ? "checking…" : degraded ? "slow" : statusLabel(status)}
+        </StatusPill>
         {/* phone: stacked — full-width identity/meta rows, bars + actions share
             a bottom strip (a side column would pin the name to a ~150px sliver);
             ≥sm: incumbent two-column card, rendering unchanged */}
@@ -258,11 +265,7 @@ export function MonitorCard({
           )}
 
           <div className="flex min-w-0 flex-1 items-start gap-2">
-            <div className="mt-1.5">
-              <StatusDot status={checking ? "checking" : status} pulse={status === "up" || status === "down" || checking} />
-            </div>
-
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 pt-4 sm:pt-2">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <button
                 type="button"
@@ -276,12 +279,6 @@ export function MonitorCard({
               >
                 {monitor.name}
               </button>
-              {/* min-w-13 + center: live/down/slow are the three states a card
-                  flips between, so they share one width — the pill no longer
-                  twitches wider on "down". Longer labels still grow. */}
-              <StatusPill tone={statusTone} uppercase className="min-w-13 justify-center">
-                {checking ? "checking…" : degraded ? "slow" : statusLabel(status)}
-              </StatusPill>
               {monitor.account && (
                 <StatusPill
                   tone="teal"
@@ -315,7 +312,7 @@ export function MonitorCard({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="mt-0.5 inline-flex max-w-full items-center gap-1 text-xs text-muted-foreground hover:text-teal"
+              className="inline-flex max-w-full items-center gap-1 text-xs text-muted-foreground hover:text-teal"
             >
               <span className="min-w-0 truncate">{hostOf(monitor.url)}</span>
               <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
