@@ -65,6 +65,7 @@ upload/
 download/
 .zscripts/
 .claude/
+.opencode/
 .z-ai-config/
 skills/
 # local gateway config
