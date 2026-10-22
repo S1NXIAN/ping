@@ -41,6 +41,20 @@ test("it returns folders and monitors, pinned first then by position", async () 
   expect(second.folderName).toBe("Render Free");
 });
 
+test("folders come back alphabetically, case-insensitively", async () => {
+  await db.session.create({ data: { token: "sess" } });
+  await db.folder.create({ data: { name: "zebra" } });
+  await db.folder.create({ data: { name: "Alpha" } });
+  await db.folder.create({ data: { name: "beta" } });
+
+  const body = await (await overview()).json();
+  expect(body.folders.map((x: { name: string }) => x.name)).toEqual([
+    "Alpha",
+    "beta",
+    "zebra",
+  ]);
+});
+
 test("it carries each monitor's real stats", async () => {
   await db.session.create({ data: { token: "sess" } });
   const m = await db.monitor.create({ data: { name: "svc", url: "https://svc.com" } });

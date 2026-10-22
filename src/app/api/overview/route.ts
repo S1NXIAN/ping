@@ -30,12 +30,18 @@ export async function GET(req: NextRequest) {
 
   // No server-side summary: the client derives the stat strip and header pills
   // from these monitors, scoped to the active Folder (see lib/summary.ts).
-  const body: OverviewResponse = {
-    folders: folders.map((f) => ({
+  // Case-insensitive in JS: SQLite's default collation is binary, so orderBy
+  // would sort "alpha" after "Zebra".
+  const folderDtos = folders
+    .map((f) => ({
       id: f.id,
       name: f.name,
       createdAt: f.createdAt.toISOString(),
-    })),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
+
+  const body: OverviewResponse = {
+    folders: folderDtos,
     monitors: dtos,
   };
 
