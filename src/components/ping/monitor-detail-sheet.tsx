@@ -189,7 +189,6 @@ export function MonitorDetailSheet({
       >
         <SheetHeader className="shrink-0 border-b bg-card/40 p-4 pb-3">
           <SheetTitle className="flex flex-wrap items-center gap-2 pr-8 text-left">
-            <StatusDot status={checking ? "checking" : status} />
             <StatusPill
               tone={monitorStatusTone(status, degraded)}
               size="sm"
