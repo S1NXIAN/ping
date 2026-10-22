@@ -190,7 +190,6 @@ export function MonitorDetailSheet({
         <SheetHeader className="shrink-0 border-b bg-card/40 p-4 pb-3">
           <SheetTitle className="flex flex-wrap items-center gap-2 pr-8 text-left">
             <StatusDot status={checking ? "checking" : status} />
-            <span className="truncate">{m?.name ?? "Monitor"}</span>
             <StatusPill
               tone={monitorStatusTone(status, degraded)}
               size="sm"
@@ -198,6 +197,7 @@ export function MonitorDetailSheet({
             >
               {checking ? "checking…" : degraded ? "slow" : statusLabel(status)}
             </StatusPill>
+            <span className="truncate">{m?.name ?? "Monitor"}</span>
             {m?.account && (
               <StatusPill
                 tone="teal"
@@ -302,7 +302,7 @@ export function MonitorDetailSheet({
             <p className="mt-1.5 text-[11px] text-muted-foreground">
               {allTime
                 ? allTime.totalChecks
-                  ? `Based on ${allTime.totalChecks.toLocaleString()} recorded checks since ${formatDateTime(allTime.firstCheckAt)}. Windows with no checks show “—”.`
+                  ? `Based on ${allTime.totalChecks.toLocaleString()} recorded checks since ${formatDateTime(allTime.firstCheckAt)}.`
                   : "No checks recorded yet — uptime appears after the first real check."
                 : "Loading recorded checks…"}
             </p>
