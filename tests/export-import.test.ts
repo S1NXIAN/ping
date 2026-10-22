@@ -43,6 +43,16 @@ test("the export carries each monitor's pin state and manual position", async ()
   expect(b.position).toBe(7);
 });
 
+test("the export omits the Self-monitor", async () => {
+  await db.monitor.create({ data: { name: "operator-monitor", url: "https://a.com" } });
+  await db.monitor.create({
+    data: { name: "PING", url: "http://localhost/api/health", isSelfMonitor: true },
+  });
+
+  const { monitors } = await exportPayload();
+  expect(monitors.map((m) => m.name)).toEqual(["operator-monitor"]);
+});
+
 test("import restores the pin state and order the export recorded", async () => {
   await db.monitor.create({ data: { name: "a", url: "https://a.com", pinned: true, position: 3 } });
   await db.monitor.create({ data: { name: "b", url: "https://b.com", pinned: false, position: 7 } });

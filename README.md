@@ -82,7 +82,8 @@ only visible by looking at PING.
   minutes (in-memory, so a restart clears it).
 - **Keep-awake strategy** — an external scheduler hits `/api/cron/tick`, which
   both wakes PING and runs every due check (see below).
-- **Import/export** — your monitor configuration as JSON.
+- **Import/export** — your monitor configuration as JSON. The Self-monitor is
+  excluded: a fresh install creates its own, so restoring it would duplicate it.
 
 ### Trust model (read this before exposing PING)
 

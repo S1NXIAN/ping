@@ -9,7 +9,9 @@ export async function GET(req: NextRequest) {
 
   const [folders, monitors] = await Promise.all([
     db.folder.findMany({ orderBy: { createdAt: "asc" } }),
-    db.monitor.findMany({ orderBy: { createdAt: "asc" } }),
+    // The Self-monitor is deployment-specific: a fresh install creates its own
+    // from its own origin, so exporting it would restore it as a duplicate.
+    db.monitor.findMany({ where: { isSelfMonitor: false }, orderBy: { createdAt: "asc" } }),
   ]);
 
   const payload = {
