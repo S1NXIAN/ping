@@ -93,7 +93,7 @@ components:
     rounded: "{rounded.none}"
     padding: "8px 16px"
     height: "36px"
-  stat-card:
+  stats-strip:
     backgroundColor: "{colors.card-charcoal}"
     textColor: "{colors.ash-white}"
     rounded: "{rounded.none}"
@@ -142,14 +142,15 @@ The voice is precise and restrained. Every number is real, labeled, and aligned;
 - Depth is light, not shadow: inset 1px top highlights + radial ambient glow
 - Instrument typography: 10px uppercase tracked labels, tabular numerals, dense hierarchy
 - Precise and restrained: 1px hover lift, 0.98 press, 200ms feedback on every control
-- Hand-rolled SVG instruments (sparkline, uptime bars, response-time chart) instead of chart libraries
+- Hand-rolled SVG instruments (sparkline, uptime bars, response-time chart, stat trace) instead of chart libraries
+- The stat strip is one instrument: three metric cells over a single live response trace
 
 ## Colors
 
 A charcoal drafting-paper scale with no hue tint, one white pencil, and three semantic status inks.
 
 ### Primary
-- **Signal White** (#ffffff): The only brand accent. Primary CTAs (white fill, Soot text), focus rings, links, pinned states, key numbers on stat cards. Its rarity is the point — if white appears everywhere, nothing leads.
+- **Signal White** (#ffffff): The only brand accent. Primary CTAs (white fill, Soot text), focus rings, links, pinned states, key numbers in the stat strip. Its rarity is the point — if white appears everywhere, nothing leads.
 - **Chalk** (#e6e8ec): The soft-white working pencil — sparkline strokes, chart primary line, the `--teal` alias (`text-teal`/`bg-teal` all resolve here), and the `100%` badge fill. Used where pure white would shout.
 - **Bright Chalk** (#f1f2f4): The `--accent-foreground` ink — text on Accent Charcoal hover fills (ghost/outline controls, sidebar hover). One step brighter than Ash White so hovered text lifts without going full white.
 
@@ -177,7 +178,7 @@ A charcoal drafting-paper scale with no hue tint, one white pencil, and three se
 
 **The Data, Not Decoration Rule.** A colored fill is always an alpha wash over charcoal (6–15% tint + matching text + 25–40% border, e.g. `bg-emerald/10 text-emerald border-emerald/30`). Never solid color blocks; never colored text directly on a colored fill.
 
-**The Uptime Band Rule.** Every uptime percentage shares one band language, from one helper (`uptimeTone`): displays-as-100% (≥ 99.995%) in Beacon Emerald (up), 90–99.99% in Caution Amber (warn), below 90% in Alarm Rose (down). No data stays neutral — unknown must never read as healthy. Dashboard stat and detail sheet all speak it.
+**The Uptime Band Rule.** Every uptime percentage shares one band language, from one helper (`uptimeTone`): displays-as-100% (≥ 99.995%) in Beacon Emerald (up), 90–99.99% in Caution Amber (warn), below 90% in Alarm Rose (down). No data stays neutral — unknown must never read as healthy. The dashboard stat strip and the detail sheet all speak it.
 
 **The Honest-Empty Rule.** "No data" is drawn as a dashed outline in muted gray (`border-dashed border-muted-foreground/60`, ≥3:1 non-text contrast) — never a near-invisible fill, and never faked as up. The legend key mirrors the bar treatment exactly.
 
@@ -191,18 +192,18 @@ A charcoal drafting-paper scale with no hue tint, one white pencil, and three se
 
 ### Hierarchy
 - **Display** (700, 24px, 1.2): The wordmark and nothing else. The system deliberately has no larger display type.
-- **Headline** (700, 20px, 1.25, −0.025em): Stat-card values — the big readable numbers. Always tabular.
+- **Headline** (700, 20px, 1.25, −0.025em): Stat-strip values — the big readable numbers. Always tabular.
 - **Title** (600, 16px, 1.4): Dialog headings, section titles, monitor names.
 - **Body** (400, 14px, 1.5): Default UI text, buttons, form labels.
-- **Meta** (400, 11px, 1.4): Timestamps, sub-lines, captions under stat values.
-- **Label** (500, 10px, 0.1em, UPPERCASE): Card labels ("MONITORS", "UPTIME 24H"), pill text, table headers. The system's signature type treatment.
+- **Meta** (400, 11px, 1.4): Timestamps, sub-lines, chart captions.
+- **Label** (500, 10px, 0.1em, UPPERCASE): Card labels ("UPTIME 24H", "FAILURES 24H"), pill text, table headers. The system's signature type treatment.
 
 ### Named Rules
-**The Instrument Type Rule.** Numbers are always tabular (`tabular-nums`) so live readings don't jitter; labels are 10px uppercase with 0.1em tracking; nothing exceeds 24px. If a layout needs bigger type, it needs less content.
+**The Instrument Type Rule.** Numbers are always tabular (`tabular-nums`) so live readings don't jitter; labels are 10px uppercase with 0.1em tracking (0.04em in the three-up stat strip below `sm`); nothing exceeds 24px. If a layout needs bigger type, it needs less content.
 
 ## Layout
 
-A dense, single-page instrument panel inside a centered 72rem (`max-w-6xl`) column (88rem at `2xl`). A sticky 56px header (h-14) carries the wordmark, ⌘K search, live up/down counts, and primary actions; content scrolls under it. On `lg`+ a sticky 14rem (w-56) folder sidebar docks left with its own hairline border; below `lg` it collapses into a horizontal row of folder chips above the stats. Four stat cards sit in a 2-up mobile / 4-up desktop grid — drawn as one instrument strip with hairline dividers on phones, independent cards from `sm` up — then a search + sort toolbar, then the monitor list. A slim sticky footer (wordmark, "Live service monitoring", non-affiliation note) anchors the bottom. The four stat cards describe the active **Scope** (GLOSSARY.md): the whole Fleet on "All monitors", one Folder otherwise — never the search query. The header counts stay Fleet-wide, the always-on "is anything down anywhere?" answer; the folder dock points at where, tinting a down folder's icon rose at every width.
+A dense, single-page instrument panel inside a centered 72rem (`max-w-6xl`) column (88rem at `2xl`). A sticky 56px header (h-14) carries the wordmark, ⌘K search, live up/down counts, and primary actions; content scrolls under it. On `lg`+ a sticky 14rem (w-56) folder sidebar docks left with its own hairline border; below `lg` it collapses into a horizontal row of folder chips above the stats. The Scope summary is one instrument strip at every width: three hairline-divided cells — Uptime 24h, Checks 24h, Failures 24h — over a shared response-time trace, then a search + sort toolbar, then the monitor list. A slim sticky footer (wordmark, "Live service monitoring", non-affiliation note) anchors the bottom. The stat strip describes the active **Scope** (GLOSSARY.md): the whole Fleet on "All monitors", one Folder otherwise — never the search query. Each cell is label + value only; the trace carries the living context and is never a second, conflicting summary. The header counts stay Fleet-wide, the always-on "is anything down anywhere?" answer; the folder dock points at where, tinting a down folder's icon rose at every width.
 
 Adaptation rules (2026-09-16 adapt pass):
 - **Fleet health is never width-gated.** Below `md` the full count pills don't fit, so the header shows one compact chip — `1↑ 0↓` (plus `N~` when slow exists), tabular, numbers tinted only when the count is real (the idle rule). "Is anything down?" must be answerable from the header at every width.
@@ -250,8 +251,24 @@ Sharp corners are the system's signature: every radius token is forced to 0px (`
 - **Shadow Strategy:** 1px inset top highlight only (see Elevation).
 - **Border:** 1px Hairline; hover raises border to Signal White at 25% and lifts the card 1px.
 - **Drag state:** while a card is dragged it lifts on `translate3d` at 1.015 scale with `border-primary/60` and the brighter top highlight (see Elevation); it is never dimmed or ghosted.
-- **Internal Padding:** 14px vertical × 16px horizontal (stat cards); 16px for larger containers.
+- **Internal Padding:** 14px top × 16px sides × 32px bottom for stat cells (the lower band holds the trace; 12 × 10 × 28 on phones); 16px for larger containers.
 - **Outage row (down cards):** while a monitor is down, the card answers "how long, and what now?" in one 11px rose line: the real down duration (from the ongoing incident's first failed check — tabular, never estimated; hidden when no incident is known rather than guessed), then `View incident` (opens the incidents sheet) as a rose text action with a ≥44px hit area.
+
+### Monitor Card
+- **State is the edge:** the status pill is pinned flush to the card's top-left corner, with its top and left borders removed. The card carries no status dot — the pill is the state read in the list.
+- **Identity line:** name, then the account pill, then the keyword pill (the quoted term; `no` prefixes an excludes check). The folder is not repeated on the card — the dock or sidebar already names the Scope.
+- **Metadata:** one 11px row — last updated, cadence, average response time. Per-monitor 24h uptime is not repeated on the card; the stat strip owns the scope aggregate.
+- **Bottom edge:** lower padding is tighter than the top (12/8px on phones, 20/12px from `sm`) so the metadata row sits close to the card's bottom rule.
+
+### Detail Sheet
+- **Header:** status pill first, then the monitor name, then the account pill. No status dot and no schedule/folder/last-updated sub-line — the host link is the only description line; the body owns history, timing, and stats.
+
+### Stat Strip
+- **Shape:** one Card Charcoal panel with a 1px Hairline border, 0px radius, and the shared inset top highlight — never three detached cards. Three equal columns are split by 1px hairlines at every width.
+- **Cells:** label + value only. A 10px uppercase label sits above a 20px/700 tabular value; tone follows the metric — Uptime's band ink, Checks in Chalk, Failures rose when any monitor has failed and emerald at zero. Icons are 14px from `sm` up; phones drop them and tighten label tracking so "FAILURES 24H" stays on one line.
+- **Trace:** a hand-rolled SVG spanning all three cells, fed by the same recent checks the strip already holds (within 24h of the newest sample, capped at 160 points). Chalk 1.5px at 55%, log-scaled response time, three faint quartile guides, short rose ticks for failed checks at the baseline, and small marks for isolated samples. A pause beyond the adaptive threshold (15–60 minutes, from the fleet's own rhythm) breaks the line rather than inventing a slope.
+- **Motion:** the trace draws in once (1.1s, segments staggered up to 420ms), a 1px Signal White scanline at 12% sweeps the panel every 16s, and values snap in on change (320ms opacity/translate/blur). Values never count through intermediate readings — every frame must show a measured number. Reduced motion hides the scanline and collapses the entrances.
+- **Accessibility:** the trace is `role="img"` with a spoken summary of recent-check count, failure count, and latest response; the three values remain plain text, and the trace's own facts are repeated in that label.
 
 ### Inputs / Fields
 - **Style:** Input Charcoal at 30% fill, 1px Input Charcoal border, sharp corners, 36px tall, Ash White 14px text.
@@ -260,29 +277,32 @@ Sharp corners are the system's signature: every radius token is forced to 0px (`
 
 ### Navigation
 - **Header:** sticky 56px bar, Soot at 85% over the grid with backdrop blur, hairline bottom edge; wordmark left ("PING." + tagline in Instrument Gray), ⌘K search button, live up/down count pills (compact `1↑ 0↓` chip below `md` — see Adaptation rules), ghost icon actions, white primary "New monitor" right.
-- **Folder sidebar** (lg+): 14rem sticky dock on Sidebar Charcoal, Sidebar Hairline right border, rows with Accent Charcoal hover, 10px uppercase "MONITORS" section label; collapses to horizontal chips below `lg`.
+- **Folder sidebar** (lg+): 14rem sticky dock on Sidebar Charcoal, Sidebar Hairline right border, rows with Accent Charcoal hover; collapses to horizontal chips below `lg`.
 - **Footer:** slim, sticky when content is short (see Layout for its contents).
 
 ### Status Dot (signature)
 - **Form:** 10px circle — the only curved element in the system (`{status-dot}`).
 - **States:** Beacon Emerald (up) / Alarm Rose (down) / Caution Amber (checking) / flat grays (#71717a paused, #a1a1aa pending, no ripple).
 - **Behavior:** live states emit a sonar ripple — `box-shadow` ring expanding 0→6px in 2.4s `cubic-bezier(0.4, 0, 0.6, 1)`, infinite, tinted per state at 55% alpha.
+- **Placement:** the dot is not a card or sheet-header ornament. Those lead with the status pill; the dot stays where it marks a row or compact live readout (command palette, Render status card, check-history rows).
 
 ### SVG Instruments (signature)
-Hand-rolled, no chart library: **sparkline** (Chalk 1.6px stroke + soft white area fill, emerald latest-point dot, gaps where data is missing); **uptime bars** (12 sharp segments — emerald full, rose empty, amber partial, dashed-outline gray for "no data", never faked); **response-time chart** (real time axis, dashed hairline gridlines, rose ticks for failed checks, amber dashed slow-threshold line, hover tooltip). Captions state exactly what was measured.
+Hand-rolled, no chart library: **sparkline** (Chalk 1.6px stroke + soft white area fill, emerald latest-point dot, gaps where data is missing); **uptime bars** (12 sharp segments — emerald full, rose empty, amber partial, dashed-outline gray for "no data", never faked); **response-time chart** (real time axis, dashed hairline gridlines, rose ticks for failed checks, amber dashed slow-threshold line, hover tooltip); **stat trace** (recent checks, log response shape, adaptive gaps, rose failure ticks, isolated-sample marks). Charts with axes caption exactly what was measured; the stat trace carries the same truth in its accessible label.
 
 ## Do's and Don'ts
 
 ### Do:
 - **Do** keep every surface one of the charcoal steps and separate them with 1px Hairline borders (#25272d).
 - **Do** use Signal White for exactly one primary action per view; everything else gets outline or ghost treatment.
-- **Do** render all numerals with `tabular-nums` and label all metrics as 10px uppercase + 0.1em tracking.
+- **Do** render all numerals with `tabular-nums` and label all metrics as 10px uppercase + 0.1em tracking (the stat strip tightens to 0.04em on phones to keep three labels on one line).
 - **Do** show alpha washes over charcoal for status fills (6–15% bg + matching text + 25–40% border).
+- **Do** treat the three stats as one instrument — hairline-divided label/value cells over a single real trace — never three detached cards.
 - **Do** give every interactive element the 3px white focus ring, 1px hover lift, and 0.98 press — feedback is part of the craft.
 
 ### Don't:
 - **Don't** round anything except the status dot (no `rounded-md/lg/xl`, no pill-shaped buttons) — the theme forces every radius token to 0, so don't reintroduce a non-zero one.
 - **Don't** introduce a second brand hue, a gradient, or a drop shadow — depth is light, color is data.
 - **Don't** stack rounded cards inside rounded cards or blur backgrounds (no glassmorphism) — the generic-SaaS look is the anti-reference.
-- **Don't** go playful: no bouncy/spring animations, no emoji decoration, no casual illustration — motion is limited to the ripple, breathe, fade-up (0.35s) and 200ms state transitions.
+- **Don't** go playful: no bouncy/spring animations, no emoji decoration, no casual illustration — motion is limited to the ripple, breathe, fade-up (0.35s), the stat trace's draw-in and scanline, and 200–320ms state transitions.
+- **Don't** animate stat values through intermediate numbers; every displayed frame must be a measured reading.
 - **Don't** fake data in any visual: gaps stay gaps (hatched/dashed bars, broken lines), unmeasured windows show "—".
