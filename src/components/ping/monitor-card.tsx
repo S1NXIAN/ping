@@ -305,7 +305,7 @@ export function MonitorCard({
                   }
                 >
                   <span className="min-w-0 truncate">
-                    {monitor.keywordMode === "excludes" ? "no" : "has"} “{monitor.keyword}”
+                    {monitor.keywordMode === "excludes" ? "no " : ""}“{monitor.keyword}”
                   </span>
                 </StatusPill>
               )}
