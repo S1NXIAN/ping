@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * The compact label/value tile used inside sheets and settings sections
- * (the smaller sibling of StatCard, which carries an icon and a caption).
+ * (the smaller sibling of StatCard, which carries an icon).
  * One source for the tile chrome; `valueClassName` carries the tone and
  * the size step a denser row needs.
  */
