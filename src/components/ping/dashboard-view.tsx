@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
-  Activity,
   AlertTriangle,
   ArrowDownAZ,
   ArrowDownZA,
@@ -718,17 +717,11 @@ export function DashboardView({
             </button>
           </div>
 
-          {/* stats strip — one instrument on phones: hairline-divided quadrants
-              (structure is drawn with 1px hairlines, not four floating fat
-              cards); ≥sm restores the incumbent four-card row. One generous
+          {/* stats strip — one instrument on phones: hairline-divided cells
+              (structure is drawn with 1px hairlines, not three floating fat
+              cards); ≥sm restores the incumbent three-card row. One generous
               break below separates overview from the working group. */}
-          <div className="mb-6 grid grid-cols-2 gap-px border bg-border sm:grid-cols-4 sm:gap-2 sm:border-0 sm:bg-transparent">
-            <StatCard
-              label="Monitors"
-              value={summary ? `${summary.up}/${summary.monitors}` : "—"}
-              icon={Activity}
-              tone={summary && summary.down > 0 ? "down" : summary && summary.degraded > 0 ? "warn" : "up"}
-            />
+          <div className="mb-6 grid grid-cols-3 gap-px border bg-border sm:gap-2 sm:border-0 sm:bg-transparent">
             <StatCard
               label="Uptime 24h"
               value={formatUptime(summary?.avgUptime24h ?? null)}
