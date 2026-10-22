@@ -6,7 +6,6 @@ import {
   ArrowDown,
   ArrowUp,
   ExternalLink,
-  Folder,
   FolderInput,
   GripVertical,
   Loader2,
@@ -307,11 +306,6 @@ export function MonitorCard({
                   <span className="min-w-0 truncate">
                     {monitor.keywordMode === "excludes" ? "no " : ""}“{monitor.keyword}”
                   </span>
-                </StatusPill>
-              )}
-              {monitor.folderName && (
-                <StatusPill tone="neutral" icon={Folder}>
-                  {monitor.folderName}
                 </StatusPill>
               )}
             </div>
