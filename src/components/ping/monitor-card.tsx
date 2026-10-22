@@ -49,7 +49,6 @@ import {
   formatDuration,
   formatInterval,
   formatMs,
-  formatUptime,
   hostOf,
   timeAgo,
 } from "@/lib/ping-client";
@@ -349,11 +348,6 @@ export function MonitorCard({
                 >
                   <Activity className="size-3" aria-hidden="true" />
                   avg {formatMs(Math.round(avgUpMs))}
-                </span>
-              )}
-              {monitor.stats.uptime24h != null && (
-                <span>
-                  24h <span className="tabular-nums text-foreground/80">{formatUptime(monitor.stats.uptime24h)}</span>
                 </span>
               )}
             </div>
