@@ -5,8 +5,6 @@ import {
   Activity,
   BarChart3,
   ExternalLink,
-  Folder,
-  History,
   Loader2,
   Pause,
   Play,
@@ -39,7 +37,6 @@ import {
   ApiError,
   formatClock,
   formatDateTime,
-  formatInterval,
   formatMs,
   formatUptime,
   hostOf,
@@ -48,7 +45,6 @@ import {
   uptimeToneClass,
 } from "@/lib/ping-client";
 import type { MonitorDetailResponse, MonitorDTO } from "@/lib/ping-types";
-import { formatTimesForDisplay } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { HistoryChart } from "./history-chart";
 import { StatusDot, statusLabel, statusWord } from "./status-dot";
@@ -202,6 +198,16 @@ export function MonitorDetailSheet({
             >
               {checking ? "checking…" : degraded ? "slow" : statusLabel(status)}
             </StatusPill>
+            {m?.account && (
+              <StatusPill
+                tone="teal"
+                size="sm"
+                icon={UserRound}
+                title={`Account used: ${m.account}`}
+              >
+                {m.account}
+              </StatusPill>
+            )}
           </SheetTitle>
           <SheetDescription className="flex flex-wrap items-center gap-x-3 gap-y-1 text-left">
             <a
@@ -213,24 +219,6 @@ export function MonitorDetailSheet({
               {m ? hostOf(m.url) : "—"}
               <ExternalLink className="size-3" aria-hidden="true" />
             </a>
-            <span className="inline-flex items-center gap-1">
-              <History className="size-3" aria-hidden="true" />
-              {m?.scheduleMode === "times" && m.scheduleTimes.length > 0
-                ? `at ${formatTimesForDisplay(m.scheduleTimes, m.timezone ?? "UTC")}`
-                : `every ${m ? formatInterval(m.intervalSec) : "—"}`}{" "}
-              · {m?.method ?? "GET"}
-            </span>
-            {m?.folderName && (
-              <span className="inline-flex items-center gap-1">
-                <Folder className="size-3" aria-hidden="true" /> {m.folderName}
-              </span>
-            )}
-            {m?.account && (
-              <StatusPill tone="teal" size="sm" icon={UserRound}>
-                {m.account}
-              </StatusPill>
-            )}
-            <span>Last updated {timeAgo(m?.lastCheckAt)}</span>
           </SheetDescription>
 
           <div className="flex flex-wrap gap-2 pt-1">
