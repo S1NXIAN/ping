@@ -9,14 +9,12 @@ import {
   Folder,
   Gauge,
   LayoutGrid,
-  ListChecks,
   LogOut,
   MoveVertical,
   Plus,
   Search,
   Settings,
   X,
-  XCircle,
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -51,10 +49,8 @@ import { useCardReorder } from "@/hooks/use-card-reorder";
 import {
   api,
   fetchIncidents,
-  formatUptime,
   newestIncidentStart,
   unseenIncidentCount,
-  uptimeTone,
 } from "@/lib/ping-client";
 import { pinnedSetAfterMove } from "@/lib/reorder";
 import { summarize } from "@/lib/summary";
@@ -67,7 +63,7 @@ import { MonitorDetailSheet } from "./monitor-detail-sheet";
 import { AddMonitorDialog } from "./add-monitor-dialog";
 import { IncidentsSheet } from "./incidents-sheet";
 import { TextPromptDialog } from "./text-prompt-dialog";
-import { StatCard } from "./stat-card";
+import { StatsStrip } from "./stats-strip";
 import { CommandPalette } from "./command-palette";
 import { StatusPill, type PillTone } from "./status-pill";
 import { InlineAlert } from "./inline-alert";
@@ -717,33 +713,9 @@ export function DashboardView({
             </button>
           </div>
 
-          {/* stats strip — one instrument on phones: hairline-divided cells
-              (structure is drawn with 1px hairlines, not three floating fat
-              cards); ≥sm restores the incumbent three-card row. One generous
-              break below separates overview from the working group. */}
-          <div className="mb-6 grid grid-cols-3 gap-px border bg-border sm:gap-2 sm:border-0 sm:bg-transparent">
-            <StatCard
-              label="Uptime 24h"
-              value={formatUptime(summary?.avgUptime24h ?? null)}
-              icon={Gauge}
-              // Shared band ink (uptimeTone): displays-as-100% -> emerald,
-              // 90–99.99% amber, <90% rose. Before, a perfect fleet shared
-              // the neutral ink of "no data" — the up state was invisible.
-              tone={uptimeTone(summary?.avgUptime24h) ?? "default"}
-            />
-            <StatCard
-              label="Checks 24h"
-              value={summary ? summary.checks24h.toLocaleString() : "—"}
-              icon={ListChecks}
-              tone="teal"
-            />
-            <StatCard
-              label="Failures 24h"
-              value={summary ? summary.monitorsWithFailures24h : "—"}
-              icon={XCircle}
-              tone={summary && summary.monitorsWithFailures24h > 0 ? "down" : "up"}
-            />
-          </div>
+          {/* Scope summary — one strip, one live trace. The generous break
+              below separates overview from the working group. */}
+          <StatsStrip summary={summary} monitors={scopedMonitors} />
 
           {/* working group: toolbar + list — one tight unit (10px internal rhythm) */}
           <div className="space-y-2.5">

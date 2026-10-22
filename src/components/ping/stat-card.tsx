@@ -1,6 +1,10 @@
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+/**
+ * One cell of the dashboard stat strip. The strip owns the panel chrome and
+ * the live trace; the cell contributes only its label, value, and tone.
+ */
 export function StatCard({
   label,
   value,
@@ -21,26 +25,22 @@ export function StatCard({
     warn: "text-warn",
     teal: "text-teal",
   }[tone];
+  const valueKey =
+    typeof value === "string" || typeof value === "number" ? String(value) : "value";
 
   return (
-    <div
-      className={cn(
-        // phone: quadrant cell of the single stats instrument — tight on-scale
-        // padding, no own border (the strip's hairlines draw the structure);
-        // ≥sm: incumbent independent card with the gentle hover lift
-        "rounded-none border-0 bg-card px-3 py-2.5 transition-all duration-200",
-        // subtle 1px top inner highlight — reads as gentle "lift" on dark
-        "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.045)]",
-        "hover:translate-y-0 hover:border-primary/25 hover:bg-card/70",
-        "sm:rounded-lg sm:border sm:px-4 sm:py-3.5 sm:hover:-translate-y-px",
-        className,
-      )}
-    >
-      <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/85">
-        {Icon && <Icon className="size-3.5 shrink-0" aria-hidden="true" />}
-        {label}
+    <div className={cn("relative min-w-0 px-2.5 pb-7 pt-3 sm:px-4 sm:pb-8 sm:pt-3.5", className)}>
+      <div className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-[0.04em] text-muted-foreground/85 sm:gap-1.5 sm:tracking-widest">
+        {Icon && <Icon className="hidden size-3.5 shrink-0 sm:block" aria-hidden="true" />}
+        <span className="whitespace-nowrap">{label}</span>
       </div>
-      <div className={cn("mt-2 text-lg font-bold tabular-nums leading-tight tracking-tight sm:text-xl", toneClass)}>
+      <div
+        key={valueKey}
+        className={cn(
+          "ping-value-in mt-1.5 text-xl font-bold tabular-nums leading-tight tracking-tight sm:mt-2",
+          toneClass,
+        )}
+      >
         {value}
       </div>
     </div>

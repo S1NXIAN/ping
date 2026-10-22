@@ -229,6 +229,49 @@ body::before {
   animation: ping-fade-up 0.35s ease-out both;
 }
 
+/* Stat strip: one-shot trace draw-in, value refresh, ambient scanline */
+@keyframes ping-trace-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.ping-trace-draw {
+  stroke-dasharray: 1;
+  animation: ping-trace-draw 1.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes ping-value-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+    filter: blur(1.5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+.ping-value-in {
+  animation: ping-value-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes ping-scan {
+  from {
+    transform: translateX(-1px);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+.ping-scan {
+  animation: ping-scan 16s linear infinite;
+  will-change: transform;
+}
+
 /* Subtle page-level ambient glow — faint white light, Render-style */
 .ping-ambient::before {
   content: "";
@@ -257,6 +300,9 @@ nextjs-portal {
   .ping-dot-ripple,
   .ping-breathe {
     animation: none;
+  }
+  .ping-scan {
+    display: none;
   }
   *,
   *::before,
