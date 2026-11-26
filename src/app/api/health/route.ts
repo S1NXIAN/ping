@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 /**
  * Public, dependency-free health endpoint. Designed for external
- * keep-alive pingers (cron-job.org, UptimeRobot, GitHub Actions, …):
+ * keep-alive pingers (cron-job.org, UptimeRobot, …):
  * cheap, never touches the DB, and counts as inbound traffic so idle
  * services stay awake on hosts like Render's free tier.
  */

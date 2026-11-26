@@ -149,34 +149,18 @@ with build `bun install && bunx prisma generate && bun run build` and start
      each nudge; checks then run at the tick cadence. Far fewer free hours.
 
    Each tick runs **every monitor whose interval has elapsed** — one external
-   scheduler drives everything. GitHub's own scheduler is best-effort and can
-   be delayed by hours; use a dedicated cron service as the primary tick and
-   keep the GitHub workflow as a backup.
+   scheduler drives everything.
 3. Scheduler options:
-   - **cron-job.org / UptimeRobot free tier (primary)** — hit the tick URL on
+   - **cron-job.org / UptimeRobot free tier** — hit the tick URL on
      a schedule with `CRON_SECRET` as the token (query `?token=` or header
      `x-cron-token`). Prefer the header so the secret stays out of logs.
    - **Plain cron** on any box — cron's `sh` has no shell environment, so put
      the literal secret in the crontab (not `$CRON_SECRET`):
      `*/10 * * * * curl -fsS -H "x-cron-token: <secret>" https://…/api/cron/tick`.
-   - **GitHub Actions (backup)** — this repo ships
-     [`.github/workflows/keep-alive.yml`](.github/workflows/keep-alive.yml);
-     set its `PING_URL` and `PING_TOKEN` repository secrets. See below.
 
 The tick endpoint returns a JSON summary (`{"ran":3,"up":3,"down":0,…}`), and
 `/api/health` is a dependency-free alternative that only wakes the service
 without triggering checks.
-
-### GitHub Actions keep-alive workflow
-
-[`.github/workflows/keep-alive.yml`](.github/workflows/keep-alive.yml) is the
-source of truth — read it there. To use it, create two repository secrets:
-`PING_URL` (your PING origin, no trailing slash, no `/api` path) and
-`PING_TOKEN` (the `CRON_SECRET` value Render generated — Dashboard → your
-service → Environment). Free on public repositories. GitHub's scheduler is
-best-effort — this repo's keep-alive has run as rarely as every few hours — so
-treat it as a backup, not the primary tick. It fails loudly when `PING_URL` or
-`PING_TOKEN` is missing instead of reporting a green no-op.
 
 ## Architecture (small on purpose)
 

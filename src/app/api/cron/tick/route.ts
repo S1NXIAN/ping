@@ -3,8 +3,8 @@ import { timingSafeEqual } from "node:crypto";
 import { runDueChecks, runtimeState } from "@/lib/checker";
 
 /**
- * External trigger endpoint for schedulers (GitHub Actions, cron-job.org,
- * UptimeRobot, …). Each hit runs every monitor whose interval has elapsed —
+ * External trigger endpoint for schedulers (cron-job.org, UptimeRobot, …).
+ * Each hit runs every monitor whose interval has elapsed —
  * so pinging PING both wakes it up and performs the real checks.
  *
  * Optionally set the CRON_SECRET env var to require ?token=<secret>.

@@ -23,7 +23,7 @@ Honesty of data as the core mechanism, purpose-built for cold-booting free-tier 
 ## Operating Context
 
 - Self-hosted single instance (currently a sandbox dev server; deployable to Render, Fly, a Raspberry Pi, or any always-on host per README).
-- Free-tier targets sleep after ~15 min of inactivity and cold-boot in ~30–60 s; a sleeping service cannot wake itself, so an external scheduler (GitHub Actions, cron-job.org, UptimeRobot, plain cron) hits `GET /api/cron/tick` every 5–10 min to wake PING and run all due checks.
+- Free-tier targets sleep after ~15 min of inactivity and cold-boot in ~30–60 s; a sleeping service cannot wake itself, so an external scheduler (cron-job.org, UptimeRobot, plain cron) hits `GET /api/cron/tick` every 5–10 min to wake PING and run all due checks.
 - A **Self-monitor** checks PING's own `/api/health` every 3 minutes by default, so the operator can see PING's own uptime and its own traffic helps keep the instance awake.
 - The operator tags monitors with the "account used" (which account/org runs each service) and groups them into folders.
 - SQLite database on local disk; history pruned by a configurable retention policy (default 30 days, capped 1 000 checks/monitor).
@@ -37,7 +37,7 @@ Capabilities (confirmed, shipping):
 - Real checks: 15 s timeout, 2xx–3xx = up, exact error text on failure; keyword checks (body must contain / must not contain, case-insensitive, first 256 KB, can't be combined with HEAD — the pairing is rejected at create, edit and import); latency "slow" state (50–30 000 ms threshold, judged from the **average** of the monitor's recent up Checks).
 - Self-monitor: created by default, checks PING's own health endpoint every 3 minutes; an ordinary monitor otherwise (visible, editable, deletable).
 - Incidents: derived from real check history (30-day window), with admin postmortem notes; ongoing incidents are pinned to the top and exempt from the list cap. The incidents list and badge, like the dashboard's stat strip, cover the active Scope (see `GLOSSARY.md`); the header counts stay fleet-wide. The incidents badge is a nudge, not a tally: it counts every ongoing incident plus every closed one newer than the newest start the operator has opened the incidents sheet over (a per-device watermark, like the sort memory), so viewed history clears and an ongoing outage keeps asking until it resolves.
-- Import/export of configuration as JSON; Render platform status card; keep-alive workflow YAML in the README.
+- Import/export of configuration as JSON; Render platform status card; keep-alive guidance in the README.
 - Auth: a single scrypt-hashed password and one dashboard Session. The login is remembered for an admin-configurable window counted from the last password entry: inside it a fresh visit skips the password, after it the next visit asks again. An open tab is never interrupted — the window is a re-prompt convenience, not a revocation; the Session ends only on logout or a password change.
 
 Constraints (must be preserved by future work):

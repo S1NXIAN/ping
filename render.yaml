@@ -3,8 +3,7 @@
 # What "free" means here (honest notes):
 # - The instance spins down after ~15 min without traffic. Once booted, PING's
 #   Self-monitor keeps it awake; a spun-down instance needs an external tick.
-#   Use a dedicated scheduler (cron-job.org / UptimeRobot) as the primary and
-#   the GitHub workflow as a backup (see README).
+#   Use a dedicated scheduler (cron-job.org / UptimeRobot — see README).
 # - No persistent disk on free: the SQLite file lives on the instance's
 #   ephemeral filesystem and RESETS on every deploy, restart, and spin-down.
 #   buildFilter below keeps docs/tests/CI-only commits from deploying; a
@@ -44,7 +43,6 @@ services:
         value: 1.4.2
       # Require a token on /api/cron/tick so a stranger who finds the URL
       # cannot make PING fetch every monitor (including LAN/localhost targets).
-      # Render generates the value; copy it into the keep-alive workflow's
-      # PING_TOKEN repository secret (see README).
+      # Render generates the value; give it to the external scheduler (see README).
       - key: CRON_SECRET
         generateValue: true
