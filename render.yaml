@@ -1,12 +1,14 @@
 # Deploy PING on Render — free tier.
 #
 # What "free" means here (honest notes):
-# - The instance spins down after ~15 min without traffic. PING pairs with the
-#   keep-alive GitHub workflow in this repo (.github/workflows/keep-alive.yml)
-#   to stay awake. Without it, checks pause while the instance sleeps.
+# - The instance spins down after ~15 min without traffic. Once booted, PING's
+#   Self-monitor keeps it awake; a spun-down instance needs an external tick.
+#   Use a dedicated scheduler (cron-job.org / UptimeRobot) as the primary and
+#   the GitHub workflow as a backup (see README).
 # - No persistent disk on free: the SQLite file lives on the instance's
-#   ephemeral filesystem and RESETS on every deploy and every spin-down.
-#   Back up via Settings → "Export monitors".
+#   ephemeral filesystem and RESETS on every deploy, restart, and spin-down.
+#   buildFilter below keeps docs/tests/CI-only commits from deploying; a
+#   runtime change still resets the DB. Back up via Settings → "Export monitors".
 # - Free instance hours are pooled per workspace (~750/month).
 #
 # Render Blueprint docs: https://render.com/docs/blueprints
@@ -18,6 +20,15 @@ services:
     region: singapore
     branch: main
     autoDeploy: true
+    # Docs, tests, and CI changes don't affect the running app. Without this
+    # filter any push to main redeploys the service and wipes the SQLite file.
+    buildFilter:
+      ignoredPaths:
+        - "*.md"
+        - "**/*.md"
+        - docs/**
+        - .github/**
+        - tests/**
     buildCommand: bun install && bunx prisma generate && bun run build
     # /tmp = only writable path on free (no disk). Ephemeral: resets on deploy/spin-down.
     startCommand: bunx prisma db push --accept-data-loss && bun .next/standalone/server.js

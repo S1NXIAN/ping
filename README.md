@@ -32,9 +32,10 @@ only visible by looking at PING.
   search box.
 - **Self-monitor** — on first setup (and on boot) PING creates a monitor that
   checks its own `/api/health` endpoint every 3 minutes, so you can see whether
-  PING itself is up — and its own inbound traffic helps keep the instance awake.
-  It is an ordinary monitor otherwise: visible in the list, editable, and
-  deletable like any other.
+  PING itself is up — and, once booted, its own inbound traffic keeps the
+  instance from idling down. It cannot wake a spun-down instance; that needs an
+  external tick. It is an ordinary monitor otherwise: visible in the list,
+  editable, and deletable like any other.
 - **Keyword checks** — beyond the status code: require (or forbid) a word in
   the response body, so a 200 from a broken page still counts as down. Set in
   the monitor form (“Keyword check”: body must contain / must not contain,
@@ -121,7 +122,11 @@ with build `bun install && bunx prisma generate && bun run build` and start
 
 - **The free plan has no persistent disks.** The blueprint runs on the free
   plan, so the SQLite database lives on the instance's ephemeral filesystem:
-  it resets on every deploy and every spin-down.
+  it resets on every deploy, restart, and spin-down. The blueprint's
+  `buildFilter` keeps docs, tests, and CI-only commits from triggering a
+  deploy; a runtime change still does. Export the monitors before a runtime
+  push and import them after the deploy. To keep the database across deploys,
+  host PING where it can persist (paid disk, VPS, Pi).
 - **Free services spin down after 15 min of inactivity.** A sleeping service
   cannot wake itself, so PING cannot keep itself alive from inside.
 - **~750 free instance hours per workspace per month.** A 31-day month is 744
@@ -144,16 +149,19 @@ with build `bun install && bunx prisma generate && bun run build` and start
      each nudge; checks then run at the tick cadence. Far fewer free hours.
 
    Each tick runs **every monitor whose interval has elapsed** — one external
-   scheduler drives everything.
+   scheduler drives everything. GitHub's own scheduler is best-effort and can
+   be delayed by hours; use a dedicated cron service as the primary tick and
+   keep the GitHub workflow as a backup.
 3. Scheduler options:
-   - **GitHub Actions** — this repo ships
-     [`.github/workflows/keep-alive.yml`](.github/workflows/keep-alive.yml);
-     set its `PING_URL` and `PING_TOKEN` repository secrets. See below.
-   - **cron-job.org / UptimeRobot free tier** — hit the tick URL on a schedule
-     with `CRON_SECRET` as the token (query `?token=` or header `x-cron-token`).
+   - **cron-job.org / UptimeRobot free tier (primary)** — hit the tick URL on
+     a schedule with `CRON_SECRET` as the token (query `?token=` or header
+     `x-cron-token`). Prefer the header so the secret stays out of logs.
    - **Plain cron** on any box — cron's `sh` has no shell environment, so put
      the literal secret in the crontab (not `$CRON_SECRET`):
      `*/10 * * * * curl -fsS -H "x-cron-token: <secret>" https://…/api/cron/tick`.
+   - **GitHub Actions (backup)** — this repo ships
+     [`.github/workflows/keep-alive.yml`](.github/workflows/keep-alive.yml);
+     set its `PING_URL` and `PING_TOKEN` repository secrets. See below.
 
 The tick endpoint returns a JSON summary (`{"ran":3,"up":3,"down":0,…}`), and
 `/api/health` is a dependency-free alternative that only wakes the service
@@ -165,9 +173,10 @@ without triggering checks.
 source of truth — read it there. To use it, create two repository secrets:
 `PING_URL` (your PING origin, no trailing slash, no `/api` path) and
 `PING_TOKEN` (the `CRON_SECRET` value Render generated — Dashboard → your
-service → Environment). Free on public repositories; GitHub's cron can drift a
-few minutes, which is fine here since each tick only runs checks that are
-actually due.
+service → Environment). Free on public repositories. GitHub's scheduler is
+best-effort — this repo's keep-alive has run as rarely as every few hours — so
+treat it as a backup, not the primary tick. It fails loudly when `PING_URL` or
+`PING_TOKEN` is missing instead of reporting a green no-op.
 
 ## Architecture (small on purpose)
 
