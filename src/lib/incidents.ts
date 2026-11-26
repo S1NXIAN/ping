@@ -7,7 +7,6 @@
 import { db } from "./db";
 import { Prisma } from "@prisma/client";
 import { MAX_MONITORS } from "./checker";
-import { nominalPeriodSec, parseTimes } from "./schedule";
 import type { AdminIncidentDTO } from "./ping-types";
 
 const INCIDENT_WINDOW_DAYS = 30;
@@ -82,8 +81,6 @@ export async function deriveIncidents(
     id: string;
     name: string;
     intervalSec: number;
-    scheduleMode?: string;
-    scheduleTimes?: string | null;
   }[],
 ): Promise<DerivedIncident[]> {
   if (monitors.length === 0) return [];
@@ -118,16 +115,8 @@ export async function deriveIncidents(
   const streaks: Streak[] = [];
   let nextId = 0;
   for (const monitor of monitors) {
-    // The gap that means "PING was asleep" scales to the monitor's real
-    // cadence. A times-of-day monitor has no fixed interval, so its nominal
-    // period is derived from its clock times (1:00 PM + 3:00 AM -> a real
-    // 14h overnight gap). Using a stored interval here would split every
-    // incident at that gap.
-    const nominalSec =
-      monitor.scheduleMode === "times"
-        ? nominalPeriodSec(parseTimes(monitor.scheduleTimes))
-        : monitor.intervalSec;
-    const gapMs = nominalSec * 3 * 1000;
+    // The gap that means "PING was asleep" scales to the monitor's interval.
+    const gapMs = monitor.intervalSec * 3 * 1000;
 
     const downs = downsByMonitor.get(monitor.id) ?? [];
     if (downs.length === 0) continue;

@@ -71,31 +71,10 @@ not a revocation.
 _Avoid_: token, cookie, unlock
 
 **Interval schedule**:
-A monitor checks every N seconds, N between 1 minute and 24 hours. Set as a
-preset or as a custom `H`/`M` value.
+A monitor checks every N seconds, N between 3 and 15 minutes. Set as a preset
+or as a custom `M` value. The 15-minute ceiling is the free tier's idle
+spin-down, so every configured cadence keeps its service awake.
 _Avoid_: recurring, periodic
-
-**Times-of-day schedule**:
-A monitor checks at fixed clock times (e.g. 1:00 PM, 3:00 AM) every day,
-interpreted in the browser's timezone (stored per monitor, refreshed on edit).
-_Avoid_: scheduled, cron, time-based
-
-**Scheduled instant**:
-The moment a times-of-day schedule says a check should run, as an absolute
-point in time. Derived from the clock times and the monitor's stored timezone.
-_Avoid_: slot, due time
-
-**Bounded catch-up**:
-When PING was asleep at a scheduled instant, it runs that check on waking —
-but only the most recent one. A wake after several missed instants runs one
-check, never a backlog.
-_Avoid_: backfill, retry
-
-**Nominal period**:
-The period a times-of-day schedule is treated as having, derived from its
-largest gap between consecutive times (1:00 PM + 3:00 AM → 14 hours). Used
-only to judge whether a gap in check history means PING was asleep.
-_Avoid_: interval (for a times-of-day monitor)
 
 **Incident**:
 A continuous stretch of failed Checks, derived from check history and never

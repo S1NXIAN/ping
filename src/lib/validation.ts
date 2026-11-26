@@ -8,7 +8,6 @@
 // blocking internal targets would break legitimate internal monitoring.
 import { z } from "zod";
 import { INTERVAL_MAX_SEC, INTERVAL_MIN_SEC } from "./ping-client";
-import { parseTimes, isUsableTimezone, MAX_SCHEDULE_TIMES, isValidTime } from "./schedule";
 
 /** Max keyword length, shared by the schema below. A validation limit, so it
  *  lives with the other input rules rather than in the check engine. */
@@ -53,61 +52,9 @@ export const monitorUrlSchema = z
 export const intervalSecSchema = z
   .number()
   .int()
-  .min(INTERVAL_MIN_SEC, `At least ${INTERVAL_MIN_SEC / 60} minute`)
-  .max(INTERVAL_MAX_SEC, `At most ${INTERVAL_MAX_SEC / 3600} hours`);
-
-/** How a monitor's cadence is defined. */
-export const scheduleModeSchema = z.enum(["interval", "times"]);
-
-/** An IANA timezone the runtime can actually format in. The probe lives in
- *  lib/schedule.ts, which also uses it to fall back to UTC at read time. */
-export const timezoneSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .refine(isUsableTimezone, "Unknown timezone");
-
-/** Clock times as the CSV the column stores, e.g. "03:00,13:00". Rejects an
- *  empty list — a times-of-day monitor with no times would never run — and a
- *  list past the cap. The cap is checked on the DISTINCT valid times, before
- *  parseTimes drops the overflow, so a hand-edited 13-time list is refused
- *  rather than silently stored as 12. Duplicates are not counted — parseTimes
- *  dedupes them, so a repeated value is not a real overflow. */
-export const scheduleTimesSchema = z
-  .string()
-  .trim()
-  .min(1, "Add at least one time")
-  .refine(
-    (v) => new Set(v.split(",").map((s) => s.trim()).filter(isValidTime)).size <= MAX_SCHEDULE_TIMES,
-    `At most ${MAX_SCHEDULE_TIMES} times`,
-  )
-  .transform((v) => parseTimes(v))
-  .refine((v) => v.length > 0, "Add at least one valid time (HH:MM)")
-  .transform((v) => v.join(","));
-
-/** The three schedule fields, shared by create and patch so both accept the
- *  same shape. Times mode requires both a time list and a timezone. */
-export const scheduleFields = {
-  scheduleMode: scheduleModeSchema.optional(),
-  scheduleTimes: scheduleTimesSchema.nullish(),
-  timezone: timezoneSchema.nullish(),
-};
-
-/**
- * Cross-field check for a schedule update. Only enforced when the payload
- * actually sets times mode — a patch that leaves the mode alone must not be
- * forced to resend the times. Returns an error message, or null when fine.
- */
-export function scheduleError(input: {
-  scheduleMode?: "interval" | "times";
-  scheduleTimes?: string | null;
-  timezone?: string | null;
-}): string | null {
-  if (input.scheduleMode !== "times") return null;
-  if (!input.scheduleTimes) return "Add at least one time";
-  if (!input.timezone) return "Pick a timezone";
-  return null;
-}
+  .min(INTERVAL_MIN_SEC, `At least ${INTERVAL_MIN_SEC / 60} minutes`)
+  .max(INTERVAL_MAX_SEC, `At most ${INTERVAL_MAX_SEC / 60} minutes`)
+  .multipleOf(60, "Use whole minutes");
 
 /**
  * Cross-field check for the method/keyword pairing. A HEAD response has no

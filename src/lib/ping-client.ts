@@ -2,61 +2,38 @@
 import type { AdminIncidentDTO } from "./ping-types";
 
 /** Check-interval bounds, shared with the API schemas (see lib/validation.ts).
- *  The floor is 60s and seconds are not a grammar unit: the scheduler wakes
- *  every 30s, so anything finer could not be honoured exactly — and showing a
- *  cadence we can't keep would break the no-invented-numbers contract. The top
- *  unit is the hour; the ceiling is 24 of them. */
-export const INTERVAL_MIN_SEC = 60;
-export const INTERVAL_MAX_SEC = 86400; // 24 hours
+ *  Seconds are not a grammar unit: the scheduler wakes every 30s, so anything
+ *  finer could not be honoured exactly. The floor is 3 minutes; the ceiling is
+ *  15 minutes, the free tier's idle spin-down — a longer interval could not
+ *  keep a service awake. */
+export const INTERVAL_MIN_SEC = 180;
+export const INTERVAL_MAX_SEC = 900;
 
-const INTERVAL_UNIT_SEC: Record<string, number> = { h: 3600, m: 60 };
-
-const INTERVAL_SYNTAX_ERROR = "Use a number and unit, e.g. 4M or 4H30M";
+const INTERVAL_SYNTAX_ERROR = "Use a number and unit, e.g. 4M";
 
 /**
- * Parses a custom check interval such as `4M`, `90M` or `4H30M`.
- * Units are H/M, case-insensitive, separated by `:`, spaces or nothing.
- * Units are unbounded (90M is valid) — only the summed total is range-checked.
- * Returns total seconds, the unit the API, DB and scheduler already use.
+ * Parses a custom check interval such as `4M` or `12M`.
+ * The only unit is M, case-insensitive; the total is range-checked in whole
+ * minutes. Returns total seconds, the unit the API, DB and scheduler speak.
  */
 export function parseInterval(input: string): { seconds: number } | { error: string } {
   const raw = input.trim();
-  if (!raw) return { error: "Enter an interval, e.g. 4M or 4H30M" };
-
-  // Split on separators. Runs of `:`/whitespace collapse, so a doubled
-  // separator ("4M::5H") is tolerated; a leading/trailing one leaves an empty
-  // part and is rejected.
-  const parts = raw.split(/[:\s]+/);
-  if (parts.some((p) => !p)) return { error: INTERVAL_SYNTAX_ERROR };
-
-  const seen = new Set<string>();
-  let total = 0;
-  for (const part of parts) {
-    // Each part is one or more <int><unit> groups ("3D15M" and "4M" both ok).
-    const groups = part.match(/\d+[a-zA-Z]+/g);
-    if (!groups || groups.join("") !== part) return { error: INTERVAL_SYNTAX_ERROR };
-    for (const group of groups) {
-      const match = group.match(/^(\d+)([a-zA-Z]+)$/)!;
-      const amount = Number(match[1]);
-      const unit = match[2].toLowerCase();
-      // Own keys only: `unit in MAP` walks the prototype chain, so
-      // "constructor"/"toString" would pass and yield NaN.
-      if (!Object.hasOwn(INTERVAL_UNIT_SEC, unit))
-        return {
-          error:
-            unit === "s"
-              ? "Seconds aren't supported — checks run on a 30s scheduler. Try 1M."
-              : `Unknown unit "${match[2]}" — use H or M`,
-        };
-      if (seen.has(unit)) return { error: `"${unit.toUpperCase()}" is given twice` };
-      seen.add(unit);
-      total += amount * INTERVAL_UNIT_SEC[unit];
-    }
+  if (!raw) return { error: "Enter an interval, e.g. 4M" };
+  const match = raw.match(/^(\d+)([a-zA-Z]+)$/);
+  if (!match) return { error: INTERVAL_SYNTAX_ERROR };
+  const unit = match[2].toLowerCase();
+  if (unit !== "m") {
+    return {
+      error:
+        unit === "s"
+          ? "Seconds aren't supported — checks run on a 30s scheduler. Try 3M."
+          : `Unknown unit "${match[2]}" — use M`,
+    };
   }
-
-  if (total < INTERVAL_MIN_SEC) return { error: `At least ${INTERVAL_MIN_SEC / 60}M` };
+  const total = Number(match[1]) * 60;
+  if (total < INTERVAL_MIN_SEC) return { error: `At least ${INTERVAL_MIN_SEC / 60} minutes` };
   if (total > INTERVAL_MAX_SEC)
-    return { error: `At most ${INTERVAL_MAX_SEC / 3600} hours` };
+    return { error: `At most ${INTERVAL_MAX_SEC / 60} minutes` };
   return { seconds: total };
 }
 
@@ -198,20 +175,9 @@ export function formatUptime(fraction: number | null | undefined): string {
   return `${pct.toFixed(pct >= 99 ? 2 : 1)}%`;
 }
 
-/** 300 -> "5m", 3600 -> "1h", 16200 -> "4h 30m".
- *  Zero-skipping compound, hours as the top unit: only the units present are
- *  shown. A legacy value past 24h still reads truthfully (e.g. "48h"). */
+/** 180 -> "3m", 900 -> "15m". Every interval written through the API is whole minutes. */
 export function formatInterval(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  const parts: string[] = [];
-  if (h) parts.push(`${h}h`);
-  if (m) parts.push(`${m}m`);
-  // `s` never comes from the grammar (the scheduler can't honour it) but a
-  // legacy/API-supplied value must still render truthfully.
-  if (s) parts.push(`${s}s`);
-  return parts.length ? parts.join(" ") : "0s";
+  return `${seconds / 60}m`;
 }
 
 /** A duration as a person reads it: "45s", "10m", "3h 5m", "1d 1h".

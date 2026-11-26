@@ -2,9 +2,6 @@
 // These describe REAL data only — anything the backend cannot measure
 // is `null`, never a fabricated number.
 
-/** How a monitor's check cadence is defined. */
-export type ScheduleMode = "interval" | "times";
-
 /** How a keyword check treats its keyword. */
 export type KeywordMode = "contains" | "excludes";
 
@@ -46,12 +43,6 @@ export interface MonitorDTO {
   url: string;
   method: "GET" | "HEAD";
   intervalSec: number;
-  /** How the cadence is defined. "times" ignores intervalSec. */
-  scheduleMode: ScheduleMode;
-  /** Clock times "HH:MM" in `timezone`, sorted; [] for an interval monitor. */
-  scheduleTimes: string[];
-  /** IANA zone the times are read in; null for an interval monitor. */
-  timezone: string | null;
   enabled: boolean;
   folderId: string | null;
   folderName: string | null;

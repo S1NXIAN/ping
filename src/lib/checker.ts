@@ -2,7 +2,6 @@
 // Nothing here simulates or estimates anything.
 import type { Check, Monitor } from "@prisma/client";
 import { db } from "./db";
-import { isTimesDue, parseTimes } from "./schedule";
 
 const CHECK_TIMEOUT_MS = 15_000;
 const MAX_CONCURRENCY = 5;
@@ -264,19 +263,11 @@ export async function runDueChecks(): Promise<TickResult> {
     const started = performance.now();
     const now = Date.now();
     const monitors = await db.monitor.findMany({ where: { enabled: true } });
-    // Two cadence modes. Interval monitors get a small grace so ticks at
-    // exactly the interval boundary don't skip. Times-of-day monitors use
-    // bounded catch-up instead: due when the most recent scheduled instant
-    // has passed and the last check predates it, so a wake after several
-    // missed scheduled instants runs ONE check (the latest), never a backlog.
-    const due = monitors.filter((m) => {
-      if (m.scheduleMode === "times") {
-        const times = parseTimes(m.scheduleTimes);
-        if (times.length === 0) return false; // nothing scheduled
-        return isTimesDue(times, m.timezone ?? "UTC", m.lastCheckAt?.getTime() ?? null, now);
-      }
-      return !m.lastCheckAt || now - m.lastCheckAt.getTime() >= (m.intervalSec - 5) * 1000;
-    });
+    // A monitor is due once its interval has elapsed. The 5s grace keeps a
+    // tick landing exactly on the boundary from skipping a check.
+    const due = monitors.filter(
+      (m) => !m.lastCheckAt || now - m.lastCheckAt.getTime() >= (m.intervalSec - 5) * 1000,
+    );
 
     let ran = 0;
     let up = 0;

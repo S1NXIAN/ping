@@ -3,13 +3,7 @@
 // Internal hosts (localhost, LAN) are allowed by design — see the README
 // trust model — so only the scheme is enforced.
 import { expect, test } from "bun:test";
-import {
-  monitorUrlSchema,
-  methodKeywordError,
-  scheduleError,
-  scheduleTimesSchema,
-  timezoneSchema,
-} from "@/lib/validation";
+import { intervalSecSchema, monitorUrlSchema, methodKeywordError } from "@/lib/validation";
 
 const ok = [
   "https://example.com",
@@ -29,39 +23,18 @@ test("trims surrounding whitespace", () => {
   expect(monitorUrlSchema.parse("  https://example.com  ")).toBe("https://example.com");
 });
 
-// The times/timezone pairing is enforced at every boundary that can create a
-// times monitor (create, patch, import), so a monitor that would never run —
-// or would run in the wrong zone — can't be persisted.
-test("scheduleError rejects a times monitor with no times or no zone", () => {
-  expect(scheduleError({ scheduleMode: "times", scheduleTimes: null, timezone: "Asia/Manila" })).toMatch(/time/i);
-  expect(scheduleError({ scheduleMode: "times", scheduleTimes: "13:00", timezone: null })).toMatch(/timezone/i);
-  expect(scheduleError({ scheduleMode: "times", scheduleTimes: "13:00", timezone: "Asia/Manila" })).toBeNull();
-});
-
-test("scheduleError leaves an interval monitor alone", () => {
-  // An interval monitor has no times or zone by design, so neither is an error.
-  expect(scheduleError({ scheduleMode: "interval", scheduleTimes: null, timezone: null })).toBeNull();
-  // A patch that does not mention the mode must not be forced to resend them.
-  expect(scheduleError({})).toBeNull();
-});
-
-test("scheduleTimesSchema normalises and rejects an empty list", () => {
-  expect(scheduleTimesSchema.parse("13:00,03:00")).toBe("03:00,13:00");
-  expect(scheduleTimesSchema.safeParse("").success).toBe(false);
-  expect(scheduleTimesSchema.safeParse("nonsense").success).toBe(false);
-});
-
-test("timezoneSchema accepts real zones and rejects invented ones", () => {
-  expect(timezoneSchema.safeParse("Asia/Manila").success).toBe(true);
-  expect(timezoneSchema.safeParse("America/New_York").success).toBe(true);
-  expect(timezoneSchema.safeParse("Mars/Olympus_Mons").success).toBe(false);
-  expect(timezoneSchema.safeParse("").success).toBe(false);
+test("intervalSecSchema accepts only whole minutes in the 3–15 range", () => {
+  expect(intervalSecSchema.safeParse(180).success).toBe(true);
+  expect(intervalSecSchema.safeParse(900).success).toBe(true);
+  expect(intervalSecSchema.safeParse(179).success).toBe(false);
+  expect(intervalSecSchema.safeParse(901).success).toBe(false);
+  // Whole minutes only: the card renders `intervalSec / 60` directly.
+  expect(intervalSecSchema.safeParse(181).success).toBe(false);
 });
 
 // HEAD returns no body, so a keyword can never match and the monitor would
-// report a permanent false down. Enforced at create, patch and import (the
-// same three boundaries as the schedule pairing), so the rule is stated
-// rather than silently coerced in the checker.
+// report a permanent false down. Enforced at create, patch and import, so the
+// rule is stated rather than silently coerced in the checker.
 test("methodKeywordError rejects HEAD with a keyword", () => {
   expect(methodKeywordError({ method: "HEAD", keyword: "welcome" })).toMatch(/body/i);
 });

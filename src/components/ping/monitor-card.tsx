@@ -53,7 +53,6 @@ import {
   timeAgo,
 } from "@/lib/ping-client";
 import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
-import { formatNextRun } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { statusLabel, statusWord } from "./status-dot";
 import { monitorStatus, averageUpResponseMs, type MonitorStatus } from "@/lib/monitor-status";
@@ -322,11 +321,7 @@ export function MonitorCard({
                 Last updated{" "}
                 <span className="text-foreground/95">{timeAgo(monitor.lastCheckAt)}</span>
               </span>
-              <span>
-                {monitor.scheduleMode === "times" && monitor.scheduleTimes.length > 0
-                  ? `next ${formatNextRun(monitor.scheduleTimes, monitor.timezone ?? "UTC")}`
-                  : `every ${formatInterval(monitor.intervalSec)}`}
-              </span>
+              <span>every {formatInterval(monitor.intervalSec)}</span>
               {/* The average, not the newest sample: the same number the slow
                   state is judged from, so the reading and the pill agree. The
                   `avg` label is stated in text, not a title — touch has none.

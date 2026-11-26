@@ -17,10 +17,10 @@ only visible by looking at PING.
 
 ## Features
 
-- **Monitors** — any http(s) URL, custom name, GET or HEAD, and one of two
-  schedules: an **interval** from 1 minute to 24 hours (pick a preset or type a
-  custom value like `4M` or `4H30M`), or **times of day** — fixed clock times
-  every day, e.g. 1:00 PM and 3:00 AM, in your browser's own timezone. Group monitors
+- **Monitors** — any http(s) URL, custom name, GET or HEAD, and a check
+  interval from 3 to 15 minutes (pick a preset or type a custom value like
+  `4M`). 15 minutes is the free tier's idle spin-down, so a monitor never waits
+  longer than a service can stay awake. Group monitors
   into **folders**, rename anything, pause or resume individual monitors, and
   tag each with the **account used** (optional label for whichever account runs
   the service — searchable).

@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
 import { runCheck, MAX_MONITORS } from "@/lib/checker";
 import { nextMonitorPosition } from "@/lib/monitor-order";
-import { monitorUrlSchema, intervalSecSchema, scheduleFields, scheduleError, methodKeywordError, keywordSchema, slowThresholdMsSchema } from "@/lib/validation";
+import { monitorUrlSchema, intervalSecSchema, methodKeywordError, keywordSchema, slowThresholdMsSchema } from "@/lib/validation";
 import { emptyStats, toMonitorDTO } from "@/lib/ping-stats";
 
 const createSchema = z.object({
@@ -24,7 +24,6 @@ const createSchema = z.object({
   keywordMode: z.enum(["contains", "excludes"]).optional(),
   /** Latency threshold in ms; null/absent = off. */
   slowThresholdMs: slowThresholdMsSchema,
-  ...scheduleFields,
 });
 
 /** Thrown inside the create transaction when the fleet is at the cap, so the
@@ -44,12 +43,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { name, url, folderId, intervalSec, method, account, keyword, keywordMode, slowThresholdMs, scheduleMode, scheduleTimes, timezone } = parsed.data;
-
-  // A times-of-day monitor needs both a time list and a zone, or it would
-  // silently never run.
-  const schedErr = scheduleError({ scheduleMode, scheduleTimes, timezone });
-  if (schedErr) return NextResponse.json({ error: schedErr }, { status: 400 });
+  const { name, url, folderId, intervalSec, method, account, keyword, keywordMode, slowThresholdMs } = parsed.data;
 
   // A HEAD check can't read the body a keyword needs — reject rather than
   // store a monitor that would report a permanent false down.
@@ -93,9 +87,6 @@ export async function POST(req: NextRequest) {
           keyword,
           keywordMode: keywordMode ?? "contains",
           slowThresholdMs: slowThresholdMs ?? null,
-          scheduleMode: scheduleMode ?? "interval",
-          scheduleTimes: scheduleMode === "times" ? (scheduleTimes ?? null) : null,
-          timezone: scheduleMode === "times" ? (timezone ?? null) : null,
           position: await nextMonitorPosition(tx),
         },
       });

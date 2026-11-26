@@ -14,42 +14,23 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { api, ApiError, formatInterval, normalizeUrl, parseInterval } from "@/lib/ping-client";
-import type { FolderDTO, MonitorDTO, ScheduleMode } from "@/lib/ping-types";
-import { cn } from "@/lib/utils";
-import { ScheduleTimesEditor } from "./schedule-times-editor";
+import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { InlineAlert } from "./inline-alert";
 
-// Nine flat choices were decision residue (critique 2026-09-16 P2); three
-// cadence chunks carry the same values with one decision instead of nine —
-// "which rhythm?" then "which step?". No capability was removed.
-const INTERVAL_GROUPS: { label: string; options: { value: string; label: string; recommended?: boolean }[] }[] = [
-  {
-    label: "Minutes",
-    options: [
-      { value: "60", label: "1 minute" },
-      { value: "120", label: "2 minutes" },
-      { value: "300", label: "5 minutes", recommended: true },
-      { value: "600", label: "10 minutes" },
-    ],
-  },
-  {
-    label: "Hours",
-    options: [
-      { value: "1800", label: "30 minutes" },
-      { value: "3600", label: "1 hour" },
-      { value: "21600", label: "6 hours" },
-      { value: "43200", label: "12 hours" },
-      { value: "86400", label: "24 hours" },
-    ],
-  },
+// Four cadence choices, capped at the free tier's 15-minute spin-down: a
+// longer interval could not keep a service awake. Values are seconds, the
+// unit the API, DB and scheduler speak.
+const INTERVAL_PRESETS: { value: string; label: string; recommended?: boolean }[] = [
+  { value: "180", label: "3 minutes" },
+  { value: "300", label: "5 minutes", recommended: true },
+  { value: "600", label: "10 minutes" },
+  { value: "900", label: "15 minutes" },
 ];
 
 const KEYWORD_MODES = [
@@ -61,18 +42,9 @@ const KEYWORD_MODES = [
 /** Sentinel for the "Custom…" row — never a real interval value. */
 const CUSTOM_INTERVAL = "custom";
 /** Every preset value, for telling a curated choice from a hand-typed one. */
-const PRESET_INTERVALS = new Set(INTERVAL_GROUPS.flatMap((g) => g.options).map((o) => o.value));
+const PRESET_INTERVALS = new Set(INTERVAL_PRESETS.map((o) => o.value));
 
-/** The viewer's own IANA zone — the sensible default for a new schedule. */
-function browserTimezone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  } catch {
-    return "UTC";
-  }
-}
-
-type FieldErrors = { url?: string; slow?: string; keyword?: string; interval?: string; times?: string };
+type FieldErrors = { url?: string; slow?: string; keyword?: string; interval?: string };
 
 /** Top-aligned label with a tap/keyboard-revealable hint instead of helper
  *  paragraphs (keeps the dialog scroll-free). A hover-only tooltip was a defect:
@@ -102,9 +74,8 @@ function FieldLabel({
             aria-expanded={hintOpen}
             aria-controls={hintId}
             onClick={() => setHintOpen((v) => !v)}
-            // Hit area grown toward the 44px touch floor (the
-            // schedule-times-editor precedent): the 16px glyph alone is far
-            // below it. Vertical only + a 4px horizontal bleed fills the
+            // Hit area grown toward the 44px touch floor: the 16px glyph alone
+            // is far below it. Vertical only + a 4px horizontal bleed fills the
             // label gap without overlapping the label, so a tap meant for the
             // label still focuses its field.
             className="relative grid size-4 place-items-center rounded-none text-[10px] font-bold text-muted-foreground/60 transition-colors before:absolute before:-inset-y-[14px] before:-inset-x-1 before:content-[''] hover:bg-secondary hover:text-foreground focus-visible:bg-secondary focus-visible:text-foreground focus-ring"
@@ -148,12 +119,8 @@ export function AddMonitorDialog({
   const [url, setUrl] = useState("");
   const [folderId, setFolderId] = useState<string>("none");
   const [intervalSec, setIntervalSec] = useState("300");
-  // "custom" replaces the preset select with a free-text H/M field.
+  // "custom" replaces the preset select with a free-text M field.
   const [intervalCustom, setIntervalCustom] = useState(false);
-  // Times-of-day mode: a list of "HH:MM" clock times, read in the viewer's
-  // own IANA zone (browserTimezone(), never a picked one).
-  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>("interval");
-  const [times, setTimes] = useState<string[]>([]);
   const [method, setMethod] = useState<"GET" | "HEAD">("GET");
   const [account, setAccount] = useState("");
   const [keywordMode, setKeywordMode] = useState<"off" | "contains" | "excludes">("off");
@@ -172,23 +139,16 @@ export function AddMonitorDialog({
       setName(initial.name);
       setUrl(initial.url);
       setFolderId(initial.folderId ?? "none");
-      // A value the presets don't cover (e.g. a saved 4H30M) opens in custom
+      // A value the presets don't cover (e.g. a saved 4M) opens in custom
       // mode — and the field then holds TEXT, so seed it with the compact form
-      // ("4h 30m") rather than the raw seconds the API stores.
-      // The grammar is whole-minute (H/M), so a legacy sub-minute value (the
-      // old schema allowed any int >= 60) has no exact text form — seed the
-      // nearest representable value, which the live preview then states plainly.
+      // rather than the raw seconds the API stores.
       const isCustom = !PRESET_INTERVALS.has(String(initial.intervalSec));
       setIntervalCustom(isCustom);
       setIntervalSec(
-        isCustom
-          ? formatInterval(Math.ceil(initial.intervalSec / 60) * 60)
-          : String(initial.intervalSec),
+        isCustom ? formatInterval(initial.intervalSec) : String(initial.intervalSec),
       );
       setMethod(initial.method);
       setAccount(initial.account ?? "");
-      setScheduleMode(initial.scheduleMode);
-      setTimes(initial.scheduleTimes);
       setKeywordMode(initial.keyword ? initial.keywordMode : "off");
       setKeyword(initial.keyword ?? "");
       setSlowThreshold(initial.slowThresholdMs != null ? String(initial.slowThresholdMs) : "");
@@ -207,8 +167,6 @@ export function AddMonitorDialog({
       setIntervalCustom(false);
       setMethod("GET");
       setAccount("");
-      setScheduleMode("interval");
-      setTimes([]);
       setKeywordMode("off");
       setKeyword("");
       setSlowThreshold("");
@@ -266,36 +224,26 @@ export function AddMonitorDialog({
     const trimmedKeyword = keyword.trim();
     if (keywordMode !== "off" && trimmedKeyword === "") next.keyword = "Enter a keyword, or set it Off";
 
-    // Custom interval: parse the H/M text to the seconds the API stores.
-    // A preset value is already seconds, so it needs no parsing. Gated on the
-    // mode: in Times of day the interval field is not rendered, so validating
-    // it would set an error no one can see and block Save with no message.
+    // Custom interval: parse the M text to the seconds the API stores.
+    // A preset value is already seconds, so it needs no parsing.
     let intervalSeconds = Number(intervalSec);
-    if (scheduleMode === "interval" && intervalCustom) {
+    if (intervalCustom) {
       const parsed = parseInterval(intervalSec);
       if ("error" in parsed) next.interval = parsed.error;
       else intervalSeconds = parsed.seconds;
     }
 
-    // Times-of-day mode needs at least one time, or the monitor would
-    // silently never run. The zone is the viewer's own, always set.
-    if (scheduleMode === "times" && times.length === 0) next.times = "Add at least one time";
-
     setFieldErrors(next);
     if (Object.values(next).some(Boolean)) {
       // surface hidden advanced-field errors
       if (next.slow || next.keyword) setAdvancedOpen(true);
-      document
-        .getElementById(next.times ? "m-times" : next.interval ? "m-interval" : "m-url")
-        ?.focus();
+      document.getElementById(next.interval ? "m-interval" : "m-url")?.focus();
       return;
     }
 
     const body: Record<string, unknown> = {
       url: normalized,
-      scheduleMode,
-      scheduleTimes: scheduleMode === "times" ? times.join(",") : null,
-      timezone: scheduleMode === "times" ? browserTimezone() : null,
+      intervalSec: intervalSeconds,
       method,
       folderId: folderId === "none" ? null : folderId,
       account: account.trim(),
@@ -305,10 +253,6 @@ export function AddMonitorDialog({
     };
     const trimmedName = name.trim();
     if (trimmedName) body.name = trimmedName;
-    // A times monitor has no interval, and the field is not even rendered in
-    // that mode — so send it only for interval monitors. (An unparsed custom
-    // string would otherwise serialise to null and 400 as a non-number.)
-    if (scheduleMode === "interval") body.intervalSec = intervalSeconds;
 
     setBusy(true);
     void (async () => {
@@ -339,9 +283,7 @@ export function AddMonitorDialog({
 
   // Trigger shows the plain label; "(recommended)" is list-only so the
   // value never overflows a half-width column into its neighbour.
-  const intervalOption = INTERVAL_GROUPS.flatMap((g) => g.options).find(
-    (o) => o.value === intervalSec,
-  );
+  const intervalOption = INTERVAL_PRESETS.find((o) => o.value === intervalSec);
   // Live preview of the custom field: the parsed seconds, or null while the
   // text is incomplete/invalid (the hint then falls back to the unit legend).
   const intervalPreview = intervalCustom ? (() => {
@@ -474,50 +416,11 @@ export function AddMonitorDialog({
               <div className="space-y-2">
                 <FieldLabel
                   htmlFor="m-interval"
-                  hint="An interval repeats on a cadence you pick (minutes to hours); times of day run at fixed clock times daily."
+                  hint="3 to 15 minutes — frequent enough to keep a free-tier service awake."
                 >
-                  Schedule
+                  Check every
                 </FieldLabel>
-                {/* Mode switch: the two cadences are genuinely different kinds
-                    of schedule, so the control says so rather than hiding one
-                    inside the other's dropdown. */}
-                <div
-                  role="radiogroup"
-                  aria-label="Schedule type"
-                  className="grid grid-cols-2 gap-px border bg-border"
-                >
-                  {(
-                    [
-                      ["interval", "Interval"],
-                      ["times", "Times of day"],
-                    ] as const
-                  ).map(([mode, label]) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      role="radio"
-                      aria-checked={scheduleMode === mode}
-                      onClick={() => {
-                        setScheduleMode(mode);
-                        clearError("interval");
-                        clearError("times");
-                      }}
-                      className={cn(
-                        "h-11 text-xs font-medium transition-colors focus-ring sm:h-9",
-                        // The selected segment is the DARKER one — it reads as
-                        // pressed-in against the group's lighter track. Bright
-                        // text carries the emphasis, not the fill.
-                        scheduleMode === mode
-                          ? "bg-card text-foreground"
-                          : "bg-secondary text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                {scheduleMode === "interval" &&
-                  (intervalCustom ? (
+                {intervalCustom ? (
                     <>
                       <Input
                         id="m-interval"
@@ -526,7 +429,7 @@ export function AddMonitorDialog({
                           setIntervalSec(e.target.value);
                           clearError("interval");
                         }}
-                        placeholder="e.g. 4M or 4H30M"
+                        placeholder="e.g. 4M"
                         autoComplete="off"
                         aria-invalid={fieldErrors.interval ? true : undefined}
                         aria-describedby={fieldErrors.interval ? "m-interval-err" : undefined}
@@ -540,13 +443,12 @@ export function AddMonitorDialog({
                             {fieldErrors.interval}
                           </p>
                         ) : (
-                          // Echo the parsed cadence so the H/M string is never
-                          // ambiguous. H/M are whole minutes, so every value the
-                          // grammar yields is exact on the 30s tick grid.
+                          // Echo the parsed cadence so the M string is never
+                          // ambiguous. Whole minutes are exact on the 30s tick grid.
                           <p className="text-xs text-muted-foreground">
                             {intervalPreview
                               ? `= every ${formatInterval(intervalPreview)}`
-                              : "H = hours, M = minutes"}
+                              : "M = minutes (3–15)"}
                           </p>
                         )}
                         <button
@@ -580,23 +482,16 @@ export function AddMonitorDialog({
                         <SelectValue>{intervalOption?.label}</SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {INTERVAL_GROUPS.map((g) => (
-                          <SelectGroup key={g.label}>
-                            <SelectLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                              {g.label}
-                            </SelectLabel>
-                            {g.options.map((i) => (
-                              <SelectItem key={i.value} value={i.value}>
-                                {i.label}
-                                {i.recommended ? " (recommended)" : ""}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
+                        {INTERVAL_PRESETS.map((i) => (
+                          <SelectItem key={i.value} value={i.value}>
+                            {i.label}
+                            {i.recommended ? " (recommended)" : ""}
+                          </SelectItem>
                         ))}
                         <SelectItem value={CUSTOM_INTERVAL}>Custom…</SelectItem>
                       </SelectContent>
                     </Select>
-                  ))}
+                )}
               </div>
 
               <div className="space-y-2">
@@ -616,20 +511,6 @@ export function AddMonitorDialog({
                 </Select>
               </div>
 
-              {/* Times mode needs the full width: a list of clock times plus a
-                  zone. Spans both columns so the rows stay readable. */}
-              {scheduleMode === "times" && (
-                <div className="sm:col-span-2">
-                  <ScheduleTimesEditor
-                    times={times}
-                    error={fieldErrors.times}
-                    onChange={(next) => {
-                      setTimes(next);
-                      clearError("times");
-                    }}
-                  />
-                </div>
-              )}
             </div>
 
             {/* advanced — collapsed by default */}

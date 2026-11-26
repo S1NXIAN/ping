@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
-import { monitorUrlSchema, intervalSecSchema, scheduleFields, scheduleError, methodKeywordError, keywordSchema, slowThresholdMsSchema } from "@/lib/validation";
+import { monitorUrlSchema, intervalSecSchema, methodKeywordError, keywordSchema, slowThresholdMsSchema } from "@/lib/validation";
 import {
   collectMonitorStats,
   dailyBuckets,
@@ -73,7 +73,6 @@ const patchSchema = z.object({
   keywordMode: z.enum(["contains", "excludes"]).optional(),
   /** Latency threshold in ms; null clears (off). */
   slowThresholdMs: slowThresholdMsSchema,
-  ...scheduleFields,
 });
 
 export async function PATCH(req: NextRequest, { params }: Params) {
@@ -96,7 +95,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const data: Record<string, unknown> = {};
-  const { name, url, folderId, intervalSec, enabled, method, pinned, account, keyword, keywordMode, slowThresholdMs, scheduleMode, scheduleTimes, timezone } = parsed.data;
+  const { name, url, folderId, intervalSec, enabled, method, pinned, account, keyword, keywordMode, slowThresholdMs } = parsed.data;
   if (name !== undefined) data.name = name;
   if (url !== undefined) data.url = url;
   if (intervalSec !== undefined) data.intervalSec = intervalSec;
@@ -104,24 +103,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (method !== undefined) data.method = method;
   if (pinned !== undefined) data.pinned = pinned;
   if (slowThresholdMs !== undefined) data.slowThresholdMs = slowThresholdMs ?? null;
-  // Schedule: the mode decides which fields are meaningful. Switching to
-  // interval clears the times/zone (an interval monitor has neither); switching
-  // to times requires both. The cross-field rule is checked against the
-  // resulting state, so a patch that only flips the mode still validates.
-  if (scheduleMode !== undefined || scheduleTimes !== undefined || timezone !== undefined) {
-    const nextMode = scheduleMode ?? (monitor.scheduleMode === "times" ? "times" : "interval");
-    const nextTimes = scheduleTimes !== undefined ? scheduleTimes : monitor.scheduleTimes;
-    const nextZone = timezone !== undefined ? timezone : monitor.timezone;
-    const schedErr = scheduleError({
-      scheduleMode: nextMode,
-      scheduleTimes: nextTimes,
-      timezone: nextZone,
-    });
-    if (schedErr) return NextResponse.json({ error: schedErr }, { status: 400 });
-    data.scheduleMode = nextMode;
-    data.scheduleTimes = nextMode === "times" ? (nextTimes ?? null) : null;
-    data.timezone = nextMode === "times" ? (nextZone ?? null) : null;
-  }
   // absent → untouched; null → off; string → set (an empty string is rejected
   // by keywordSchema, so it never reaches here)
   if (keyword !== undefined) {

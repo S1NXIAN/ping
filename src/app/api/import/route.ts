@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
 import { MAX_MONITORS } from "@/lib/checker";
 import { nextMonitorPosition } from "@/lib/monitor-order";
-import { monitorUrlSchema, intervalSecSchema, scheduleModeSchema, scheduleTimesSchema, timezoneSchema, scheduleError, methodKeywordError, keywordSchema, slowThresholdMsSchema } from "@/lib/validation";
+import { monitorUrlSchema, intervalSecSchema, methodKeywordError, keywordSchema, slowThresholdMsSchema } from "@/lib/validation";
 import type { ImportResult } from "@/lib/ping-types";
 
 const schema = z.object({
@@ -23,11 +23,6 @@ const schema = z.object({
         keywordMode: z.enum(["contains", "excludes"]).default("contains"),
         slowThresholdMs: slowThresholdMsSchema,
         folder: z.string().trim().max(40).nullish(),
-        // Schedule mode. Absent in exports written before times-of-day existed,
-        // so both are optional and default to the interval behaviour.
-        scheduleMode: scheduleModeSchema.optional(),
-        scheduleTimes: scheduleTimesSchema.nullish(),
-        timezone: timezoneSchema.nullish(),
         // Pin state and manual order. Absent in exports written before they
         // were carried, so an old file imports with a fresh monitor's defaults
         // (unpinned, appended at the end).
@@ -58,17 +53,10 @@ export async function POST(req: NextRequest) {
 
   const { folders, monitors } = parsed.data;
 
-  // Validate every monitor's schedule up front (pure) — a bad monitor rejects
-  // the whole file before anything is written, the same invariant create and
-  // patch enforce.
+  // Validate every monitor's method/keyword pairing up front (pure) — a bad
+  // monitor rejects the whole file before anything is written, the same
+  // invariant create and patch enforce.
   for (const m of monitors) {
-    const schedErr = scheduleError({
-      scheduleMode: m.scheduleMode,
-      scheduleTimes: m.scheduleTimes,
-      timezone: m.timezone,
-    });
-    if (schedErr) return NextResponse.json({ error: `${m.name}: ${schedErr}` }, { status: 400 });
-
     const methodErr = methodKeywordError({ method: m.method, keyword: m.keyword });
     if (methodErr) return NextResponse.json({ error: `${m.name}: ${methodErr}` }, { status: 400 });
   }
@@ -142,9 +130,6 @@ export async function POST(req: NextRequest) {
               keyword: m.keyword ?? null,
               keywordMode: m.keywordMode,
               slowThresholdMs: m.slowThresholdMs ?? null,
-              scheduleMode: m.scheduleMode === "times" ? "times" : "interval",
-              scheduleTimes: m.scheduleMode === "times" ? (m.scheduleTimes ?? null) : null,
-              timezone: m.scheduleMode === "times" ? (m.timezone ?? null) : null,
               folderId: m.folder ? (folderIds.get(m.folder) ?? null) : null,
               pinned: m.pinned,
               position,

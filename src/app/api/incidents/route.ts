@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const folderId = req.nextUrl.searchParams.get("folderId");
   const monitors = await db.monitor.findMany({
     where: folderId ? { folderId } : undefined,
-    select: { id: true, name: true, intervalSec: true, scheduleMode: true, scheduleTimes: true },
+    select: { id: true, name: true, intervalSec: true },
     orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }],
   });
   const derived = await deriveIncidents(monitors);
