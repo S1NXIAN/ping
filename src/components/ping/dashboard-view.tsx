@@ -181,7 +181,7 @@ export function DashboardView({
     }
   }, [scopeFolderId]);
   useEffect(() => {
-    void loadIncidents();
+    if (data) void loadIncidents();
   }, [loadIncidents, data]);
   const incidents = incidentData?.folderId === scopeFolderId ? incidentData.list : null;
 

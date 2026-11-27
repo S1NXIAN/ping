@@ -1,5 +1,6 @@
 // Small client-side helpers for PING: fetch wrapper + formatters.
 import type { AdminIncidentDTO } from "./ping-types";
+import { isOngoingIncident } from "./incident-status";
 
 /** Check-interval bounds, shared with the API schemas (see lib/validation.ts).
  *  Seconds are not a unit: the scheduler wakes every 30s, so anything finer
@@ -47,9 +48,7 @@ export function unseenIncidentCount(
   seenStartedAt: number,
 ): number {
   return incidents.filter(
-    (i) =>
-      (i.endedAt == null && !i.monitorPaused) ||
-      Date.parse(i.startedAt) > seenStartedAt,
+    (i) => isOngoingIncident(i) || Date.parse(i.startedAt) > seenStartedAt,
   ).length;
 }
 

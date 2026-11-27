@@ -78,8 +78,11 @@ _Avoid_: recurring, periodic
 
 **Incident**:
 A continuous stretch of failed Checks, derived from check history and never
-stored or entered by hand. An **ongoing** Incident (no end yet) is pinned to
-the top of the incidents list and is exempt from the list's size cap, so a
-long outage can never be buried under newer ones or dropped — the exempt set
-is itself bounded.
+stored or entered by hand. An **ongoing** Incident (no end yet, monitor
+running) is pinned to the top of the incidents list and is exempt from the
+list's size cap, so a long outage can never be buried under newer ones or
+dropped — the exempt set is itself bounded. A paused monitor's open Incident
+is **paused**: listed with history, never counted as ongoing. An Incident
+ended only by a sleep gap, with no up Check observed, is **no recovery**,
+never resolved.
 _Avoid_: outage record, event

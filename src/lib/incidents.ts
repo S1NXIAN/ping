@@ -7,6 +7,7 @@
 import { db } from "./db";
 import { Prisma } from "@prisma/client";
 import { MAX_MONITORS } from "./checker";
+import { incidentState } from "./incident-status";
 import type { AdminIncidentDTO } from "./ping-types";
 
 const INCIDENT_WINDOW_DAYS = 30;
@@ -90,9 +91,11 @@ export async function deriveIncidents(
     intervalSec: number;
     enabled: boolean;
   }[],
+  /** Injectable clock for deterministic tests. */
+  now = Date.now(),
 ): Promise<DerivedIncident[]> {
   if (monitors.length === 0) return [];
-  const since = new Date(Date.now() - INCIDENT_WINDOW_DAYS * 86400_000);
+  const since = new Date(now - INCIDENT_WINDOW_DAYS * 86400_000);
 
   // 1) All down rows for the whole fleet in ONE query (newest
   //    MAX_DOWN_ROWS_PER_MONITOR per monitor; older rows can't reach the cut).
@@ -155,15 +158,15 @@ export async function deriveIncidents(
   }
   if (streaks.length === 0) return [];
 
-  const nameById = new Map(monitors.map((m) => [m.id, m.name]));
-  const pausedById = new Map(monitors.map((m) => [m.id, !m.enabled]));
+  const monitorById = new Map(
+    monitors.map((m) => [m.id, { name: m.name, paused: !m.enabled }]),
+  );
 
   // 3) Every monitor's LAST streak is resolved first: it is the only streak
   //    that can be ongoing, and ongoing incidents are exempt from the cap.
   const incidents: DerivedIncident[] = await resolveStreaks(
     streaks.filter((s) => s.isLast),
-    nameById,
-    pausedById,
+    monitorById,
   );
 
   // 4) Resolve the remaining (closed-only) streaks newest-first, stopping as
@@ -173,7 +176,7 @@ export async function deriveIncidents(
   //    cannot enter the cut.
   const rest = streaks.filter((s) => !s.isLast).sort((a, b) => b.lastDown - a.lastDown);
   for (let i = 0; i < rest.length; i += RESOLVE_BATCH) {
-    incidents.push(...(await resolveStreaks(rest.slice(i, i + RESOLVE_BATCH), nameById, pausedById)));
+    incidents.push(...(await resolveStreaks(rest.slice(i, i + RESOLVE_BATCH), monitorById)));
     const closedStarts = incidents
       .filter((x) => x.endedAt != null)
       .map((x) => new Date(x.startedAt).getTime())
@@ -188,16 +191,16 @@ export async function deriveIncidents(
     }
   }
 
-  // Ongoing incidents (no end) pin to the top, newest-first among themselves,
-  // and are exempt from the closed-incident size cap; closed incidents keep
-  // the existing newest-first order and cap. The exempt set is bounded by the
-  // fleet cap (one ongoing incident per monitor), so the list can never grow
-  // without limit while still never dropping a real current outage.
+  // Ongoing incidents pin to the top, newest-first among themselves, and are
+  // exempt from the size cap; paused and closed incidents share the existing
+  // newest-first history cap. The exempt set is bounded by the fleet cap (one
+  // ongoing incident per monitor), so the list can never grow without limit
+  // while still never dropping a real current outage.
   const byNewest = (a: DerivedIncident, b: DerivedIncident) =>
     new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
-  const ongoing = incidents.filter((i) => i.endedAt == null).sort(byNewest);
-  const closed = incidents.filter((i) => i.endedAt != null).sort(byNewest);
-  return [...ongoing.slice(0, MAX_ONGOING_INCIDENTS), ...closed.slice(0, MAX_INCIDENTS)];
+  const ongoing = incidents.filter((i) => incidentState(i) === "ongoing").sort(byNewest);
+  const settled = incidents.filter((i) => incidentState(i) !== "ongoing").sort(byNewest);
+  return [...ongoing.slice(0, MAX_ONGOING_INCIDENTS), ...settled.slice(0, MAX_INCIDENTS)];
 }
 
 /**
@@ -212,8 +215,7 @@ export async function deriveIncidents(
  */
 async function resolveStreaks(
   streaks: Streak[],
-  nameById: Map<string, string>,
-  pausedById: Map<string, boolean>,
+  monitorById: Map<string, { name: string; paused: boolean }>,
 ): Promise<DerivedIncident[]> {
   if (streaks.length === 0) return [];
 
@@ -310,10 +312,11 @@ async function resolveStreaks(
         }
       }
 
+      const monitor = monitorById.get(streak.monitorId);
       out.push({
         monitorId: streak.monitorId,
-        monitorName: nameById.get(streak.monitorId) ?? "",
-        monitorPaused: pausedById.get(streak.monitorId) ?? false,
+        monitorName: monitor?.name ?? "",
+        monitorPaused: monitor?.paused ?? false,
         recovered,
         startedAt: new Date(sub.rows[0].t).toISOString(),
         endedAt: endedAt == null ? null : new Date(endedAt).toISOString(),

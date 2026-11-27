@@ -224,7 +224,7 @@ test("a failed manual check while paused never opens an incident", async () => {
   const m = await db.monitor.create({
     data: { name: "svc", url: "https://svc.example.com", intervalSec: 600, enabled: false },
   });
-  const now = Date.now();
+  const now = Date.parse("2026-01-15T00:00:00Z");
   await db.check.createMany({
     data: [
       { monitorId: m.id, status: "down", statusCode: 503, checkedAt: new Date(now - 3_600_000) },
@@ -238,7 +238,7 @@ test("a failed manual check while paused never opens an incident", async () => {
       },
     ],
   });
-  const incidents = await deriveIncidents([m]);
+  const incidents = await deriveIncidents([m], now);
   // The pre-pause run stays the one paused incident; the manual failure adds none.
   expect(incidents.length).toBe(1);
   expect(incidents[0].endedAt).toBeNull();
@@ -252,7 +252,7 @@ test("a successful manual check while paused resolves the incident", async () =>
   const m = await db.monitor.create({
     data: { name: "svc", url: "https://svc.example.com", intervalSec: 600, enabled: false },
   });
-  const now = Date.now();
+  const now = Date.parse("2026-01-15T00:00:00Z");
   await db.check.createMany({
     data: [
       { monitorId: m.id, status: "down", statusCode: 503, checkedAt: new Date(now - 3_600_000) },
@@ -265,7 +265,7 @@ test("a successful manual check while paused resolves the incident", async () =>
       },
     ],
   });
-  const incidents = await deriveIncidents([m]);
+  const incidents = await deriveIncidents([m], now);
   expect(incidents.length).toBe(1);
   expect(incidents[0].recovered).toBe(true);
   expect(new Date(incidents[0].endedAt!).getTime()).toBe(now - 300_000);
@@ -303,6 +303,33 @@ test("a paused monitor's open incident is flagged paused, not dropped", async ()
   expect(stillOpen.length).toBe(1);
   expect(stillOpen[0].monitorPaused).toBe(false);
   expect(stillOpen[0].startedAt).toBe(openStart.toISOString());
+});
+
+test("a paused incident is not pinned above newer resolved history", async () => {
+  const { deriveIncidents } = await import("@/lib/incidents");
+  const paused = await db.monitor.create({
+    data: {
+      name: "paused",
+      url: "https://paused.example.com",
+      intervalSec: 600,
+      enabled: false,
+    },
+  });
+  const running = await db.monitor.create({
+    data: { name: "running", url: "https://running.example.com", intervalSec: 600 },
+  });
+  const now = Date.parse("2026-01-15T00:00:00Z");
+  await db.check.createMany({
+    data: [
+      // Paused monitor: open run started two hours ago.
+      { monitorId: paused.id, status: "down", statusCode: 503, checkedAt: new Date(now - 2 * 3_600_000) },
+      // Running monitor: newer, already resolved.
+      { monitorId: running.id, status: "down", statusCode: 503, checkedAt: new Date(now - 3_600_000) },
+      { monitorId: running.id, status: "up", statusCode: 200, checkedAt: new Date(now - 30 * 60_000) },
+    ],
+  });
+  const incidents = await deriveIncidents([paused, running], now);
+  expect(incidents.map((i) => i.monitorName)).toEqual(["running", "paused"]);
 });
 
 test("a recovery observed after a sleep still closes the incident at the up check", async () => {

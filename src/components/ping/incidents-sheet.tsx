@@ -12,10 +12,18 @@ import {
 } from "@/components/ui/sheet";
 import { fetchIncidents, formatDateTime, timeAgo } from "@/lib/ping-client";
 import type { AdminIncidentDTO } from "@/lib/ping-types";
-import { StatusPill } from "./status-pill";
+import { StatusPill, type PillTone } from "./status-pill";
 import { EmptyState } from "./empty-state";
 import { InlineAlert } from "./inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { incidentState, isOngoingIncident, type IncidentState } from "@/lib/incident-status";
+
+const STATE_PILL: Record<IncidentState, { label: string; tone: PillTone }> = {
+  ongoing: { label: "ongoing", tone: "down" },
+  paused: { label: "paused", tone: "neutral" },
+  "no-recovery": { label: "no recovery", tone: "neutral" },
+  resolved: { label: "resolved", tone: "up" },
+};
 
 /** Admin view of the last 30 days of incidents (derived from real checks). */
 export function IncidentsSheet({
@@ -39,8 +47,7 @@ export function IncidentsSheet({
   // ticked while open so a long outage's duration stays honest.
   const [now, setNow] = useState(() => Date.now());
   // The header badge counts monitors still failing: ongoing, never paused or resolved.
-  const openCount =
-    incidents?.filter((i) => i.endedAt == null && !i.monitorPaused).length ?? 0;
+  const ongoingCount = incidents?.filter(isOngoingIncident).length ?? 0;
 
   const load = useCallback(async () => {
     try {
@@ -68,9 +75,9 @@ export function IncidentsSheet({
           <SheetTitle className="flex items-center gap-2 text-base">
             <AlertTriangle className="size-4 text-down/90" aria-hidden="true" />
             Incidents
-            {openCount > 0 && (
+            {ongoingCount > 0 && (
               <StatusPill tone="down" size="sm" className="tabular-nums">
-                {openCount}
+                {ongoingCount}
               </StatusPill>
             )}
           </SheetTitle>
@@ -132,19 +139,17 @@ function formatRange(startedAt: string, endedAt: string | null, paused: boolean)
 }
 
 function IncidentRow({ inc, now }: { inc: AdminIncidentDTO; now: number }) {
-  const ended = inc.endedAt != null;
-  // A sleep gap closes the run at its last down check without seeing it recover.
-  const recovered = inc.recovered === true;
+  const state = STATE_PILL[incidentState(inc)];
 
   return (
     <div className="relative rounded-lg border bg-card px-3 pb-2.5 pt-6">
       <StatusPill
-        tone={recovered ? "up" : ended || inc.monitorPaused ? "neutral" : "down"}
+        tone={state.tone}
         size="sm"
         uppercase
         className="absolute left-0 top-0 z-10 min-w-13 justify-center border-t-0 border-l-0"
       >
-        {recovered ? "resolved" : ended ? "no recovery" : inc.monitorPaused ? "paused" : "ongoing"}
+        {state.label}
       </StatusPill>
       <div className="flex items-baseline justify-between gap-2">
         <span className="min-w-0 truncate text-sm font-medium text-foreground">

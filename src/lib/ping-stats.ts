@@ -46,7 +46,6 @@ interface RawCheckRow {
   statusCode: number | null;
   responseMs: number | null;
   error: string | null;
-  whilePaused: boolean;
   checkedAt: Date | number | string; // prisma sqlite stores epoch-ms INTEGER
 }
 
@@ -77,7 +76,9 @@ export function emptyStats(): MonitorStatsDTO {
   };
 }
 export function toCheckDTO(
-  c: Omit<Check, "checkedAt"> & { checkedAt: Date | number | string | bigint },
+  c: Pick<Check, "id" | "status" | "statusCode" | "responseMs" | "error"> & {
+    checkedAt: Date | number | string | bigint;
+  },
 ): CheckDTO {
   return {
     id: c.id,
@@ -175,7 +176,7 @@ export async function collectMonitorStats(
           SELECT * FROM (${Prisma.join(
             windowIds.map(
               (id) => Prisma.sql`SELECT * FROM (
-                SELECT id, monitorId, status, statusCode, responseMs, error, whilePaused, checkedAt
+                SELECT id, monitorId, status, statusCode, responseMs, error, checkedAt
                 FROM "Check" WHERE monitorId = ${id} AND checkedAt >= ${since48hMs}
                 ORDER BY checkedAt DESC LIMIT ${RECENT_CHECKS})`,
             ),
