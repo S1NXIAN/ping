@@ -23,11 +23,11 @@ test("trims surrounding whitespace", () => {
   expect(monitorUrlSchema.parse("  https://example.com  ")).toBe("https://example.com");
 });
 
-test("intervalSecSchema accepts only whole minutes in the 3–15 range", () => {
+test("intervalSecSchema accepts only whole minutes in the 3–10 range", () => {
   expect(intervalSecSchema.safeParse(180).success).toBe(true);
-  expect(intervalSecSchema.safeParse(900).success).toBe(true);
+  expect(intervalSecSchema.safeParse(600).success).toBe(true);
   expect(intervalSecSchema.safeParse(179).success).toBe(false);
-  expect(intervalSecSchema.safeParse(901).success).toBe(false);
+  expect(intervalSecSchema.safeParse(601).success).toBe(false);
   // Whole minutes only: the card renders `intervalSec / 60` directly.
   expect(intervalSecSchema.safeParse(181).success).toBe(false);
 });

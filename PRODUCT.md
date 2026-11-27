@@ -33,7 +33,7 @@ Honesty of data as the core mechanism, purpose-built for cold-booting free-tier 
 
 Capabilities (confirmed, shipping):
 
-- Monitors: any http(s) URL, GET or HEAD, one **interval** schedule (3–15 minutes; presets, or a custom `M` value such as `4M`) — folders, pinning, manual/A–Z/Z–A/slowest/fastest sorting, drag reorder (desktop) with Move up/down in the card menu on every device, per-device sort memory, `/` search focus, ⌘K command palette.
+- Monitors: any http(s) URL, GET or HEAD, one **interval** schedule (3–10 minutes, whole minutes on a slider) — folders, pinning, manual/A–Z/Z–A/slowest/fastest sorting, drag reorder (desktop) with Move up/down in the card menu on every device, per-device sort memory, `/` search focus, ⌘K command palette.
 - Real checks: 15 s timeout, 2xx–3xx = up, exact error text on failure; keyword checks (body must contain / must not contain, case-insensitive, first 256 KB, can't be combined with HEAD — the pairing is rejected at create, edit and import); latency "slow" state (50–30 000 ms threshold, judged from the **average** of the monitor's recent up Checks).
 - Self-monitor: created by default, checks PING's own health endpoint every 3 minutes; an ordinary monitor otherwise (visible, editable, deletable).
 - Incidents: derived from real check history (30-day window), with admin postmortem notes; ongoing incidents are pinned to the top and exempt from the list cap. The incidents list and badge, like the dashboard's stat strip, cover the active Scope (see `GLOSSARY.md`); the header counts stay fleet-wide. The incidents badge is a nudge, not a tally: it counts every ongoing incident plus every closed one newer than the newest start the operator has opened the incidents sheet over (a per-device watermark, like the sort memory), so viewed history clears and an ongoing outage keeps asking until it resolves.
@@ -44,7 +44,7 @@ Constraints (must be preserved by future work):
 
 - Single-instance assumption: in-process scheduler, in-memory login throttle, globalThis-held concurrency guards are process-local.
 - SQLite only; history retention default 30 days + 1 000 checks/monitor; incident notes pruned at a fixed 32 days.
-- Check interval 3–15 minutes (whole minutes only — `S` is not a configurable unit); ≤200 monitors. 15 minutes is the free tier's idle spin-down, so no monitor can be configured to wait longer than a service stays awake.
+- Check interval 3–10 minutes, whole minutes on a slider; ≤200 monitors. The ceiling rationale lives in `GLOSSARY.md` → Interval schedule.
 - Monitor URLs must be http(s) — any host, including internal targets (`localhost`, LAN names, `169.254.*` link-local) by design: creating a monitor requires the authenticated admin session, so this is not an untrusted-input path (see README trust model).
 - UTC day buckets everywhere (stats, bars) so views align across timezones.
 - English-only UI; no i18n requirement recorded.

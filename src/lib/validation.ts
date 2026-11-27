@@ -47,8 +47,8 @@ export const monitorUrlSchema = z
     }
   }, "Enter a valid http(s) URL");
 
-/** Check interval in seconds. Bounded to the range the scheduler and the
- *  custom-interval grammar can honour (see INTERVAL_MIN_SEC / MAX_SEC). */
+/** Check interval in seconds. Bounded to the range the scheduler can honour
+ *  (see INTERVAL_MIN_SEC / MAX_SEC). */
 export const intervalSecSchema = z
   .number()
   .int()

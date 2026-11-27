@@ -21,7 +21,7 @@ model Monitor {
   name           String
   url            String
   method         String    @default("GET") // GET | HEAD
-  intervalSec    Int       @default(300) // seconds between checks (180–900)
+  intervalSec    Int       @default(300) // seconds between checks (180–600)
   enabled        Boolean   @default(true)
   folderId       String?
   folder         Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)

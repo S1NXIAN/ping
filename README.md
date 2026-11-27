@@ -18,9 +18,8 @@ only visible by looking at PING.
 ## Features
 
 - **Monitors** — any http(s) URL, custom name, GET or HEAD, and a check
-  interval from 3 to 15 minutes (pick a preset or type a custom value like
-  `4M`). 15 minutes is the free tier's idle spin-down, so a monitor never waits
-  longer than a service can stay awake. Group monitors
+  interval from 3 to 10 minutes on a slider (whole minutes; ceiling rationale
+  in `GLOSSARY.md` → Interval schedule). Group monitors
   into **folders**, rename anything, pause or resume individual monitors, and
   tag each with the **account used** (optional label for whichever account runs
   the service — searchable).
@@ -42,8 +41,7 @@ only visible by looking at PING.
   case-insensitive, first 256 KB of the body, ≤200 chars). A keyword needs a
   response body, so it can't be combined with a HEAD check: create, edit and
   import all refuse that pairing rather than storing a monitor that would
-  never pass. (Monitors saved before this rule existed are switched to GET
-  once, on boot.) A failed keyword match is recorded as a real down
+  never pass. A failed keyword match is recorded as a real down
   check (error message, incidents and uptime math all follow).
 - **Slow (degraded) state** — optional per-monitor threshold (50–30000 ms, set
   in the monitor form). A monitor is **slow** when the average response time of

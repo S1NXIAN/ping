@@ -19,19 +19,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { api, ApiError, formatInterval, normalizeUrl, parseInterval } from "@/lib/ping-client";
+import { api, ApiError, clampIntervalSec, INTERVAL_MAX_SEC, INTERVAL_MIN_SEC, normalizeUrl } from "@/lib/ping-client";
 import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { InlineAlert } from "./inline-alert";
 
-// Four cadence choices, capped at the free tier's 15-minute spin-down: a
-// longer interval could not keep a service awake. Values are seconds, the
-// unit the API, DB and scheduler speak.
-const INTERVAL_PRESETS: { value: string; label: string; recommended?: boolean }[] = [
-  { value: "180", label: "3 minutes" },
-  { value: "300", label: "5 minutes", recommended: true },
-  { value: "600", label: "10 minutes" },
-  { value: "900", label: "15 minutes" },
-];
+// The slider speaks whole minutes; the API and DB speak seconds. Convert once
+// at each boundary rather than scattering /60 and *60 through the form.
+const INTERVAL_MIN_MIN = INTERVAL_MIN_SEC / 60;
+const INTERVAL_MAX_MIN = INTERVAL_MAX_SEC / 60;
 
 const KEYWORD_MODES = [
   { value: "off", label: "Off (status code only)" },
@@ -39,12 +34,7 @@ const KEYWORD_MODES = [
   { value: "excludes", label: "Body must not contain it" },
 ];
 
-/** Sentinel for the "Custom…" row — never a real interval value. */
-const CUSTOM_INTERVAL = "custom";
-/** Every preset value, for telling a curated choice from a hand-typed one. */
-const PRESET_INTERVALS = new Set(INTERVAL_PRESETS.map((o) => o.value));
-
-type FieldErrors = { url?: string; slow?: string; keyword?: string; interval?: string };
+type FieldErrors = { url?: string; slow?: string; keyword?: string };
 
 /** Top-aligned label with a tap/keyboard-revealable hint instead of helper
  *  paragraphs (keeps the dialog scroll-free). A hover-only tooltip was a defect:
@@ -118,9 +108,7 @@ export function AddMonitorDialog({
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [folderId, setFolderId] = useState<string>("none");
-  const [intervalSec, setIntervalSec] = useState("300");
-  // "custom" replaces the preset select with a free-text M field.
-  const [intervalCustom, setIntervalCustom] = useState(false);
+  const [intervalMin, setIntervalMin] = useState(5);
   const [method, setMethod] = useState<"GET" | "HEAD">("GET");
   const [account, setAccount] = useState("");
   const [keywordMode, setKeywordMode] = useState<"off" | "contains" | "excludes">("off");
@@ -139,14 +127,9 @@ export function AddMonitorDialog({
       setName(initial.name);
       setUrl(initial.url);
       setFolderId(initial.folderId ?? "none");
-      // A value the presets don't cover (e.g. a saved 4M) opens in custom
-      // mode — and the field then holds TEXT, so seed it with the compact form
-      // rather than the raw seconds the API stores.
-      const isCustom = !PRESET_INTERVALS.has(String(initial.intervalSec));
-      setIntervalCustom(isCustom);
-      setIntervalSec(
-        isCustom ? formatInterval(initial.intervalSec) : String(initial.intervalSec),
-      );
+      // Clamp a saved value to the current 3–10 range: a legacy 15-minute
+      // monitor opens at 10, with no converter to preserve it.
+      setIntervalMin(clampIntervalSec(initial.intervalSec) / 60);
       setMethod(initial.method);
       setAccount(initial.account ?? "");
       setKeywordMode(initial.keyword ? initial.keywordMode : "off");
@@ -163,8 +146,7 @@ export function AddMonitorDialog({
       setName("");
       setUrl("");
       setFolderId(defaultFolderId ?? "none");
-      setIntervalSec("300");
-      setIntervalCustom(false);
+      setIntervalMin(5);
       setMethod("GET");
       setAccount("");
       setKeywordMode("off");
@@ -224,26 +206,17 @@ export function AddMonitorDialog({
     const trimmedKeyword = keyword.trim();
     if (keywordMode !== "off" && trimmedKeyword === "") next.keyword = "Enter a keyword, or set it Off";
 
-    // Custom interval: parse the M text to the seconds the API stores.
-    // A preset value is already seconds, so it needs no parsing.
-    let intervalSeconds = Number(intervalSec);
-    if (intervalCustom) {
-      const parsed = parseInterval(intervalSec);
-      if ("error" in parsed) next.interval = parsed.error;
-      else intervalSeconds = parsed.seconds;
-    }
-
     setFieldErrors(next);
     if (Object.values(next).some(Boolean)) {
       // surface hidden advanced-field errors
       if (next.slow || next.keyword) setAdvancedOpen(true);
-      document.getElementById(next.interval ? "m-interval" : "m-url")?.focus();
+      document.getElementById("m-url")?.focus();
       return;
     }
 
     const body: Record<string, unknown> = {
       url: normalized,
-      intervalSec: intervalSeconds,
+      intervalSec: intervalMin * 60,
       method,
       folderId: folderId === "none" ? null : folderId,
       account: account.trim(),
@@ -280,16 +253,10 @@ export function AddMonitorDialog({
   }
 
   const fieldClass = "h-11 w-full sm:h-9";
+  const intervalFill = `${
+    ((intervalMin - INTERVAL_MIN_MIN) / (INTERVAL_MAX_MIN - INTERVAL_MIN_MIN)) * 100
+  }%`;
 
-  // Trigger shows the plain label; "(recommended)" is list-only so the
-  // value never overflows a half-width column into its neighbour.
-  const intervalOption = INTERVAL_PRESETS.find((o) => o.value === intervalSec);
-  // Live preview of the custom field: the parsed seconds, or null while the
-  // text is incomplete/invalid (the hint then falls back to the unit legend).
-  const intervalPreview = intervalCustom ? (() => {
-    const r = parseInterval(intervalSec);
-    return "seconds" in r ? r.seconds : null;
-  })() : null;
   const folderLabel =
     folderId === "none" ? "No folder" : folders.find((f) => f.id === folderId)?.name ?? "No folder";
 
@@ -414,84 +381,31 @@ export function AddMonitorDialog({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <FieldLabel
-                  htmlFor="m-interval"
-                  hint="3 to 15 minutes — frequent enough to keep a free-tier service awake."
+                <div className="flex items-baseline justify-between gap-2">
+                  <Label htmlFor="m-interval" className="text-sm font-medium leading-none">
+                    Check every
+                  </Label>
+                  <span className="text-sm font-semibold tabular-nums">{intervalMin} min</span>
+                </div>
+                <input
+                  id="m-interval"
+                  type="range"
+                  min={INTERVAL_MIN_MIN}
+                  max={INTERVAL_MAX_MIN}
+                  step={1}
+                  value={intervalMin}
+                  onChange={(e) => setIntervalMin(Number(e.target.value))}
+                  aria-valuetext={`${intervalMin} minutes`}
+                  className="ping-range h-11 w-full sm:h-9"
+                  style={{ "--range-fill": intervalFill } as React.CSSProperties}
+                />
+                <div
+                  aria-hidden="true"
+                  className="flex justify-between text-[10px] tabular-nums text-muted-foreground"
                 >
-                  Check every
-                </FieldLabel>
-                {intervalCustom ? (
-                    <>
-                      <Input
-                        id="m-interval"
-                        value={intervalSec}
-                        onChange={(e) => {
-                          setIntervalSec(e.target.value);
-                          clearError("interval");
-                        }}
-                        placeholder="e.g. 4M"
-                        autoComplete="off"
-                        aria-invalid={fieldErrors.interval ? true : undefined}
-                        aria-describedby={fieldErrors.interval ? "m-interval-err" : undefined}
-                        className={fieldClass}
-                      />
-                      {/* Hint and the way back to presets share one line, so
-                          the field itself keeps the full column width. */}
-                      <div className="flex items-center justify-between gap-2">
-                        {fieldErrors.interval ? (
-                          <p id="m-interval-err" role="alert" className="text-xs text-down">
-                            {fieldErrors.interval}
-                          </p>
-                        ) : (
-                          // Echo the parsed cadence so the M string is never
-                          // ambiguous. Whole minutes are exact on the 30s tick grid.
-                          <p className="text-xs text-muted-foreground">
-                            {intervalPreview
-                              ? `= every ${formatInterval(intervalPreview)}`
-                              : "M = minutes (3–15)"}
-                          </p>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIntervalCustom(false);
-                            setIntervalSec("300");
-                            clearError("interval");
-                          }}
-                          className="shrink-0 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:text-foreground focus-ring"
-                        >
-                          Presets
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <Select
-                      value={intervalSec}
-                      onValueChange={(v) => {
-                        if (v === CUSTOM_INTERVAL) {
-                          setIntervalCustom(true);
-                          // Seed the field from the current choice so the user
-                          // edits rather than retypes.
-                          setIntervalSec(formatInterval(Number(intervalSec)));
-                          return;
-                        }
-                        setIntervalSec(v);
-                      }}
-                    >
-                      <SelectTrigger id="m-interval" className={fieldClass}>
-                        <SelectValue>{intervalOption?.label}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {INTERVAL_PRESETS.map((i) => (
-                          <SelectItem key={i.value} value={i.value}>
-                            {i.label}
-                            {i.recommended ? " (recommended)" : ""}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value={CUSTOM_INTERVAL}>Custom…</SelectItem>
-                      </SelectContent>
-                    </Select>
-                )}
+                  <span>{INTERVAL_MIN_MIN} min</span>
+                  <span>{INTERVAL_MAX_MIN} min</span>
+                </div>
               </div>
 
               <div className="space-y-2">

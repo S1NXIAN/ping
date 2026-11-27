@@ -71,9 +71,9 @@ not a revocation.
 _Avoid_: token, cookie, unlock
 
 **Interval schedule**:
-A monitor checks every N seconds, N between 3 and 15 minutes. Set as a preset
-or as a custom `M` value. The 15-minute ceiling is the free tier's idle
-spin-down, so every configured cadence keeps its service awake.
+A monitor checks every N seconds, N between 3 and 10 minutes, chosen on a
+slider in whole minutes. The 10-minute ceiling stays below the free tier's
+15-minute idle spin-down, so every configured cadence keeps its service awake.
 _Avoid_: recurring, periodic
 
 **Incident**:

@@ -182,6 +182,58 @@ body::before {
   scrollbar-width: none;
 }
 
+/* Check-interval slider: a 2px hairline track with a hard-stop white fill and
+ * a square thumb, so the chosen cadence reads as instrument data. The fill is
+ * a hard stop, not a decorative gradient. */
+.ping-range {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.ping-range::-webkit-slider-runnable-track {
+  height: 2px;
+  background: linear-gradient(
+    to right,
+    var(--primary) var(--range-fill, 0%),
+    var(--input) var(--range-fill, 0%)
+  );
+}
+.ping-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 20px;
+  margin-top: -9px;
+  border: 0;
+  border-radius: 0;
+  background: var(--primary);
+}
+.ping-range::-moz-range-track {
+  height: 2px;
+  background: var(--input);
+}
+.ping-range::-moz-range-progress {
+  height: 2px;
+  background: var(--primary);
+}
+.ping-range::-moz-range-thumb {
+  width: 12px;
+  height: 20px;
+  border: 0;
+  border-radius: 0;
+  background: var(--primary);
+}
+.ping-range:focus-visible {
+  outline: none;
+}
+.ping-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5);
+}
+.ping-range:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5);
+}
+
 /* Live status dot with sonar ripple */
 @keyframes ping-ripple {
   0% {

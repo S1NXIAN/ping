@@ -2,39 +2,20 @@
 import type { AdminIncidentDTO } from "./ping-types";
 
 /** Check-interval bounds, shared with the API schemas (see lib/validation.ts).
- *  Seconds are not a grammar unit: the scheduler wakes every 30s, so anything
- *  finer could not be honoured exactly. The floor is 3 minutes; the ceiling is
- *  15 minutes, the free tier's idle spin-down — a longer interval could not
- *  keep a service awake. */
+ *  Seconds are not a unit: the scheduler wakes every 30s, so anything finer
+ *  could not be honoured exactly. The floor is 3 minutes; the ceiling is 10
+ *  minutes. 15 minutes is the free tier's idle spin-down — a monitor set there
+ *  would let the service cold-boot, which defeats the point of PING. */
 export const INTERVAL_MIN_SEC = 180;
-export const INTERVAL_MAX_SEC = 900;
+export const INTERVAL_MAX_SEC = 600;
 
-const INTERVAL_SYNTAX_ERROR = "Use a number and unit, e.g. 4M";
-
-/**
- * Parses a custom check interval such as `4M` or `12M`.
- * The only unit is M, case-insensitive; the total is range-checked in whole
- * minutes. Returns total seconds, the unit the API, DB and scheduler speak.
- */
-export function parseInterval(input: string): { seconds: number } | { error: string } {
-  const raw = input.trim();
-  if (!raw) return { error: "Enter an interval, e.g. 4M" };
-  const match = raw.match(/^(\d+)([a-zA-Z]+)$/);
-  if (!match) return { error: INTERVAL_SYNTAX_ERROR };
-  const unit = match[2].toLowerCase();
-  if (unit !== "m") {
-    return {
-      error:
-        unit === "s"
-          ? "Seconds aren't supported — checks run on a 30s scheduler. Try 3M."
-          : `Unknown unit "${match[2]}" — use M`,
-    };
-  }
-  const total = Number(match[1]) * 60;
-  if (total < INTERVAL_MIN_SEC) return { error: `At least ${INTERVAL_MIN_SEC / 60} minutes` };
-  if (total > INTERVAL_MAX_SEC)
-    return { error: `At most ${INTERVAL_MAX_SEC / 60} minutes` };
-  return { seconds: total };
+/** Clamp a stored interval to the current bounds, rounded to a whole minute.
+ *  A legacy 15-minute monitor opens at 10; a legacy 1-minute at 3. */
+export function clampIntervalSec(seconds: number): number {
+  return Math.min(
+    INTERVAL_MAX_SEC,
+    Math.max(INTERVAL_MIN_SEC, Math.round(seconds / 60) * 60),
+  );
 }
 
 export class ApiError extends Error {
@@ -175,7 +156,7 @@ export function formatUptime(fraction: number | null | undefined): string {
   return `${pct.toFixed(pct >= 99 ? 2 : 1)}%`;
 }
 
-/** 180 -> "3m", 900 -> "15m". Every interval written through the API is whole minutes. */
+/** 180 -> "3m", 600 -> "10m". Every interval written through the API is whole minutes. */
 export function formatInterval(seconds: number): string {
   return `${seconds / 60}m`;
 }
