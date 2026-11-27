@@ -10,7 +10,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { fetchIncidents, formatDateTime, formatDuration } from "@/lib/ping-client";
+import { fetchIncidents, formatDateTime, timeAgo } from "@/lib/ping-client";
 import type { AdminIncidentDTO } from "@/lib/ping-types";
 import { StatusPill } from "./status-pill";
 import { EmptyState } from "./empty-state";
@@ -112,10 +112,23 @@ export function IncidentsSheet({
   );
 }
 
+/**
+ * One line for the row's second line: the date once, then the time range.
+ * Repeating "Nov 27, 10:34 PM" twice made start and end read the same at 11px.
+ */
+function formatRange(startedAt: string, endedAt: string | null): string {
+  const started = new Date(startedAt);
+  if (!endedAt) return `${formatDateTime(startedAt)} → now`;
+  const ended = new Date(endedAt);
+  const end =
+    ended.toDateString() === started.toDateString()
+      ? ended.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+      : formatDateTime(endedAt);
+  return `${formatDateTime(startedAt)} → ${end}`;
+}
+
 function IncidentRow({ inc, now }: { inc: AdminIncidentDTO; now: number }) {
-  const started = new Date(inc.startedAt);
-  const ended = inc.endedAt ? new Date(inc.endedAt) : null;
-  const durationMs = (ended ? ended.getTime() : now) - started.getTime();
+  const ended = inc.endedAt != null;
 
   return (
     <div className="rounded-lg border bg-card px-3 py-2.5">
@@ -131,12 +144,11 @@ function IncidentRow({ inc, now }: { inc: AdminIncidentDTO; now: number }) {
           </StatusPill>
         )}
         <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
-          {formatDuration(Math.round(durationMs / 1000), { coarse: true })}
+          {timeAgo(inc.endedAt ?? inc.startedAt, now)}
         </span>
       </div>
-      <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-        <span>started {formatDateTime(inc.startedAt)}</span>
-        {ended && <span>resolved {formatDateTime(inc.endedAt)}</span>}
+      <div className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">
+        {formatRange(inc.startedAt, inc.endedAt)}
       </div>
     </div>
   );
