@@ -3,7 +3,6 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
 import { MAX_MONITORS } from "@/lib/checker";
-import { nextMonitorPosition } from "@/lib/monitor-order";
 import { monitorUrlSchema, intervalSecSchema, methodKeywordError, keywordSchema, slowThresholdMsSchema } from "@/lib/validation";
 import type { ImportResult } from "@/lib/ping-types";
 
@@ -15,23 +14,20 @@ const schema = z.object({
       z.object({
         name: z.string().trim().min(1).max(80),
         url: monitorUrlSchema,
-        method: z.enum(["GET", "HEAD"]).default("GET"),
-        intervalSec: intervalSecSchema.default(300),
-        enabled: z.boolean().default(true),
+        method: z.enum(["GET", "HEAD"]),
+        intervalSec: intervalSecSchema,
+        enabled: z.boolean(),
         account: z.string().trim().max(60).nullish().transform((v) => (v && v.length > 0 ? v : null)),
         keyword: keywordSchema,
-        keywordMode: z.enum(["contains", "excludes"]).default("contains"),
+        keywordMode: z.enum(["contains", "excludes"]),
         slowThresholdMs: slowThresholdMsSchema,
         folder: z.string().trim().max(40).nullish(),
-        // Pin state and manual order. Absent in exports written before they
-        // were carried, so an old file imports with a fresh monitor's defaults
-        // (unpinned, appended at the end).
-        pinned: z.boolean().default(false),
-        position: z.number().int().min(0).optional(),
+        pinned: z.boolean(),
+        position: z.number().int().min(0),
       }),
     )
     .max(200),
-  folders: z.array(z.object({ name: z.string().trim().min(1).max(40) })).max(50).optional(),
+  folders: z.array(z.object({ name: z.string().trim().min(1).max(40) })).max(50),
 });
 
 /** Thrown inside the import transaction for a user-facing 400 (rolls back). */
@@ -97,28 +93,20 @@ export async function POST(req: NextRequest) {
           folderIds.set(name, created.id);
           foldersCreated += 1;
         }
-        if (folders) {
-          for (const f of folders) {
-            if (folderIds.has(f.name)) continue;
-            const created = await tx.folder.create({ data: { name: f.name } });
-            folderIds.set(f.name, created.id);
-            foldersCreated += 1;
-          }
+        for (const f of folders) {
+          if (folderIds.has(f.name)) continue;
+          const created = await tx.folder.create({ data: { name: f.name } });
+          folderIds.set(f.name, created.id);
+          foldersCreated += 1;
         }
 
         let created = 0;
         let skipped = 0;
-        let nextPosition = await nextMonitorPosition(tx);
         for (const m of monitors) {
           if (existingUrls.has(m.url)) {
             skipped += 1;
             continue;
           }
-          // Restore the export's manual order and pin state; a monitor whose
-          // file has no position (an older export) appends past everything seen
-          // so far, so it never collides with an imported position.
-          const position = m.position ?? nextPosition;
-          nextPosition = Math.max(nextPosition, position + 1);
           await tx.monitor.create({
             data: {
               name: m.name,
@@ -132,7 +120,7 @@ export async function POST(req: NextRequest) {
               slowThresholdMs: m.slowThresholdMs ?? null,
               folderId: m.folder ? (folderIds.get(m.folder) ?? null) : null,
               pinned: m.pinned,
-              position,
+              position: m.position,
             },
           });
           existingUrls.add(m.url);

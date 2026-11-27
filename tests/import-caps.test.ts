@@ -25,6 +25,25 @@ async function importReq(body: unknown): Promise<NextRequest> {
   });
 }
 
+/** A current-format monitor; import requires every field. */
+function monitor(overrides: Record<string, unknown> = {}) {
+  return {
+    name: "m",
+    url: "https://m.example.com",
+    method: "GET",
+    intervalSec: 300,
+    enabled: true,
+    keywordMode: "contains",
+    pinned: false,
+    position: 0,
+    ...overrides,
+  };
+}
+
+function payload(monitors: unknown[]) {
+  return { app: "PING", version: 1, monitors, folders: [] };
+}
+
 beforeEach(async () => {
   await resetDb();
 });
@@ -38,11 +57,7 @@ test("importing past the monitor cap is refused", async () => {
   });
   const { POST } = await import("@/app/api/import/route");
   const res = await POST(
-    await importReq({
-      app: "PING",
-      version: 1,
-      monitors: [{ name: "new", url: "https://new.example.com" }],
-    }),
+    await importReq(payload([monitor({ name: "new", url: "https://new.example.com" })])),
   );
   expect(res.status).toBe(400);
   expect(await db.monitor.count()).toBe(MAX_MONITORS);
@@ -57,11 +72,7 @@ test("importing monitors up to the cap succeeds", async () => {
   });
   const { POST } = await import("@/app/api/import/route");
   const res = await POST(
-    await importReq({
-      app: "PING",
-      version: 1,
-      monitors: [{ name: "last", url: "https://last.example.com" }],
-    }),
+    await importReq(payload([monitor({ name: "last", url: "https://last.example.com" })])),
   );
   expect(res.status).toBe(200);
   expect(await db.monitor.count()).toBe(MAX_MONITORS);
@@ -71,43 +82,10 @@ test("a file whose monitors already exist is skipped, not counted against the ca
   await db.monitor.create({ data: { name: "dup", url: "https://dup.example.com" } });
   const { POST } = await import("@/app/api/import/route");
   const res = await POST(
-    await importReq({
-      app: "PING",
-      version: 1,
-      monitors: [{ name: "dup", url: "https://dup.example.com" }],
-    }),
+    await importReq(payload([monitor({ name: "dup", url: "https://dup.example.com" })])),
   );
   expect(res.status).toBe(200);
   const body = await res.json();
   expect(body.created).toBe(0);
   expect(body.skipped).toBe(1);
-});
-
-test("an old-format export carrying removed fields still imports", async () => {
-  // A file written before scheduled pings / maintenance / webhooks were
-  // removed: the unknown fields are simply ignored, monitors still land.
-  // Schedule keys are unknown now too — an old times-of-day monitor imports
-  // as a plain interval monitor, with no conversion code.
-  const { POST } = await import("@/app/api/import/route");
-  const res = await POST(
-    await importReq({
-      app: "PING",
-      version: 1,
-      monitors: [
-        {
-          name: "legacy",
-          url: "https://legacy.example.com",
-          scheduleMode: "times",
-          scheduleTimes: "03:00,13:00",
-          timezone: "Asia/Manila",
-        },
-      ],
-      scheduledPings: [{ monitorId: "x", runAt: new Date().toISOString() }],
-      maintenanceWindows: [{ monitor: "legacy", startsAt: new Date().toISOString(), endsAt: new Date().toISOString() }],
-      webhookChannels: [{ name: "old", url: "https://hooks.slack.com/services/x" }],
-    }),
-  );
-  expect(res.status).toBe(200);
-  const imported = await db.monitor.findFirstOrThrow({ where: { name: "legacy" } });
-  expect(imported.intervalSec).toBe(300);
 });

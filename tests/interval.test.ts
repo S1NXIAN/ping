@@ -2,13 +2,7 @@
 // seconds — the unit the API, DB and scheduler speak. Seconds are not a unit:
 // the scheduler wakes every 30s, and whole minutes are all exact on that grid.
 import { expect, test } from "bun:test";
-import {
-  clampIntervalSec,
-  INTERVAL_MAX_SEC,
-  INTERVAL_MIN_SEC,
-  formatDuration,
-  formatInterval,
-} from "@/lib/ping-client";
+import { INTERVAL_MAX_SEC, INTERVAL_MIN_SEC, formatDuration, formatInterval } from "@/lib/ping-client";
 
 test("formatInterval renders whole minutes", () => {
   expect(formatInterval(180)).toBe("3m");
@@ -32,14 +26,6 @@ test("formatDuration coarse reads an outage: no seconds, padded minutes", () => 
   expect(formatDuration(600, { coarse: true })).toBe("10m");
   expect(formatDuration(11100, { coarse: true })).toBe("3h 05m");
   expect(formatDuration(90000, { coarse: true })).toBe("1d 1h");
-});
-
-test("clampIntervalSec rounds to whole minutes and clamps to 3–10", () => {
-  expect(clampIntervalSec(60)).toBe(180); // a legacy 1-minute value
-  expect(clampIntervalSec(181)).toBe(180); // rounds down to the floor
-  expect(clampIntervalSec(300)).toBe(300); // the default
-  expect(clampIntervalSec(599)).toBe(600); // rounds up to the ceiling
-  expect(clampIntervalSec(900)).toBe(600); // a legacy 15-minute value
 });
 
 test("exported bounds match the documented range", () => {

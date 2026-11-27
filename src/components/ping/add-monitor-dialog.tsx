@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { api, ApiError, clampIntervalSec, INTERVAL_MAX_SEC, INTERVAL_MIN_SEC, normalizeUrl } from "@/lib/ping-client";
+import { api, ApiError, INTERVAL_MAX_SEC, INTERVAL_MIN_SEC, normalizeUrl } from "@/lib/ping-client";
 import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { InlineAlert } from "./inline-alert";
 
@@ -127,9 +127,7 @@ export function AddMonitorDialog({
       setName(initial.name);
       setUrl(initial.url);
       setFolderId(initial.folderId ?? "none");
-      // Clamp a saved value to the current 3–10 range: a legacy 15-minute
-      // monitor opens at 10, with no converter to preserve it.
-      setIntervalMin(clampIntervalSec(initial.intervalSec) / 60);
+      setIntervalMin(initial.intervalSec / 60);
       setMethod(initial.method);
       setAccount(initial.account ?? "");
       setKeywordMode(initial.keyword ? initial.keywordMode : "off");

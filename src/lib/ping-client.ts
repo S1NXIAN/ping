@@ -9,15 +9,6 @@ import type { AdminIncidentDTO } from "./ping-types";
 export const INTERVAL_MIN_SEC = 180;
 export const INTERVAL_MAX_SEC = 600;
 
-/** Clamp a stored interval to the current bounds, rounded to a whole minute.
- *  A legacy 15-minute monitor opens at 10; a legacy 1-minute at 3. */
-export function clampIntervalSec(seconds: number): number {
-  return Math.min(
-    INTERVAL_MAX_SEC,
-    Math.max(INTERVAL_MIN_SEC, Math.round(seconds / 60) * 60),
-  );
-}
-
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {

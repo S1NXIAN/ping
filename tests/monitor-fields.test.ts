@@ -45,6 +45,21 @@ async function importFile(body: unknown): Promise<Response> {
   return POST(await authed("/api/import", "POST", body));
 }
 
+/** A current-format monitor; import requires every field. */
+function monitor(overrides: Record<string, unknown> = {}) {
+  return {
+    name: "m",
+    url: "https://m.com",
+    method: "GET",
+    intervalSec: 300,
+    enabled: true,
+    keywordMode: "contains",
+    pinned: false,
+    position: 0,
+    ...overrides,
+  };
+}
+
 // ---- slow threshold bounds (50–30000) ----
 
 test("create accepts a slow threshold at each bound", async () => {
@@ -72,7 +87,8 @@ test("import accepts a slow threshold at the lower bound", async () => {
   const ok = await importFile({
     app: "PING",
     version: 1,
-    monitors: [{ name: "ok", url: "https://ok.com", slowThresholdMs: 50 }],
+    monitors: [monitor({ name: "ok", url: "https://ok.com", slowThresholdMs: 50 })],
+    folders: [],
   });
   expect(ok.status).toBe(200);
 });
@@ -81,7 +97,8 @@ test("import refuses a slow threshold below the lower bound", async () => {
   const bad = await importFile({
     app: "PING",
     version: 1,
-    monitors: [{ name: "bad", url: "https://bad.com", slowThresholdMs: 49 }],
+    monitors: [monitor({ name: "bad", url: "https://bad.com", slowThresholdMs: 49 })],
+    folders: [],
   });
   expect(bad.status).toBe(400);
 });
@@ -101,7 +118,8 @@ test("a keyword longer than 200 characters is refused on import", async () => {
   const imp = await importFile({
     app: "PING",
     version: 1,
-    monitors: [{ name: "bad", url: "https://bad.com", keyword: "x".repeat(201) }],
+    monitors: [monitor({ name: "bad", url: "https://bad.com", keyword: "x".repeat(201) })],
+    folders: [],
   });
   expect(imp.status).toBe(400);
 });
@@ -119,7 +137,8 @@ test("a HEAD monitor with a keyword is refused on import", async () => {
   const imp = await importFile({
     app: "PING",
     version: 1,
-    monitors: [{ name: "bad", url: "https://bad.com", method: "HEAD", keyword: "ok" }],
+    monitors: [monitor({ name: "bad", url: "https://bad.com", method: "HEAD", keyword: "ok" })],
+    folders: [],
   });
   expect(imp.status).toBe(400);
 });
