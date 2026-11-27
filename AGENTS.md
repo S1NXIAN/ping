@@ -26,4 +26,4 @@ Any code change MUST follow [`CODING_STANDARD.md`](~/core/docs/standards/CODING_
 ## Architecture decisions
 
 Before changing a persisted data format, read
-`docs/adr/0003-current-format-only.md`. Other decisions live in `docs/adr/`.
+`docs/adr/0002-current-format-only.md`. Other decisions live in `docs/adr/`.
