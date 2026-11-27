@@ -211,9 +211,64 @@ test("a sleep gap between two down checks never fabricates one long incident", a
   // at the later down across the gap.
   const older = incidents.find((i) => i.endedAt != null)!;
   expect(new Date(older.endedAt!).getTime()).toBe(new Date(older.startedAt).getTime());
+  // No up check was seen, so it must not claim a recovery.
+  expect(older.recovered).toBe(false);
   // The newer down, with nothing after it, is the ongoing one.
   const ongoing = incidents.filter((i) => i.endedAt == null);
   expect(ongoing.length).toBe(1);
+  expect(ongoing[0].recovered).toBeNull();
+});
+
+test("a failed manual check while paused never opens an incident", async () => {
+  const { deriveIncidents } = await import("@/lib/incidents");
+  const m = await db.monitor.create({
+    data: { name: "svc", url: "https://svc.example.com", intervalSec: 600, enabled: false },
+  });
+  const now = Date.now();
+  await db.check.createMany({
+    data: [
+      { monitorId: m.id, status: "down", statusCode: 503, checkedAt: new Date(now - 3_600_000) },
+      // Manual "Check now" after the monitor was paused; still failing.
+      {
+        monitorId: m.id,
+        status: "down",
+        statusCode: 503,
+        whilePaused: true,
+        checkedAt: new Date(now - 300_000),
+      },
+    ],
+  });
+  const incidents = await deriveIncidents([m]);
+  // The pre-pause run stays the one paused incident; the manual failure adds none.
+  expect(incidents.length).toBe(1);
+  expect(incidents[0].endedAt).toBeNull();
+  expect(incidents[0].monitorPaused).toBe(true);
+  expect(incidents[0].downChecks).toBe(1);
+  expect(new Date(incidents[0].startedAt).getTime()).toBe(now - 3_600_000);
+});
+
+test("a successful manual check while paused resolves the incident", async () => {
+  const { deriveIncidents } = await import("@/lib/incidents");
+  const m = await db.monitor.create({
+    data: { name: "svc", url: "https://svc.example.com", intervalSec: 600, enabled: false },
+  });
+  const now = Date.now();
+  await db.check.createMany({
+    data: [
+      { monitorId: m.id, status: "down", statusCode: 503, checkedAt: new Date(now - 3_600_000) },
+      {
+        monitorId: m.id,
+        status: "up",
+        statusCode: 200,
+        whilePaused: true,
+        checkedAt: new Date(now - 300_000),
+      },
+    ],
+  });
+  const incidents = await deriveIncidents([m]);
+  expect(incidents.length).toBe(1);
+  expect(incidents[0].recovered).toBe(true);
+  expect(new Date(incidents[0].endedAt!).getTime()).toBe(now - 300_000);
 });
 
 test("a paused monitor's open incident is flagged paused, not dropped", async () => {
@@ -238,6 +293,7 @@ test("a paused monitor's open incident is flagged paused, not dropped", async ()
   const open = paused.filter((i) => i.endedAt == null);
   expect(open.length).toBe(1);
   expect(open[0].monitorPaused).toBe(true);
+  expect(open[0].recovered).toBeNull();
   expect(open[0].startedAt).toBe(openStart.toISOString());
 
   // Resumed: the same open run is a real ongoing incident again.
@@ -268,4 +324,5 @@ test("a recovery observed after a sleep still closes the incident at the up chec
   expect(incidents.length).toBe(1);
   expect(incidents[0].endedAt).not.toBeNull();
   expect(new Date(incidents[0].endedAt!).getTime()).toBe(now);
+  expect(incidents[0].recovered).toBe(true);
 });

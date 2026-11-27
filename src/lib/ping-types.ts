@@ -133,6 +133,8 @@ export interface AdminIncidentDTO {
   monitorName: string;
   startedAt: string;
   endedAt: string | null;
+  /** Null while ongoing; false when a sleep gap ended it without an up check. */
+  recovered: boolean | null;
   /** The monitor is paused; an open incident is then shown as paused. */
   monitorPaused: boolean;
   downChecks: number;

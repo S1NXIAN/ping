@@ -34,6 +34,9 @@ export interface DerivedIncident {
   startedAt: string; // ISO — first failed check
   /** Null while the incident is still ongoing. */
   endedAt: string | null;
+  /** Null while ongoing. True only when an up Check was observed after the
+   *  incident; false when a sleep gap ended it at its last down check. */
+  recovered: boolean | null;
   /** The monitor is paused. An ongoing incident on a paused monitor has no
    *  checks left to close it, so it is shown as paused rather than ongoing. */
   monitorPaused: boolean;
@@ -63,8 +66,9 @@ interface Streak {
 /**
  * Stitches recorded checks into down incidents for the given monitors.
  * Derived from real data only — no incident is ever fabricated. Gaps longer
- * than 3× the monitor's interval are treated as "no data" and end an
- * incident. Ongoing incidents of paused monitors are omitted.
+ * than 3× the monitor's interval are treated as "no data" and end an incident.
+ * Failed checks taken while a monitor is paused stay in history but are
+ * ignored here; an up check is still allowed to close the open incident.
  *
  * Implementation note — memory safety: a naive derivation scans EVERY check
  * of the last 30 days (tens of thousands of rows per monitor under a short
@@ -102,7 +106,7 @@ export async function deriveIncidents(
              ROW_NUMBER() OVER (PARTITION BY monitorId ORDER BY checkedAt DESC) AS rn
       FROM "Check"
       WHERE monitorId IN (${Prisma.join(monitors.map((m) => m.id))})
-        AND status = 'down' AND checkedAt >= ${sinceMs}
+        AND status = 'down' AND whilePaused = 0 AND checkedAt >= ${sinceMs}
     ) WHERE rn <= ${MAX_DOWN_ROWS_PER_MONITOR}`;
   const downsByMonitor = new Map<string, DownRow[]>();
   for (const r of rawDowns) {
@@ -252,6 +256,7 @@ async function resolveStreaks(
       AND b.checkedAt = (
         SELECT c.checkedAt FROM "Check" c
         WHERE c.monitorId = l.monitorId AND c.checkedAt > l.lastDown
+          AND NOT (c.status = 'down' AND c.whilePaused = 1)
         ORDER BY c.checkedAt ASC LIMIT 1
       )`;
   const boundaryByStreak = new Map<number, { status: string; checkedAt: number } | null>();
@@ -290,16 +295,26 @@ async function resolveStreaks(
     for (const sub of subStreaks) {
       const subLast = sub.rows[sub.rows.length - 1].t;
       let endedAt: number | null = sub.closedByUpAt;
+      let recovered: boolean | null = endedAt == null ? null : true;
       if (endedAt == null) {
         const boundary = boundaryByStreak.get(streak.id) ?? null;
-        if (!boundary) endedAt = null;
-        else endedAt = boundary.status === "up" ? boundary.checkedAt : subLast;
+        if (!boundary) {
+          endedAt = null;
+        } else if (boundary.status === "up") {
+          endedAt = boundary.checkedAt;
+          recovered = true;
+        } else {
+          // A sleep gap ended the run; no recovery was observed.
+          endedAt = subLast;
+          recovered = false;
+        }
       }
 
       out.push({
         monitorId: streak.monitorId,
         monitorName: nameById.get(streak.monitorId) ?? "",
         monitorPaused: pausedById.get(streak.monitorId) ?? false,
+        recovered,
         startedAt: new Date(sub.rows[0].t).toISOString(),
         endedAt: endedAt == null ? null : new Date(endedAt).toISOString(),
         downChecks: sub.rows.length,

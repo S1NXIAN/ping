@@ -16,6 +16,7 @@ function inc(
     monitorName: "svc",
     startedAt,
     endedAt,
+    recovered: endedAt ? true : null,
     monitorPaused,
     downChecks: 1,
     lastStatusCode: 503,

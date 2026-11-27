@@ -78,6 +78,9 @@ model Check {
   statusCode  Int?
   responseMs  Int?
   error       String?
+  // True when this check ran while the monitor was paused (manual "check now").
+  // A failed paused check stays in history but never opens or extends an incident.
+  whilePaused Boolean  @default(false)
   checkedAt   DateTime @default(now())
 
   // (monitorId, checkedAt): per-monitor history walks (recent checks,

@@ -223,7 +223,16 @@ async function runCheckInner(monitor: Monitor): Promise<Check> {
   const errorText = error ? error.slice(0, 200) : null;
   const [check] = await db.$transaction([
     db.check.create({
-      data: { monitorId: monitor.id, status, statusCode, responseMs, error: errorText, checkedAt },
+      data: {
+        monitorId: monitor.id,
+        status,
+        statusCode,
+        responseMs,
+        error: errorText,
+        // Only "Check now" can run with the monitor disabled.
+        whilePaused: !monitor.enabled,
+        checkedAt,
+      },
     }),
     db.monitor.update({
       where: { id: monitor.id },

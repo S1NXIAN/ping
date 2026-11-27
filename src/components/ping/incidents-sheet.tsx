@@ -132,16 +132,18 @@ function formatRange(startedAt: string, endedAt: string | null, paused: boolean)
 
 function IncidentRow({ inc, now }: { inc: AdminIncidentDTO; now: number }) {
   const ended = inc.endedAt != null;
+  // A sleep gap closes the run at its last down check without seeing it recover.
+  const recovered = inc.recovered === true;
 
   return (
     <div className="relative rounded-lg border bg-card px-3 pb-2.5 pt-6">
       <StatusPill
-        tone={ended ? "up" : inc.monitorPaused ? "neutral" : "down"}
+        tone={recovered ? "up" : ended || inc.monitorPaused ? "neutral" : "down"}
         size="sm"
         uppercase
         className="absolute left-0 top-0 z-10 min-w-13 justify-center border-t-0 border-l-0"
       >
-        {ended ? "resolved" : inc.monitorPaused ? "paused" : "ongoing"}
+        {recovered ? "resolved" : ended ? "no recovery" : inc.monitorPaused ? "paused" : "ongoing"}
       </StatusPill>
       <div className="flex items-baseline justify-between gap-2">
         <span className="min-w-0 truncate text-sm font-medium text-foreground">
