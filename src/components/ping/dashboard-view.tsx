@@ -161,11 +161,11 @@ export function DashboardView({
 
   // incidents — postmortem-note sheet, plus the 30d list that drives both
   // the toolbar's rose state and the cards' outage rows (same endpoint the
-  // sheet renders; refreshed on mount and on sheet close so the badge never
-  // outlives its data). Scoped to the active Folder so the badge counts the
-  // Scope, not the whole Fleet. The loaded list is tagged with the Folder it
-  // came from, so a failed scoped fetch shows no badge rather than another
-  // Folder's count (one scope per view).
+  // sheet renders; refreshed with the overview poll and on sheet close so the
+  // badge follows new and resolved incidents). Scoped to the active Folder so
+  // the badge counts the Scope, not the whole Fleet. The loaded list is tagged
+  // with the Folder it came from, so a failed scoped fetch shows no badge
+  // rather than another Folder's count (one scope per view).
   const scopeFolderId = activeFolder === "all" ? null : activeFolder;
   const [incidentData, setIncidentData] = useState<{
     folderId: string | null;
@@ -182,7 +182,7 @@ export function DashboardView({
   }, [scopeFolderId]);
   useEffect(() => {
     void loadIncidents();
-  }, [loadIncidents]);
+  }, [loadIncidents, data]);
   const incidents = incidentData?.folderId === scopeFolderId ? incidentData.list : null;
 
   // The badge is a nudge, not a tally: ongoing incidents always count (they

@@ -38,8 +38,9 @@ export function IncidentsSheet({
   // so a re-render never produces a different number from the same props, and
   // ticked while open so a long outage's duration stays honest.
   const [now, setNow] = useState(() => Date.now());
-  // The header badge is the open live list: ongoing and paused, never resolved.
-  const openCount = incidents?.filter((i) => i.endedAt == null).length ?? 0;
+  // The header badge counts monitors still failing: ongoing, never paused or resolved.
+  const openCount =
+    incidents?.filter((i) => i.endedAt == null && !i.monitorPaused).length ?? 0;
 
   const load = useCallback(async () => {
     try {
