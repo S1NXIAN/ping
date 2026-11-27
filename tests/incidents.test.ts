@@ -89,7 +89,7 @@ test("the batched query keeps each monitor's incidents separate", async () => {
 async function seedIncidents(
   n: number,
   opts: { ongoing?: boolean } = {},
-): Promise<{ id: string; name: string; intervalSec: number }> {
+): Promise<{ id: string; name: string; intervalSec: number; enabled: boolean }> {
   const m = await db.monitor.create({
     data: { name: "svc", url: "https://svc.example.com", intervalSec: 60 },
   });
@@ -214,6 +214,35 @@ test("a sleep gap between two down checks never fabricates one long incident", a
   // The newer down, with nothing after it, is the ongoing one.
   const ongoing = incidents.filter((i) => i.endedAt == null);
   expect(ongoing.length).toBe(1);
+});
+
+test("an ongoing incident on a paused monitor is hidden, its closed ones are not", async () => {
+  const { deriveIncidents } = await import("@/lib/incidents");
+  const m = await db.monitor.create({
+    data: { name: "svc", url: "https://svc.example.com", intervalSec: 60 },
+  });
+  const t = (min: number) => new Date(Date.now() - min * 60_000);
+  const openStart = t(5);
+  await db.check.createMany({
+    data: [
+      { monitorId: m.id, status: "down", statusCode: 503, checkedAt: t(30) },
+      { monitorId: m.id, status: "up", statusCode: 200, checkedAt: t(29) },
+      { monitorId: m.id, status: "down", statusCode: 503, checkedAt: openStart },
+      { monitorId: m.id, status: "down", statusCode: 503, checkedAt: t(4) },
+    ],
+  });
+
+  // Paused: no check will close the open run, so it is not listed at all.
+  const paused = await deriveIncidents([{ ...m, enabled: false }]);
+  expect(paused.length).toBe(1);
+  expect(paused[0].endedAt).not.toBeNull();
+
+  // Resumed: the same open run is listed again with its real start.
+  const resumed = await deriveIncidents([{ ...m, enabled: true }]);
+  expect(resumed.length).toBe(2);
+  const stillOpen = resumed.filter((i) => i.endedAt == null);
+  expect(stillOpen.length).toBe(1);
+  expect(stillOpen[0].startedAt).toBe(openStart.toISOString());
 });
 
 test("a recovery observed after a sleep still closes the incident at the up check", async () => {

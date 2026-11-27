@@ -61,7 +61,7 @@ interface Streak {
  * Stitches recorded checks into down incidents for the given monitors.
  * Derived from real data only — no incident is ever fabricated. Gaps longer
  * than 3× the monitor's interval are treated as "no data" and end an
- * incident.
+ * incident. Ongoing incidents of paused monitors are omitted.
  *
  * Implementation note — memory safety: a naive derivation scans EVERY check
  * of the last 30 days (tens of thousands of rows per monitor under a short
@@ -81,6 +81,7 @@ export async function deriveIncidents(
     id: string;
     name: string;
     intervalSec: number;
+    enabled: boolean;
   }[],
 ): Promise<DerivedIncident[]> {
   if (monitors.length === 0) return [];
@@ -178,6 +179,11 @@ export async function deriveIncidents(
     }
   }
 
+  // An ongoing incident on a PAUSED monitor is hidden: no check will ever close
+  // it, so it would sit as "ongoing" with a duration that keeps growing for an
+  // outage nobody is watching. Its closed incidents still list.
+  const enabledById = new Map(monitors.map((m) => [m.id, m.enabled]));
+
   // Ongoing incidents (no end) pin to the top, newest-first among themselves,
   // and are exempt from the closed-incident size cap; closed incidents keep
   // the existing newest-first order and cap. The exempt set is bounded by the
@@ -185,7 +191,9 @@ export async function deriveIncidents(
   // without limit while still never dropping a real current outage.
   const byNewest = (a: DerivedIncident, b: DerivedIncident) =>
     new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
-  const ongoing = incidents.filter((i) => i.endedAt == null).sort(byNewest);
+  const ongoing = incidents
+    .filter((i) => i.endedAt == null && enabledById.get(i.monitorId))
+    .sort(byNewest);
   const closed = incidents.filter((i) => i.endedAt != null).sort(byNewest);
   return [...ongoing.slice(0, MAX_ONGOING_INCIDENTS), ...closed.slice(0, MAX_INCIDENTS)];
 }
