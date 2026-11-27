@@ -1,17 +1,22 @@
 // The incidents badge counts what still needs attention: every ongoing
-// incident (unresolved) plus every closed incident newer than the last time
-// the sheet was opened. Expected values come from worked examples.
+// incident (unresolved and not paused) plus every paused or closed incident
+// newer than the last time the sheet was opened. Expected values come from
+// worked examples.
 import { expect, test } from "bun:test";
 import { newestIncidentStart, unseenIncidentCount } from "@/lib/ping-client";
 import type { AdminIncidentDTO } from "@/lib/ping-types";
 
-function inc(startedAt: string, endedAt: string | null): AdminIncidentDTO {
+function inc(
+  startedAt: string,
+  endedAt: string | null,
+  monitorPaused = false,
+): AdminIncidentDTO {
   return {
     monitorId: "m",
     monitorName: "svc",
     startedAt,
     endedAt,
-    monitorPaused: false,
+    monitorPaused,
     downChecks: 1,
     lastStatusCode: 503,
     noteId: null,
@@ -33,6 +38,12 @@ test("a closed incident counts only until it has been seen", () => {
   const closed = inc(iso(-HOUR), iso(-HOUR + 60_000));
   expect(unseenIncidentCount([closed], t0 - 2 * HOUR)).toBe(1); // unseen
   expect(unseenIncidentCount([closed], t0)).toBe(0); // seen
+});
+
+test("a paused incident clears once seen, like a closed one", () => {
+  const paused = inc(iso(-5 * HOUR), null, true);
+  expect(unseenIncidentCount([paused], t0 - 6 * HOUR)).toBe(1); // unseen
+  expect(unseenIncidentCount([paused], t0)).toBe(0); // seen, no check left to close it
 });
 
 test("the count mixes ongoing and unseen closed incidents", () => {

@@ -38,6 +38,8 @@ export function IncidentsSheet({
   // so a re-render never produces a different number from the same props, and
   // ticked while open so a long outage's duration stays honest.
   const [now, setNow] = useState(() => Date.now());
+  // The header badge is the open live list: ongoing and paused, never resolved.
+  const openCount = incidents?.filter((i) => i.endedAt == null).length ?? 0;
 
   const load = useCallback(async () => {
     try {
@@ -65,9 +67,9 @@ export function IncidentsSheet({
           <SheetTitle className="flex items-center gap-2 text-base">
             <AlertTriangle className="size-4 text-down/90" aria-hidden="true" />
             Incidents
-            {incidents && incidents.length > 0 && (
+            {openCount > 0 && (
               <StatusPill tone="down" size="sm" className="tabular-nums">
-                {incidents.length}
+                {openCount}
               </StatusPill>
             )}
           </SheetTitle>
@@ -132,23 +134,20 @@ function IncidentRow({ inc, now }: { inc: AdminIncidentDTO; now: number }) {
   const ended = inc.endedAt != null;
 
   return (
-    <div className="rounded-lg border bg-card px-3 py-2.5">
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-sm font-medium text-foreground">{inc.monitorName}</span>
-        {ended ? (
-          <StatusPill tone="up" size="sm" uppercase>
-            resolved
-          </StatusPill>
-        ) : inc.monitorPaused ? (
-          <StatusPill tone="neutral" size="sm" uppercase>
-            paused
-          </StatusPill>
-        ) : (
-          <StatusPill tone="down" size="sm" uppercase>
-            ongoing
-          </StatusPill>
-        )}
-        <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
+    <div className="relative rounded-lg border bg-card px-3 pb-2.5 pt-6">
+      <StatusPill
+        tone={ended ? "up" : inc.monitorPaused ? "neutral" : "down"}
+        size="sm"
+        uppercase
+        className="absolute left-0 top-0 z-10 min-w-13 justify-center border-t-0 border-l-0"
+      >
+        {ended ? "resolved" : inc.monitorPaused ? "paused" : "ongoing"}
+      </StatusPill>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="min-w-0 truncate text-sm font-medium text-foreground">
+          {inc.monitorName}
+        </span>
+        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
           {timeAgo(inc.endedAt ?? inc.startedAt, now)}
         </span>
       </div>

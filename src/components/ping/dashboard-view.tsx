@@ -186,10 +186,10 @@ export function DashboardView({
   const incidents = incidentData?.folderId === scopeFolderId ? incidentData.list : null;
 
   // The badge is a nudge, not a tally: ongoing incidents always count (they
-  // keep asking until resolved), closed ones only until the sheet has been
-  // opened over them. The watermark is per device, like the sort memory, and
-  // advances only from a list that actually loaded — a failed fetch leaves it
-  // untouched, so nothing is marked seen that was never shown.
+  // keep asking until resolved), paused and closed ones only until the sheet
+  // has been opened over them. The watermark is per device, like the sort
+  // memory, and advances only from a list that actually loaded — a failed fetch
+  // leaves it untouched, so nothing is marked seen that was never shown.
   const [seenIncidentsAt, setSeenIncidentsAt] = useState(0);
   const seenRef = useRef(0);
   useEffect(() => {

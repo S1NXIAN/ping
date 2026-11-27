@@ -36,17 +36,20 @@ export function newestIncidentStart(incidents: AdminIncidentDTO[]): number {
 
 /**
  * The incidents badge count: every ongoing incident (unresolved, so it keeps
- * asking for attention) plus every closed incident that started after the last
- * time the sheet was opened (`seenStartedAt`). Opening the sheet moves
- * `seenStartedAt` to the newest start it listed, so viewed history clears while
- * an ongoing outage never does.
+ * asking for attention) plus every paused or closed incident that started after
+ * the last time the sheet was opened (`seenStartedAt`). A paused monitor's open
+ * incident has no check left to close it, so it clears like viewed history
+ * instead of asking forever. Opening the sheet moves `seenStartedAt` to the
+ * newest start it listed.
  */
 export function unseenIncidentCount(
   incidents: AdminIncidentDTO[],
   seenStartedAt: number,
 ): number {
   return incidents.filter(
-    (i) => i.endedAt == null || Date.parse(i.startedAt) > seenStartedAt,
+    (i) =>
+      (i.endedAt == null && !i.monitorPaused) ||
+      Date.parse(i.startedAt) > seenStartedAt,
   ).length;
 }
 
