@@ -211,7 +211,9 @@ function IncidentRow({
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <span className="text-sm font-medium text-foreground">{inc.monitorName}</span>
         {ended ? (
-          <span className="text-[11px] text-muted-foreground">resolved</span>
+          <StatusPill tone="up" size="sm" uppercase>
+            resolved
+          </StatusPill>
         ) : (
           <StatusPill tone="down" size="sm" uppercase>
             ongoing
@@ -223,12 +225,7 @@ function IncidentRow({
       </div>
       <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
         <span>started {formatDateTime(inc.startedAt)}</span>
-        <span>
-          {inc.downChecks} failed check{inc.downChecks === 1 ? "" : "s"}
-        </span>
-        {inc.lastStatusCode != null && (
-          <span className="tabular-nums">HTTP {inc.lastStatusCode}</span>
-        )}
+        {ended && <span>resolved {formatDateTime(inc.endedAt)}</span>}
       </div>
 
       {editing ? (
