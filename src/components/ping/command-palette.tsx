@@ -229,7 +229,7 @@ export function CommandPalette({
         <CommandGroup heading="Open">
           <CommandItem onSelect={() => run(onOpenIncidents)}>
             <AlertTriangle />
-            Incidents &amp; notes
+            Incidents
           </CommandItem>
         </CommandGroup>
 
