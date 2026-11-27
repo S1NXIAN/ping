@@ -113,12 +113,13 @@ export function IncidentsSheet({
 }
 
 /**
- * One line for the row's second line: the date once, then the time range.
- * Repeating "Nov 27, 10:34 PM" twice made start and end read the same at 11px.
+ * The row's second line: the date once, then the time range. Repeating
+ * "Nov 27, 10:34 PM" twice made start and end read the same at 11px. A paused
+ * monitor's open incident shows the start alone — its end was never observed.
  */
-function formatRange(startedAt: string, endedAt: string | null): string {
+function formatRange(startedAt: string, endedAt: string | null, paused: boolean): string {
   const started = new Date(startedAt);
-  if (!endedAt) return `${formatDateTime(startedAt)} → now`;
+  if (!endedAt) return paused ? formatDateTime(startedAt) : `${formatDateTime(startedAt)} → now`;
   const ended = new Date(endedAt);
   const end =
     ended.toDateString() === started.toDateString()
@@ -138,6 +139,10 @@ function IncidentRow({ inc, now }: { inc: AdminIncidentDTO; now: number }) {
           <StatusPill tone="up" size="sm" uppercase>
             resolved
           </StatusPill>
+        ) : inc.monitorPaused ? (
+          <StatusPill tone="neutral" size="sm" uppercase>
+            paused
+          </StatusPill>
         ) : (
           <StatusPill tone="down" size="sm" uppercase>
             ongoing
@@ -148,7 +153,7 @@ function IncidentRow({ inc, now }: { inc: AdminIncidentDTO; now: number }) {
         </span>
       </div>
       <div className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">
-        {formatRange(inc.startedAt, inc.endedAt)}
+        {formatRange(inc.startedAt, inc.endedAt, inc.monitorPaused)}
       </div>
     </div>
   );

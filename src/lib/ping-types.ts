@@ -133,6 +133,8 @@ export interface AdminIncidentDTO {
   monitorName: string;
   startedAt: string;
   endedAt: string | null;
+  /** The monitor is paused; an open incident is then shown as paused. */
+  monitorPaused: boolean;
   downChecks: number;
   lastStatusCode: number | null;
   /** Non-null when a note is attached (this is its row id). */

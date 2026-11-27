@@ -34,6 +34,9 @@ export interface DerivedIncident {
   startedAt: string; // ISO — first failed check
   /** Null while the incident is still ongoing. */
   endedAt: string | null;
+  /** The monitor is paused. An ongoing incident on a paused monitor has no
+   *  checks left to close it, so it is shown as paused rather than ongoing. */
+  monitorPaused: boolean;
   downChecks: number;
   lastStatusCode: number | null;
 }
@@ -149,12 +152,14 @@ export async function deriveIncidents(
   if (streaks.length === 0) return [];
 
   const nameById = new Map(monitors.map((m) => [m.id, m.name]));
+  const pausedById = new Map(monitors.map((m) => [m.id, !m.enabled]));
 
   // 3) Every monitor's LAST streak is resolved first: it is the only streak
   //    that can be ongoing, and ongoing incidents are exempt from the cap.
   const incidents: DerivedIncident[] = await resolveStreaks(
     streaks.filter((s) => s.isLast),
     nameById,
+    pausedById,
   );
 
   // 4) Resolve the remaining (closed-only) streaks newest-first, stopping as
@@ -164,7 +169,7 @@ export async function deriveIncidents(
   //    cannot enter the cut.
   const rest = streaks.filter((s) => !s.isLast).sort((a, b) => b.lastDown - a.lastDown);
   for (let i = 0; i < rest.length; i += RESOLVE_BATCH) {
-    incidents.push(...(await resolveStreaks(rest.slice(i, i + RESOLVE_BATCH), nameById)));
+    incidents.push(...(await resolveStreaks(rest.slice(i, i + RESOLVE_BATCH), nameById, pausedById)));
     const closedStarts = incidents
       .filter((x) => x.endedAt != null)
       .map((x) => new Date(x.startedAt).getTime())
@@ -179,11 +184,6 @@ export async function deriveIncidents(
     }
   }
 
-  // An ongoing incident on a PAUSED monitor is hidden: no check will ever close
-  // it, so it would sit as "ongoing" with a duration that keeps growing for an
-  // outage nobody is watching. Its closed incidents still list.
-  const enabledById = new Map(monitors.map((m) => [m.id, m.enabled]));
-
   // Ongoing incidents (no end) pin to the top, newest-first among themselves,
   // and are exempt from the closed-incident size cap; closed incidents keep
   // the existing newest-first order and cap. The exempt set is bounded by the
@@ -191,9 +191,7 @@ export async function deriveIncidents(
   // without limit while still never dropping a real current outage.
   const byNewest = (a: DerivedIncident, b: DerivedIncident) =>
     new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
-  const ongoing = incidents
-    .filter((i) => i.endedAt == null && enabledById.get(i.monitorId))
-    .sort(byNewest);
+  const ongoing = incidents.filter((i) => i.endedAt == null).sort(byNewest);
   const closed = incidents.filter((i) => i.endedAt != null).sort(byNewest);
   return [...ongoing.slice(0, MAX_ONGOING_INCIDENTS), ...closed.slice(0, MAX_INCIDENTS)];
 }
@@ -211,6 +209,7 @@ export async function deriveIncidents(
 async function resolveStreaks(
   streaks: Streak[],
   nameById: Map<string, string>,
+  pausedById: Map<string, boolean>,
 ): Promise<DerivedIncident[]> {
   if (streaks.length === 0) return [];
 
@@ -300,6 +299,7 @@ async function resolveStreaks(
       out.push({
         monitorId: streak.monitorId,
         monitorName: nameById.get(streak.monitorId) ?? "",
+        monitorPaused: pausedById.get(streak.monitorId) ?? false,
         startedAt: new Date(sub.rows[0].t).toISOString(),
         endedAt: endedAt == null ? null : new Date(endedAt).toISOString(),
         downChecks: sub.rows.length,

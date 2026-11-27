@@ -216,7 +216,7 @@ test("a sleep gap between two down checks never fabricates one long incident", a
   expect(ongoing.length).toBe(1);
 });
 
-test("an ongoing incident on a paused monitor is hidden, its closed ones are not", async () => {
+test("a paused monitor's open incident is flagged paused, not dropped", async () => {
   const { deriveIncidents } = await import("@/lib/incidents");
   const m = await db.monitor.create({
     data: { name: "svc", url: "https://svc.example.com", intervalSec: 60 },
@@ -232,16 +232,20 @@ test("an ongoing incident on a paused monitor is hidden, its closed ones are not
     ],
   });
 
-  // Paused: no check will close the open run, so it is not listed at all.
+  // Paused: no check will close the open run, so the row says paused.
   const paused = await deriveIncidents([{ ...m, enabled: false }]);
-  expect(paused.length).toBe(1);
-  expect(paused[0].endedAt).not.toBeNull();
+  expect(paused.length).toBe(2);
+  const open = paused.filter((i) => i.endedAt == null);
+  expect(open.length).toBe(1);
+  expect(open[0].monitorPaused).toBe(true);
+  expect(open[0].startedAt).toBe(openStart.toISOString());
 
-  // Resumed: the same open run is listed again with its real start.
+  // Resumed: the same open run is a real ongoing incident again.
   const resumed = await deriveIncidents([{ ...m, enabled: true }]);
   expect(resumed.length).toBe(2);
   const stillOpen = resumed.filter((i) => i.endedAt == null);
   expect(stillOpen.length).toBe(1);
+  expect(stillOpen[0].monitorPaused).toBe(false);
   expect(stillOpen[0].startedAt).toBe(openStart.toISOString());
 });
 

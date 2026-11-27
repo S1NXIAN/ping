@@ -11,6 +11,7 @@ function inc(startedAt: string, endedAt: string | null): AdminIncidentDTO {
     monitorName: "svc",
     startedAt,
     endedAt,
+    monitorPaused: false,
     downChecks: 1,
     lastStatusCode: 503,
     noteId: null,
