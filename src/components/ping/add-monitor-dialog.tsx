@@ -397,13 +397,6 @@ export function AddMonitorDialog({
                   className="ping-range h-11 w-full sm:h-9"
                   style={{ "--range-fill": intervalFill } as React.CSSProperties}
                 />
-                <div
-                  aria-hidden="true"
-                  className="flex justify-between text-[10px] tabular-nums text-muted-foreground"
-                >
-                  <span>{INTERVAL_MIN_MIN} min</span>
-                  <span>{INTERVAL_MAX_MIN} min</span>
-                </div>
               </div>
 
               <div className="space-y-2">
