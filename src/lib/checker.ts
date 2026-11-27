@@ -272,23 +272,24 @@ export async function runDueChecks(): Promise<TickResult> {
     let ran = 0;
     let up = 0;
     let down = 0;
-    for (let i = 0; i < due.length; i += MAX_CONCURRENCY) {
-      const batch = due.slice(i, i + MAX_CONCURRENCY);
-      const results = await Promise.all(
-        batch.map((m) =>
-          runCheck(m).catch((err) => {
-            console.error(`[PING] check error for "${m.name}":`, err);
-            return null;
-          }),
-        ),
-      );
-      for (const r of results) {
+    let next = 0;
+    // Rolling pool so one slow cold-booting monitor never stalls the other slots.
+    const worker = async () => {
+      while (next < due.length) {
+        const m = due[next++];
+        const r = await runCheck(m).catch((err) => {
+          console.error(`[PING] check error for "${m.name}":`, err);
+          return null;
+        });
         if (!r) continue; // already in flight elsewhere — nothing was run
         ran += 1;
         if (r.status === "up") up += 1;
         else down += 1;
       }
-    }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(MAX_CONCURRENCY, due.length) }, worker),
+    );
 
     const result: TickResult = {
       ran,

@@ -72,3 +72,50 @@ test("the check row and the monitor's headline status agree after a batch", asyn
     expect(m.lastCheckAt?.getTime()).toBe(newest?.checkedAt.getTime());
   }
 });
+
+test("one slow monitor does not stall the remaining slots", async () => {
+  const { runDueChecks } = await import("@/lib/checker");
+  const total = 7; // > MAX_CONCURRENCY (5)
+  await db.monitor.createMany({
+    data: Array.from({ length: total }, (_, i) => ({
+      name: `m${i}`,
+      url: `https://m${i}.example.com`,
+      intervalSec: 60,
+    })),
+  });
+
+  let releaseSlow!: () => void;
+  const slowGate = new Promise<void>((r) => {
+    releaseSlow = r;
+  });
+  let slowHeld = false;
+  let fastStarted = 0;
+  let active = 0;
+  let maxActive = 0;
+
+  globalThis.fetch = mock(async () => {
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    try {
+      if (!slowHeld) {
+        slowHeld = true;
+        await slowGate;
+      } else {
+        fastStarted += 1;
+        // All 6 remaining monitors started while the first is still open;
+        // chunked batching of 5 would stall at 4 and never reach 6.
+        if (fastStarted === total - 1) releaseSlow();
+      }
+      return new Response(null, { status: 200 });
+    } finally {
+      active -= 1;
+    }
+  }) as unknown as typeof fetch;
+
+  const result = await runDueChecks();
+
+  expect(result.ran).toBe(total);
+  expect(result.up).toBe(total);
+  expect(maxActive).toBeLessThanOrEqual(5);
+  expect(await db.check.count()).toBe(total);
+});
