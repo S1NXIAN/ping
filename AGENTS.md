@@ -22,3 +22,8 @@ Any edit to agent-facing docs (`AGENTS.md`, `docs/`, per-component `README.md`) 
 ### Coding standards
 
 Any code change MUST follow [`CODING_STANDARD.md`](~/core/docs/standards/CODING_STANDARD.md).
+
+## Architecture decisions
+
+Before changing a persisted data format, read
+`docs/adr/0003-current-format-only.md`. Other decisions live in `docs/adr/`.
