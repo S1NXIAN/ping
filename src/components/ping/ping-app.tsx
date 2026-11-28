@@ -51,6 +51,33 @@ export function PingApp() {
       });
   }, []);
 
+  // Login → dashboard handoff: the panel cuts away, then the app fades in
+  // behind a single wipe. Short by design — 760ms end to end — and skipped
+  // entirely when the system asks for reduced motion.
+  const [handoff, setHandoff] = useState<null | "out" | "in">(null);
+  const handoffTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (handoffTimer.current) clearTimeout(handoffTimer.current);
+    };
+  }, []);
+
+  const enterApp = useCallback(() => {
+    setInitialized(true);
+    setView("dashboard");
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setPhase("app");
+      return;
+    }
+    setHandoff("out");
+    handoffTimer.current = setTimeout(() => {
+      setPhase("app");
+      setHandoff("in");
+      handoffTimer.current = setTimeout(() => setHandoff(null), 420);
+    }, 340);
+  }, []);
+
   if (phase === "booting") {
     return (
       <div className="ping-ambient flex min-h-dvh flex-col items-center justify-center gap-4">
@@ -60,28 +87,34 @@ export function PingApp() {
     );
   }
 
+  const wipe = handoff ? (
+    <div className="ping-handoff-wipe" aria-hidden="true" />
+  ) : null;
+
   if (phase === "login") {
     return (
-      <LoginView
-        initialized={initialized}
-        onAuthenticated={() => {
-          setInitialized(true);
-          setPhase("app");
-          setView("dashboard");
-        }}
-      />
+      <>
+        <div className={handoff === "out" ? "ping-handoff-out" : undefined}>
+          <LoginView initialized={initialized} onAuthenticated={enterApp} />
+        </div>
+        {wipe}
+      </>
     );
   }
 
-  return view === "admin" ? (
-    <AdminView
-      onBack={() => setView("dashboard")}
-      onAuthLost={returnToLogin}
-    />
-  ) : (
-    <DashboardView
-      onLogout={returnToLogin}
-      onOpenAdmin={() => setView("admin")}
-    />
+  return (
+    <>
+      <div className={handoff === "in" ? "ping-handoff-in" : undefined}>
+        {view === "admin" ? (
+          <AdminView onBack={() => setView("dashboard")} onAuthLost={returnToLogin} />
+        ) : (
+          <DashboardView
+            onLogout={returnToLogin}
+            onOpenAdmin={() => setView("admin")}
+          />
+        )}
+      </div>
+      {wipe}
+    </>
   );
 }

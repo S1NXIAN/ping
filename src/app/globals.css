@@ -762,6 +762,47 @@ body::before {
   }
 }
 
+/* Login → dashboard handoff: the panel cuts, the app fades in behind one wipe */
+.ping-handoff-out {
+  animation: ping-handoff-out 0.34s cubic-bezier(0.4, 0, 1, 1) both;
+}
+@keyframes ping-handoff-out {
+  to {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+}
+.ping-handoff-in {
+  animation: ping-handoff-in 0.3s ease-out both;
+}
+@keyframes ping-handoff-in {
+  from {
+    opacity: 0;
+  }
+}
+.ping-handoff-wipe {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+  background: var(--foreground);
+  animation: ping-handoff-wipe 0.45s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes ping-handoff-wipe {
+  0% {
+    clip-path: inset(0 100% 0 0);
+    opacity: 0.16;
+  }
+  70% {
+    clip-path: inset(0 0 0 0);
+    opacity: 0.1;
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    opacity: 0;
+  }
+}
+
 /* Hide the Next.js dev-tools portal ("N" badge) — dev-only noise */
 nextjs-portal {
   display: none !important;
