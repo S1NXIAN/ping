@@ -668,13 +668,74 @@ body::before {
   font-variant-numeric: tabular-nums;
 }
 .ping-stats-meter {
+  position: relative;
   height: 3px;
+  overflow: hidden;
   background: var(--border);
 }
-.ping-stats-meter span {
+/* No data: an honest dashed hairline, never a measured zero fill. */
+.ping-stats-meter.is-empty {
+  background: transparent;
+  border-bottom: 1px dashed var(--muted-foreground);
+}
+.ping-stats-fill {
+  position: relative;
   display: block;
   height: 100%;
+  overflow: hidden;
   background: currentColor;
+}
+/* Idle sweep rides the measured band only, so the light never implies uptime. */
+.ping-stats-fill::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background: var(--foreground);
+  opacity: 0.2;
+  animation: ping-stats-sweep 7s linear infinite;
+}
+/* Empty band: the faintest sweep on the track still shows PING is watching. */
+.ping-stats-meter.is-blank::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background: var(--foreground);
+  opacity: 0.1;
+  animation: ping-stats-sweep 7s linear infinite;
+}
+/* Real-check pulse: same light, faster and brighter, once. */
+.ping-stats-pulse {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background: var(--foreground);
+  animation: ping-stats-pulse 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes ping-stats-sweep {
+  from {
+    left: 0;
+  }
+  to {
+    left: 100%;
+  }
+}
+@keyframes ping-stats-pulse {
+  0% {
+    left: 0;
+    opacity: 0.75;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
 }
 .ping-stats-side {
   display: flex;
@@ -730,6 +791,11 @@ nextjs-portal {
     animation: none;
   }
   .ping-scan {
+    display: none;
+  }
+  .ping-stats-fill::after,
+  .ping-stats-meter.is-blank::after,
+  .ping-stats-pulse {
     display: none;
   }
   *,

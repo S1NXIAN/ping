@@ -665,8 +665,8 @@ export function DashboardView({
             </button>
           </div>
 
-          {/* Scope summary — one strip, one live trace. The generous break
-              below separates overview from the working group. */}
+          {/* Scope summary — uptime leads, checks and failures beside it. The
+              generous break below separates overview from the working group. */}
           <StatsStrip summary={summary} />
 
           {/* working group: toolbar + list — one tight unit (10px internal rhythm) */}
