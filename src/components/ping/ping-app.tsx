@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/ping-client";
 import type { SessionResponse } from "@/lib/ping-types";
+import { warmOverview } from "@/hooks/use-overview";
 import { PingLogo } from "./ping-logo";
 import { LoginView } from "./login-view";
 import { DashboardView } from "./dashboard-view";
@@ -66,6 +67,7 @@ export function PingApp() {
   const enterApp = useCallback(() => {
     setInitialized(true);
     setView("dashboard");
+    void warmOverview();
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setPhase("app");
       return;

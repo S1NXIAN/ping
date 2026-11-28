@@ -645,6 +645,41 @@ body::before {
   background: var(--card);
   box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.045);
   contain: layout paint;
+  animation: ping-fade-up 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* Rows arrive in a short, cheap stagger — opacity only, so drag transforms
+   are never fought by a lingering keyframe. */
+.ping-ledger-list > *:not([aria-hidden="true"]) {
+  animation: ping-row-in 0.3s ease-out backwards;
+}
+.ping-ledger-list > *:nth-child(2) {
+  animation-delay: 30ms;
+}
+.ping-ledger-list > *:nth-child(3) {
+  animation-delay: 60ms;
+}
+.ping-ledger-list > *:nth-child(4) {
+  animation-delay: 90ms;
+}
+.ping-ledger-list > *:nth-child(5) {
+  animation-delay: 120ms;
+}
+.ping-ledger-list > *:nth-child(6) {
+  animation-delay: 150ms;
+}
+.ping-ledger-list > *:nth-child(7) {
+  animation-delay: 180ms;
+}
+.ping-ledger-list > *:nth-child(n + 8) {
+  animation-delay: 210ms;
+}
+@keyframes ping-row-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 .ping-stats-primary {
   display: flex;
