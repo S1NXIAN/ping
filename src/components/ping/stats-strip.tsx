@@ -60,7 +60,8 @@ export function StatsStrip({ summary }: { summary?: OverviewSummary }) {
           aria-hidden="true"
         >
           <span className="ping-stats-fill" style={{ width: `${uptimePct}%` }}>
-            {pulse > 0 && <span key={pulse} className="ping-stats-pulse" />}
+            <span className="ping-stats-sweep" aria-hidden="true" />
+            {pulse > 0 && <span key={pulse} className="ping-stats-pulse" aria-hidden="true" />}
           </span>
         </div>
       </div>
