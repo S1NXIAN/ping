@@ -1,4 +1,4 @@
-// deriveIncidents stitches real down checks into incidents. Expected values
+// listIncidents stitches real down checks into incidents. Expected values
 // come from worked examples, not the implementation.
 import { beforeEach, expect, test } from "bun:test";
 import { db, resetDb } from "./helpers/test-db";
@@ -7,12 +7,17 @@ beforeEach(async () => {
   await resetDb();
 });
 
-test("a run of down checks becomes one incident, closed by the next up", async () => {
-  const { deriveIncidents } = await import("@/lib/incidents");
-  const m = await db.monitor.create({
-    data: { name: "svc", url: "https://svc.example.com", intervalSec: 60 },
+async function monitor(name = "svc", intervalSec = 60, enabled = true) {
+  return db.monitor.create({
+    data: { name, url: `https://${name}.example.com`, intervalSec, enabled },
   });
-  const t = (min: number) => new Date(Date.now() - min * 60_000);
+}
+
+test("a run of down checks becomes one incident, closed by the next up", async () => {
+  const { listIncidents } = await import("@/lib/incidents");
+  const m = await monitor();
+  const now = Date.now();
+  const t = (min: number) => new Date(now - min * 60_000);
   await db.check.createMany({
     data: [
       { monitorId: m.id, status: "up", checkedAt: t(10) },
@@ -22,19 +27,17 @@ test("a run of down checks becomes one incident, closed by the next up", async (
     ],
   });
 
-  const incidents = await deriveIncidents([m]);
+  const incidents = await listIncidents({ now });
   expect(incidents.length).toBe(1);
-  expect(incidents[0].downChecks).toBe(2);
-  expect(incidents[0].lastStatusCode).toBe(503);
+  expect(incidents[0].state).toBe("resolved");
   expect(incidents[0].endedAt).not.toBeNull();
 });
 
 test("an up check in the middle splits two incidents", async () => {
-  const { deriveIncidents } = await import("@/lib/incidents");
-  const m = await db.monitor.create({
-    data: { name: "svc", url: "https://svc.example.com", intervalSec: 60 },
-  });
-  const t = (min: number) => new Date(Date.now() - min * 60_000);
+  const { listIncidents } = await import("@/lib/incidents");
+  const m = await monitor();
+  const now = Date.now();
+  const t = (min: number) => new Date(now - min * 60_000);
   await db.check.createMany({
     data: [
       { monitorId: m.id, status: "down", statusCode: 500, checkedAt: t(9) },
@@ -42,28 +45,29 @@ test("an up check in the middle splits two incidents", async () => {
       { monitorId: m.id, status: "down", statusCode: 502, checkedAt: t(7) },
     ],
   });
-  const incidents = await deriveIncidents([m]);
+  const incidents = await listIncidents({ now });
   expect(incidents.length).toBe(2);
 });
 
 test("an ongoing down run has endedAt null", async () => {
-  const { deriveIncidents } = await import("@/lib/incidents");
-  const m = await db.monitor.create({
-    data: { name: "svc", url: "https://svc.example.com", intervalSec: 60 },
-  });
+  const { listIncidents } = await import("@/lib/incidents");
+  const m = await monitor();
+  const now = Date.now();
   await db.check.create({
-    data: { monitorId: m.id, status: "down", statusCode: 503, checkedAt: new Date() },
+    data: { monitorId: m.id, status: "down", statusCode: 503, checkedAt: new Date(now) },
   });
-  const incidents = await deriveIncidents([m]);
+  const incidents = await listIncidents({ now });
   expect(incidents.length).toBe(1);
+  expect(incidents[0].state).toBe("ongoing");
   expect(incidents[0].endedAt).toBeNull();
 });
 
 test("the batched query keeps each monitor's incidents separate", async () => {
-  const { deriveIncidents } = await import("@/lib/incidents");
-  const a = await db.monitor.create({ data: { name: "a", url: "https://a.com", intervalSec: 60 } });
-  const b = await db.monitor.create({ data: { name: "b", url: "https://b.com", intervalSec: 60 } });
-  const t = (min: number) => new Date(Date.now() - min * 60_000);
+  const { listIncidents } = await import("@/lib/incidents");
+  const a = await monitor("a");
+  const b = await monitor("b");
+  const now = Date.now();
+  const t = (min: number) => new Date(now - min * 60_000);
   await db.check.createMany({
     data: [
       // a: one incident, closed
@@ -75,24 +79,19 @@ test("the batched query keeps each monitor's incidents separate", async () => {
       { monitorId: b.id, status: "down", statusCode: 503, checkedAt: t(5) },
     ],
   });
-  const incidents = await deriveIncidents([a, b]);
+  const incidents = await listIncidents({ now });
   expect(incidents.filter((i) => i.monitorId === a.id).length).toBe(1);
   expect(incidents.filter((i) => i.monitorId === b.id).length).toBe(2);
-  const bLast = incidents.find((i) => i.monitorId === b.id && i.lastStatusCode === 503);
-  expect(bLast?.endedAt).toBeNull(); // still ongoing
+  const bLast = incidents.find((i) => i.monitorId === b.id && i.endedAt === null);
+  expect(bLast?.state).toBe("ongoing");
 });
 
 // ---- pinning ongoing incidents (#11) ----
 
 /** One monitor with `n` closed incidents, each 2 checks, plus optionally one
  *  ongoing incident. Closed incidents are spaced 1 hour apart, newest last. */
-async function seedIncidents(
-  n: number,
-  opts: { ongoing?: boolean } = {},
-): Promise<{ id: string; name: string; intervalSec: number; enabled: boolean }> {
-  const m = await db.monitor.create({
-    data: { name: "svc", url: "https://svc.example.com", intervalSec: 60 },
-  });
+async function seedIncidents(n: number, opts: { ongoing?: boolean } = {}) {
+  const m = await monitor();
   const now = Date.now();
   const rows: { monitorId: string; status: string; statusCode: number | null; checkedAt: Date }[] = [];
   // Oldest first: each closed incident is a down,up pair an hour apart.
@@ -106,37 +105,36 @@ async function seedIncidents(
     rows.push({ monitorId: m.id, status: "down", statusCode: 503, checkedAt: new Date(now - 30_000) });
   }
   await db.check.createMany({ data: rows });
-  return m;
+  return { m, now };
 }
 
 test("an ongoing incident survives when more than the cap of newer incidents exist", async () => {
-  const { deriveIncidents, MAX_INCIDENTS } = await import("@/lib/incidents");
+  const { listIncidents, MAX_INCIDENTS } = await import("@/lib/incidents");
   // MAX_INCIDENTS + 5 closed incidents, plus the ongoing one.
-  const m = await seedIncidents(MAX_INCIDENTS + 5, { ongoing: true });
-  const incidents = await deriveIncidents([m]);
-  const ongoing = incidents.filter((i) => i.endedAt == null);
-  expect(ongoing.length).toBe(1);
+  const { m, now } = await seedIncidents(MAX_INCIDENTS + 5, { ongoing: true });
+  const incidents = await listIncidents({ now });
+  expect(incidents.filter((i) => i.monitorId === m.id && i.state === "ongoing").length).toBe(1);
 });
 
 test("the ongoing incident sorts above the closed ones", async () => {
-  const { deriveIncidents } = await import("@/lib/incidents");
-  const m = await seedIncidents(3, { ongoing: true });
-  const incidents = await deriveIncidents([m]);
-  expect(incidents[0].endedAt).toBeNull();
+  const { listIncidents } = await import("@/lib/incidents");
+  const { now } = await seedIncidents(3, { ongoing: true });
+  const incidents = await listIncidents({ now });
+  expect(incidents[0].state).toBe("ongoing");
 });
 
 test("closed incidents are capped", async () => {
-  const { deriveIncidents, MAX_INCIDENTS } = await import("@/lib/incidents");
-  const m = await seedIncidents(MAX_INCIDENTS + 5);
-  const incidents = await deriveIncidents([m]);
+  const { listIncidents, MAX_INCIDENTS } = await import("@/lib/incidents");
+  const { now } = await seedIncidents(MAX_INCIDENTS + 5);
+  const incidents = await listIncidents({ now });
   expect(incidents.length).toBe(MAX_INCIDENTS);
-  for (const i of incidents) expect(i.endedAt).not.toBeNull();
+  for (const i of incidents) expect(i.state).not.toBe("ongoing");
 });
 
 test("closed incidents keep newest-first order", async () => {
-  const { deriveIncidents, MAX_INCIDENTS } = await import("@/lib/incidents");
-  const m = await seedIncidents(MAX_INCIDENTS + 5);
-  const incidents = await deriveIncidents([m]);
+  const { listIncidents, MAX_INCIDENTS } = await import("@/lib/incidents");
+  const { now } = await seedIncidents(MAX_INCIDENTS + 5);
+  const incidents = await listIncidents({ now });
   for (let i = 1; i < incidents.length; i++) {
     expect(new Date(incidents[i - 1].startedAt).getTime()).toBeGreaterThanOrEqual(
       new Date(incidents[i].startedAt).getTime(),
@@ -145,39 +143,33 @@ test("closed incidents keep newest-first order", async () => {
 });
 
 test("multiple ongoing incidents are ordered newest-first among themselves", async () => {
-  const { deriveIncidents } = await import("@/lib/incidents");
-  const older = await db.monitor.create({
-    data: { name: "older", url: "https://older.example.com", intervalSec: 60 },
-  });
-  const newer = await db.monitor.create({
-    data: { name: "newer", url: "https://newer.example.com", intervalSec: 60 },
+  const { listIncidents } = await import("@/lib/incidents");
+  const older = await monitor("older");
+  const newer = await monitor("newer");
+  const now = Date.now();
+  await db.check.create({
+    data: { monitorId: older.id, status: "down", checkedAt: new Date(now - 10 * 60_000) },
   });
   await db.check.create({
-    data: { monitorId: older.id, status: "down", checkedAt: new Date(Date.now() - 10 * 60_000) },
+    data: { monitorId: newer.id, status: "down", checkedAt: new Date(now - 60_000) },
   });
-  await db.check.create({
-    data: { monitorId: newer.id, status: "down", checkedAt: new Date(Date.now() - 60_000) },
-  });
-  const incidents = await deriveIncidents([older, newer]);
+  const incidents = await listIncidents({ now });
   expect(incidents.map((i) => i.monitorName)).toEqual(["newer", "older"]);
 });
 
 test("every ongoing outage is listed — six monitors down, six incidents", async () => {
-  const { deriveIncidents } = await import("@/lib/incidents");
+  const { listIncidents } = await import("@/lib/incidents");
   // The reported bug: more monitors down at once than the old fixed cap of 5,
   // so the oldest ongoing outage vanished from the list.
-  const monitors: Awaited<ReturnType<typeof db.monitor.create>>[] = [];
+  const now = Date.now();
   for (let i = 0; i < 6; i++) {
-    const m = await db.monitor.create({
-      data: { name: `svc${i}`, url: `https://svc${i}.example.com`, intervalSec: 60 },
-    });
+    const m = await monitor(`svc${i}`);
     await db.check.create({
-      data: { monitorId: m.id, status: "down", statusCode: 503, checkedAt: new Date() },
+      data: { monitorId: m.id, status: "down", statusCode: 503, checkedAt: new Date(now) },
     });
-    monitors.push(m);
   }
-  const incidents = await deriveIncidents(monitors);
-  const ongoing = incidents.filter((i) => i.endedAt == null);
+  const incidents = await listIncidents({ now });
+  const ongoing = incidents.filter((i) => i.state === "ongoing");
   expect(ongoing.length).toBe(6);
   expect(new Set(ongoing.map((i) => i.monitorId)).size).toBe(6);
 });
@@ -191,10 +183,8 @@ test("the exempt ongoing set is bounded by the fleet cap, not a small fixed numb
 });
 
 test("a sleep gap between two down checks never fabricates one long incident", async () => {
-  const { deriveIncidents } = await import("@/lib/incidents");
-  const m = await db.monitor.create({
-    data: { name: "svc", url: "https://svc.example.com", intervalSec: 300 },
-  });
+  const { listIncidents } = await import("@/lib/incidents");
+  const m = await monitor("svc", 300);
   const now = Date.now();
   // One down, then PING asleep for 2h (far past 3x the 5-min interval), then
   // another down. The service was still failing, but PING observed nothing in
@@ -205,25 +195,20 @@ test("a sleep gap between two down checks never fabricates one long incident", a
       { monitorId: m.id, status: "down", statusCode: 503, checkedAt: new Date(now) },
     ],
   });
-  const incidents = await deriveIncidents([m]);
+  const incidents = await listIncidents({ now });
   expect(incidents.length).toBe(2);
   // The older incident ends at its OWN last down check (zero-length here), not
   // at the later down across the gap.
-  const older = incidents.find((i) => i.endedAt != null)!;
+  const older = incidents.find((i) => i.state === "no-recovery")!;
   expect(new Date(older.endedAt!).getTime()).toBe(new Date(older.startedAt).getTime());
-  // No up check was seen, so it must not claim a recovery.
-  expect(older.recovered).toBe(false);
   // The newer down, with nothing after it, is the ongoing one.
-  const ongoing = incidents.filter((i) => i.endedAt == null);
+  const ongoing = incidents.filter((i) => i.state === "ongoing");
   expect(ongoing.length).toBe(1);
-  expect(ongoing[0].recovered).toBeNull();
 });
 
 test("a failed manual check while paused never opens an incident", async () => {
-  const { deriveIncidents } = await import("@/lib/incidents");
-  const m = await db.monitor.create({
-    data: { name: "svc", url: "https://svc.example.com", intervalSec: 600, enabled: false },
-  });
+  const { listIncidents } = await import("@/lib/incidents");
+  const m = await monitor("svc", 600, false);
   const now = Date.parse("2026-01-15T00:00:00Z");
   await db.check.createMany({
     data: [
@@ -238,20 +223,17 @@ test("a failed manual check while paused never opens an incident", async () => {
       },
     ],
   });
-  const incidents = await deriveIncidents([m], now);
+  const incidents = await listIncidents({ now });
   // The pre-pause run stays the one paused incident; the manual failure adds none.
   expect(incidents.length).toBe(1);
+  expect(incidents[0].state).toBe("paused");
   expect(incidents[0].endedAt).toBeNull();
-  expect(incidents[0].monitorPaused).toBe(true);
-  expect(incidents[0].downChecks).toBe(1);
   expect(new Date(incidents[0].startedAt).getTime()).toBe(now - 3_600_000);
 });
 
 test("a successful manual check while paused resolves the incident", async () => {
-  const { deriveIncidents } = await import("@/lib/incidents");
-  const m = await db.monitor.create({
-    data: { name: "svc", url: "https://svc.example.com", intervalSec: 600, enabled: false },
-  });
+  const { listIncidents } = await import("@/lib/incidents");
+  const m = await monitor("svc", 600, false);
   const now = Date.parse("2026-01-15T00:00:00Z");
   await db.check.createMany({
     data: [
@@ -265,18 +247,17 @@ test("a successful manual check while paused resolves the incident", async () =>
       },
     ],
   });
-  const incidents = await deriveIncidents([m], now);
+  const incidents = await listIncidents({ now });
   expect(incidents.length).toBe(1);
-  expect(incidents[0].recovered).toBe(true);
+  expect(incidents[0].state).toBe("resolved");
   expect(new Date(incidents[0].endedAt!).getTime()).toBe(now - 300_000);
 });
 
 test("a paused monitor's open incident is flagged paused, not dropped", async () => {
-  const { deriveIncidents } = await import("@/lib/incidents");
-  const m = await db.monitor.create({
-    data: { name: "svc", url: "https://svc.example.com", intervalSec: 60 },
-  });
-  const t = (min: number) => new Date(Date.now() - min * 60_000);
+  const { listIncidents } = await import("@/lib/incidents");
+  const m = await monitor();
+  const now = Date.now();
+  const t = (min: number) => new Date(now - min * 60_000);
   const openStart = t(5);
   await db.check.createMany({
     data: [
@@ -288,36 +269,28 @@ test("a paused monitor's open incident is flagged paused, not dropped", async ()
   });
 
   // Paused: no check will close the open run, so the row says paused.
-  const paused = await deriveIncidents([{ ...m, enabled: false }]);
+  await db.monitor.update({ where: { id: m.id }, data: { enabled: false } });
+  const paused = await listIncidents({ now });
   expect(paused.length).toBe(2);
   const open = paused.filter((i) => i.endedAt == null);
   expect(open.length).toBe(1);
-  expect(open[0].monitorPaused).toBe(true);
-  expect(open[0].recovered).toBeNull();
+  expect(open[0].state).toBe("paused");
   expect(open[0].startedAt).toBe(openStart.toISOString());
 
   // Resumed: the same open run is a real ongoing incident again.
-  const resumed = await deriveIncidents([{ ...m, enabled: true }]);
+  await db.monitor.update({ where: { id: m.id }, data: { enabled: true } });
+  const resumed = await listIncidents({ now });
   expect(resumed.length).toBe(2);
   const stillOpen = resumed.filter((i) => i.endedAt == null);
   expect(stillOpen.length).toBe(1);
-  expect(stillOpen[0].monitorPaused).toBe(false);
+  expect(stillOpen[0].state).toBe("ongoing");
   expect(stillOpen[0].startedAt).toBe(openStart.toISOString());
 });
 
 test("a paused incident is not pinned above newer resolved history", async () => {
-  const { deriveIncidents } = await import("@/lib/incidents");
-  const paused = await db.monitor.create({
-    data: {
-      name: "paused",
-      url: "https://paused.example.com",
-      intervalSec: 600,
-      enabled: false,
-    },
-  });
-  const running = await db.monitor.create({
-    data: { name: "running", url: "https://running.example.com", intervalSec: 600 },
-  });
+  const { listIncidents } = await import("@/lib/incidents");
+  const paused = await monitor("paused", 600, false);
+  const running = await monitor("running", 600);
   const now = Date.parse("2026-01-15T00:00:00Z");
   await db.check.createMany({
     data: [
@@ -328,15 +301,13 @@ test("a paused incident is not pinned above newer resolved history", async () =>
       { monitorId: running.id, status: "up", statusCode: 200, checkedAt: new Date(now - 30 * 60_000) },
     ],
   });
-  const incidents = await deriveIncidents([paused, running], now);
+  const incidents = await listIncidents({ now });
   expect(incidents.map((i) => i.monitorName)).toEqual(["running", "paused"]);
 });
 
 test("a recovery observed after a sleep still closes the incident at the up check", async () => {
-  const { deriveIncidents } = await import("@/lib/incidents");
-  const m = await db.monitor.create({
-    data: { name: "svc", url: "https://svc.example.com", intervalSec: 300 },
-  });
+  const { listIncidents } = await import("@/lib/incidents");
+  const m = await monitor("svc", 300);
   const now = Date.now();
   // Down, PING asleep, then an UP two hours later. We DID observe the service
   // come back, so the incident ends at that real recovery time — not at the
@@ -347,9 +318,8 @@ test("a recovery observed after a sleep still closes the incident at the up chec
       { monitorId: m.id, status: "up", statusCode: 200, checkedAt: new Date(now) },
     ],
   });
-  const incidents = await deriveIncidents([m]);
+  const incidents = await listIncidents({ now });
   expect(incidents.length).toBe(1);
-  expect(incidents[0].endedAt).not.toBeNull();
+  expect(incidents[0].state).toBe("resolved");
   expect(new Date(incidents[0].endedAt!).getTime()).toBe(now);
-  expect(incidents[0].recovered).toBe(true);
 });

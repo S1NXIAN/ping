@@ -46,15 +46,11 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useOverview } from "@/hooks/use-overview";
 import { useCardReorder } from "@/hooks/use-card-reorder";
-import {
-  api,
-  fetchIncidents,
-  newestIncidentStart,
-  unseenIncidentCount,
-} from "@/lib/ping-client";
+import { useIncidents } from "@/hooks/use-incidents";
+import { api } from "@/lib/ping-client";
 import { pinnedSetAfterMove } from "@/lib/reorder";
 import { summarize } from "@/lib/summary";
-import type { AdminIncidentDTO, FolderDTO, MonitorDTO } from "@/lib/ping-types";
+import type { FolderDTO, MonitorDTO } from "@/lib/ping-types";
 import { cn } from "@/lib/utils";
 import { PingLogo, PingWordmark } from "./ping-logo";
 import { MonitorCard, type CardDnd } from "./monitor-card";
@@ -71,9 +67,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export type SortMode = "manual" | "az" | "za" | "slowest" | "fastest";
 const SORT_STORAGE_KEY = "ping.sort";
-// Per-device watermark: the newest incident start the operator has opened the
-// incidents sheet to see. Clears the badge's closed-incident half.
-const SEEN_STORAGE_KEY = "ping.incidents.seen";
 
 export function DashboardView({
   onLogout,
@@ -159,71 +152,20 @@ export function DashboardView({
     }
   }
 
-  // incidents — postmortem-note sheet, plus the 30d list that drives both
-  // the toolbar's rose state and the cards' outage rows (same endpoint the
-  // sheet renders; refreshed with the overview poll and on sheet close so the
-  // badge follows new and resolved incidents). Scoped to the active Folder so
-  // the badge counts the Scope, not the whole Fleet. The loaded list is tagged
-  // with the Folder it came from, so a failed scoped fetch shows no badge
-  // rather than another Folder's count (one scope per view).
+  // incidents — 30d derived outage list that drives both the toolbar's rose
+  // state and the cards' outage rows. Scoped to the active Folder so the badge
+  // counts the Scope, not the whole Fleet; the hook owns the list, the seen
+  // watermark, and the badge/sheet projections so they never disagree.
   const scopeFolderId = activeFolder === "all" ? null : activeFolder;
-  const [incidentData, setIncidentData] = useState<{
-    folderId: string | null;
-    list: AdminIncidentDTO[];
-  } | null>(null);
-  const loadIncidents = useCallback(async () => {
-    try {
-      const list = await fetchIncidents(scopeFolderId);
-      setIncidentData({ folderId: scopeFolderId, list });
-    } catch {
-      // The sheet surfaces its own errors; a failed fetch leaves the previous
-      // list tagged to its own Folder, so it never leaks into this Scope.
-    }
-  }, [scopeFolderId]);
-  useEffect(() => {
-    if (data) void loadIncidents();
-  }, [loadIncidents, data]);
-  const incidents = incidentData?.folderId === scopeFolderId ? incidentData.list : null;
-
-  // The badge is a nudge, not a tally: ongoing incidents always count (they
-  // keep asking until resolved), paused and closed ones only until the sheet
-  // has been opened over them. The watermark is per device, like the sort
-  // memory, and advances only from a list that actually loaded — a failed fetch
-  // leaves it untouched, so nothing is marked seen that was never shown.
-  const [seenIncidentsAt, setSeenIncidentsAt] = useState(0);
-  const seenRef = useRef(0);
-  useEffect(() => {
-    try {
-      const v = Number(localStorage.getItem(SEEN_STORAGE_KEY)) || 0;
-      seenRef.current = v;
-      setSeenIncidentsAt(v);
-    } catch {
-      /* private browsing etc. */
-    }
-  }, []);
-  const markIncidentsViewed = useCallback((list: AdminIncidentDTO[]) => {
-    const newest = newestIncidentStart(list);
-    if (newest <= seenRef.current) return;
-    seenRef.current = newest;
-    setSeenIncidentsAt(newest);
-    try {
-      localStorage.setItem(SEEN_STORAGE_KEY, String(newest));
-    } catch {
-      /* ignore */
-    }
-  }, []);
-  const incidentCount = incidents ? unseenIncidentCount(incidents, seenIncidentsAt) : 0;
-
-  // Down cards' honest "down since": the ONGOING incident's real first
-  // failed check (endedAt == null). No incident known → no claim, never a
-  // guess; the label simply stays hidden.
-  const downSinceByMonitor = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const inc of incidents ?? []) {
-      if (inc.endedAt == null) map.set(inc.monitorId, inc.startedAt);
-    }
-    return map;
-  }, [incidents]);
+  const {
+    incidents,
+    error: incidentsError,
+    unseenCount: incidentCount,
+    ongoingCount,
+    downSince: downSinceByMonitor,
+    markViewed: markIncidentsViewed,
+    refresh: refreshIncidents,
+  } = useIncidents(scopeFolderId, data);
 
   // Palette-initiated delete — confirmed here with the same consequence copy
   // as the card's dialog (the palette itself can't host a confirm step).
@@ -983,12 +925,13 @@ export function DashboardView({
 
       <IncidentsSheet
         open={incidentsOpen}
-        onOpenChange={(o) => {
-          setIncidentsOpen(o);
-          if (!o) void loadIncidents();
-        }}
+        onOpenChange={setIncidentsOpen}
+        folderId={scopeFolderId}
+        incidents={incidents}
+        error={incidentsError}
+        ongoingCount={ongoingCount}
         onViewed={markIncidentsViewed}
-        folderId={activeFolder === "all" ? null : activeFolder}
+        onRefresh={refreshIncidents}
       />
 
       <CommandPalette

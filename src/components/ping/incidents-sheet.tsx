@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, ShieldQuestion } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -10,13 +10,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { fetchIncidents, formatDateTime, timeAgo } from "@/lib/ping-client";
-import type { AdminIncidentDTO } from "@/lib/ping-types";
+import { formatDateTime, timeAgo } from "@/lib/ping-client";
+import type { IncidentDTO, IncidentState } from "@/lib/ping-types";
 import { StatusPill, type PillTone } from "./status-pill";
 import { EmptyState } from "./empty-state";
 import { InlineAlert } from "./inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { incidentState, isOngoingIncident, type IncidentState } from "@/lib/incident-status";
 
 const STATE_PILL: Record<IncidentState, { label: string; tone: PillTone }> = {
   ongoing: { label: "ongoing", tone: "down" },
@@ -25,48 +24,55 @@ const STATE_PILL: Record<IncidentState, { label: string; tone: PillTone }> = {
   resolved: { label: "resolved", tone: "up" },
 };
 
-/** Admin view of the last 30 days of incidents (derived from real checks). */
+/** Admin view of the last 30 days of incidents (derived from real checks). The
+ *  list and the seen watermark are owned by the dashboard's Incident state, so
+ *  the badge and this sheet never disagree. */
 export function IncidentsSheet({
   open,
   onOpenChange,
-  onViewed,
   folderId,
+  incidents,
+  error,
+  ongoingCount,
+  onViewed,
+  onRefresh,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Called with the list whenever it loads while open, so the dashboard can
-   *  clear its badge's seen-incident half. Never called on a failed load. */
-  onViewed: (incidents: AdminIncidentDTO[]) => void;
   /** Active Folder to scope to; null = the whole Fleet ("All monitors"). */
   folderId: string | null;
+  /** The active Scope's shared list; null while nothing has loaded yet. */
+  incidents: IncidentDTO[] | null;
+  error: string | null;
+  ongoingCount: number;
+  /** Called once with the list each time the sheet opens, so the badge clears
+   *  for what the operator actually saw. */
+  onViewed: (incidents: IncidentDTO[]) => void;
+  /** One background refresh on open, so the list is current when shown. */
+  onRefresh: () => Promise<void>;
 }) {
-  const [incidents, setIncidents] = useState<AdminIncidentDTO[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   // The clock for "ongoing" durations. Read in an effect (not during render)
   // so a re-render never produces a different number from the same props, and
   // ticked while open so a long outage's duration stays honest.
   const [now, setNow] = useState(() => Date.now());
-  // The header badge counts monitors still failing: ongoing, never paused or resolved.
-  const ongoingCount = incidents?.filter(isOngoingIncident).length ?? 0;
-
-  const load = useCallback(async () => {
-    try {
-      const list = await fetchIncidents(folderId);
-      setIncidents(list);
-      setError(null);
-      onViewed(list);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load incidents");
-    }
-  }, [folderId, onViewed]);
+  const markedRef = useRef(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      markedRef.current = false;
+      return;
+    }
     setNow(Date.now());
-    void load();
+    void onRefresh();
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
-  }, [open, load]);
+  }, [open, onRefresh]);
+
+  useEffect(() => {
+    if (!open || !incidents || markedRef.current) return;
+    markedRef.current = true;
+    onViewed(incidents);
+  }, [open, incidents, onViewed]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -127,9 +133,9 @@ export function IncidentsSheet({
  * "Nov 27, 10:34 PM" twice made start and end read the same at 11px. A paused
  * monitor's open incident shows the start alone — its end was never observed.
  */
-function formatRange(startedAt: string, endedAt: string | null, paused: boolean): string {
+function formatRange(startedAt: string, endedAt: string | null, state: IncidentState): string {
   const started = new Date(startedAt);
-  if (!endedAt) return paused ? formatDateTime(startedAt) : `${formatDateTime(startedAt)} → now`;
+  if (!endedAt) return state === "paused" ? formatDateTime(startedAt) : `${formatDateTime(startedAt)} → now`;
   const ended = new Date(endedAt);
   const end =
     ended.toDateString() === started.toDateString()
@@ -138,8 +144,8 @@ function formatRange(startedAt: string, endedAt: string | null, paused: boolean)
   return `${formatDateTime(startedAt)} → ${end}`;
 }
 
-function IncidentRow({ inc, now }: { inc: AdminIncidentDTO; now: number }) {
-  const state = STATE_PILL[incidentState(inc)];
+function IncidentRow({ inc, now }: { inc: IncidentDTO; now: number }) {
+  const state = STATE_PILL[inc.state];
 
   return (
     <div className="relative rounded-lg border bg-card px-3 pb-2.5 pt-6">
@@ -160,7 +166,7 @@ function IncidentRow({ inc, now }: { inc: AdminIncidentDTO; now: number }) {
         </span>
       </div>
       <div className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">
-        {formatRange(inc.startedAt, inc.endedAt, inc.monitorPaused)}
+        {formatRange(inc.startedAt, inc.endedAt, inc.state)}
       </div>
     </div>
   );

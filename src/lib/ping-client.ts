@@ -1,6 +1,4 @@
 // Small client-side helpers for PING: fetch wrapper + formatters.
-import type { AdminIncidentDTO } from "./ping-types";
-import { isOngoingIncident } from "./incident-status";
 
 /** Check-interval bounds, shared with the API schemas (see lib/validation.ts).
  *  Seconds are not a unit: the scheduler wakes every 30s, so anything finer
@@ -16,40 +14,6 @@ export class ApiError extends Error {
     super(message);
     this.status = status;
   }
-}
-
-/**
- * Lists incidents for one Scope (see GLOSSARY.md "Scope"): the whole Fleet
- * when `folderId` is null, else that Folder's monitors. The server scopes
- * before the list cap, so the badge and the sheet never undercount.
- */
-export async function fetchIncidents(folderId: string | null): Promise<AdminIncidentDTO[]> {
-  const qs = folderId ? `?folderId=${encodeURIComponent(folderId)}` : "";
-  const r = await api<{ incidents: AdminIncidentDTO[] }>(`/api/incidents${qs}`);
-  return r.incidents;
-}
-
-/** The newest incident start in a loaded list, as epoch ms (0 for an empty
- *  list). The sheet records this when opened, so the badge clears. */
-export function newestIncidentStart(incidents: AdminIncidentDTO[]): number {
-  return incidents.reduce((max, i) => Math.max(max, Date.parse(i.startedAt)), 0);
-}
-
-/**
- * The incidents badge count: every ongoing incident (unresolved, so it keeps
- * asking for attention) plus every paused or closed incident that started after
- * the last time the sheet was opened (`seenStartedAt`). A paused monitor's open
- * incident has no check left to close it, so it clears like viewed history
- * instead of asking forever. Opening the sheet moves `seenStartedAt` to the
- * newest start it listed.
- */
-export function unseenIncidentCount(
-  incidents: AdminIncidentDTO[],
-  seenStartedAt: number,
-): number {
-  return incidents.filter(
-    (i) => isOngoingIncident(i) || Date.parse(i.startedAt) > seenStartedAt,
-  ).length;
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {

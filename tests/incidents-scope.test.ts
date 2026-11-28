@@ -1,8 +1,9 @@
-// GET /api/incidents is scoped to the active Folder (?folderId=), so the
-// dashboard's badge and sheet show only the Scope's incidents. Scoping MUST
-// happen before the MAX_INCIDENTS cap is applied: filtering the capped list
-// client-side would silently drop a folder's 16th+ incident and undercount
-// the badge. Expected values come from real seeded checks.
+// listIncidents is scoped to the active Folder, so the dashboard's badge and
+// sheet show only the Scope's incidents. Scoping MUST happen before the
+// MAX_INCIDENTS cap is applied: filtering the capped list client-side would
+// silently drop a folder's 16th+ incident and undercount the badge. Expected
+// values come from real seeded checks. One thin route test pins the HTTP
+// adapter (auth guard + ?folderId= forwarding).
 import { beforeEach, expect, test } from "bun:test";
 import { NextRequest } from "next/server";
 import { db, resetDb } from "./helpers/test-db";
@@ -36,13 +37,9 @@ test("without folderId the list covers the whole Fleet", async () => {
   await seedDownMonitor("filed", folder.id);
   await seedDownMonitor("unfiled", null);
 
-  const { GET } = await import("@/app/api/incidents/route");
-  const res = await GET(await get());
-  const { incidents } = await res.json();
-  expect(incidents.map((i: { monitorName: string }) => i.monitorName).sort()).toEqual([
-    "filed",
-    "unfiled",
-  ]);
+  const { listIncidents } = await import("@/lib/incidents");
+  const incidents = await listIncidents();
+  expect(incidents.map((i) => i.monitorName).sort()).toEqual(["filed", "unfiled"]);
 });
 
 test("folderId narrows the list to that Folder's monitors only", async () => {
@@ -50,19 +47,17 @@ test("folderId narrows the list to that Folder's monitors only", async () => {
   await seedDownMonitor("filed", folder.id);
   await seedDownMonitor("unfiled", null);
 
-  const { GET } = await import("@/app/api/incidents/route");
-  const res = await GET(await get(folder.id));
-  const { incidents } = await res.json();
-  expect(incidents.map((i: { monitorName: string }) => i.monitorName)).toEqual(["filed"]);
+  const { listIncidents } = await import("@/lib/incidents");
+  const incidents = await listIncidents({ folderId: folder.id });
+  expect(incidents.map((i) => i.monitorName)).toEqual(["filed"]);
 });
 
 test("an empty Folder yields no incidents", async () => {
   const folder = await db.folder.create({ data: { name: "Empty" } });
   await seedDownMonitor("elsewhere", null);
 
-  const { GET } = await import("@/app/api/incidents/route");
-  const res = await GET(await get(folder.id));
-  const { incidents } = await res.json();
+  const { listIncidents } = await import("@/lib/incidents");
+  const incidents = await listIncidents({ folderId: folder.id });
   expect(incidents).toEqual([]);
 });
 
@@ -90,9 +85,19 @@ test("a rival Folder's incidents never consume this Folder's cap", async () => {
   await seedClosed("in-b", b.id, MAX_INCIDENTS + 5, 0); // newer
   await seedClosed("in-a", a.id, 5, 100); // older
 
+  const { listIncidents } = await import("@/lib/incidents");
+  const incidents = await listIncidents({ folderId: a.id });
+  expect(incidents).toHaveLength(5);
+  expect(incidents.every((i) => i.monitorName === "in-a")).toBe(true);
+
+  // The thin HTTP adapter: the route forwards ?folderId= to the module and
+  // refuses an unauthenticated request.
   const { GET } = await import("@/app/api/incidents/route");
   const res = await GET(await get(a.id));
-  const { incidents } = await res.json();
-  expect(incidents).toHaveLength(5);
-  expect(incidents.every((i: { monitorName: string }) => i.monitorName === "in-a")).toBe(true);
+  const body = await res.json();
+  expect(body.incidents.map((i: { monitorName: string }) => i.monitorName)).toEqual(
+    Array(5).fill("in-a"),
+  );
+  const unauthorized = await GET(new NextRequest("http://localhost/api/incidents"));
+  expect(unauthorized.status).toBe(401);
 });

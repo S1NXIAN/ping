@@ -127,21 +127,17 @@ export interface MonitorHistoryResponse {
 
 export type RenderIndicator = "none" | "minor" | "major" | "critical" | "unknown";
 
-/** Incident + its admin note, as listed in the admin incidents view. */
-export interface AdminIncidentDTO {
+/** The four states an Incident row can be in (see GLOSSARY.md "Incident"). */
+export type IncidentState = "ongoing" | "paused" | "no-recovery" | "resolved";
+
+/** Derived incident listed in the admin incidents view. */
+export interface IncidentDTO {
   monitorId: string;
   monitorName: string;
   startedAt: string;
+  /** Null only for `ongoing` and `paused` incidents. */
   endedAt: string | null;
-  /** Null while ongoing; false when a sleep gap ended it without an up check. */
-  recovered: boolean | null;
-  /** The monitor is paused; an open incident is then shown as paused. */
-  monitorPaused: boolean;
-  downChecks: number;
-  lastStatusCode: number | null;
-  /** Non-null when a note is attached (this is its row id). */
-  noteId: string | null;
-  note: string | null;
+  state: IncidentState;
 }
 
 export interface RenderStatusResponse {

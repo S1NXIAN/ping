@@ -1,20 +1,16 @@
 // Incident derivation for the admin incidents view. Incidents are never
-// stored as rows — they are stitched
-// from REAL recorded checks: a run of consecutive "down" checks for one
-// monitor, bounded by up checks (or still ongoing). Admin postmortem notes
-// (IncidentNote rows) are joined on by the exact timestamp of the first
-// failed check, which is the stable key both sides agree on.
+// stored as rows — they are stitched from REAL recorded checks: a run of
+// consecutive "down" checks for one monitor, bounded by up checks (or still
+// ongoing).
 import { db } from "./db";
 import { Prisma } from "@prisma/client";
 import { MAX_MONITORS } from "./checker";
-import { incidentState } from "./incident-status";
-import type { AdminIncidentDTO } from "./ping-types";
+import type { IncidentDTO, IncidentState } from "./ping-types";
 
 const INCIDENT_WINDOW_DAYS = 30;
-/** How far back the two lookups that must outlive the derivation window reach:
- *  the "last down" stat and the incident-note prune. The extra days are slack
- *  so a note or down recorded just before the window edge is not dropped while
- *  its incident can still be derived (which uses INCIDENT_WINDOW_DAYS). */
+/** How far back the "last down" stat reaches. The extra days are slack so a
+ *  down recorded just before the window edge stays visible alongside any
+ *  incident derived in INCIDENT_WINDOW_DAYS. */
 export const INCIDENT_LOOKBACK_DAYS = INCIDENT_WINDOW_DAYS + 2;
 export const MAX_INCIDENTS = 15;
 /** Ongoing incidents are exempt from MAX_INCIDENTS so a long outage is never
@@ -29,26 +25,10 @@ const MAX_UP_MARKERS_PER_STREAK = 2000;
 /** Streaks resolved per round while the closed-incident cut is still open. */
 const RESOLVE_BATCH = 256;
 
-export interface DerivedIncident {
-  monitorId: string;
-  monitorName: string;
-  startedAt: string; // ISO — first failed check
-  /** Null while the incident is still ongoing. */
-  endedAt: string | null;
-  /** Null while ongoing. True only when an up Check was observed after the
-   *  incident; false when a sleep gap ended it at its last down check. */
-  recovered: boolean | null;
-  /** The monitor is paused. An ongoing incident on a paused monitor has no
-   *  checks left to close it, so it is shown as paused rather than ongoing. */
-  monitorPaused: boolean;
-  downChecks: number;
-  lastStatusCode: number | null;
-}
 
 /** One recorded down check. */
 interface DownRow {
   t: number;
-  code: number | null;
 }
 
 /** A run of consecutive down checks for one monitor, before splitting on the
@@ -62,6 +42,23 @@ interface Streak {
   isLast: boolean;
   /** Last down time; no incident from this streak can start after it. */
   lastDown: number;
+}
+
+/**
+ * Lists the last 30 days of derived Incidents for one Scope (see GLOSSARY.md
+ * "Scope"): the whole Fleet when `folderId` is omitted, else that Folder's
+ * Monitors. Scoping happens before the cap, so a Folder's incidents are never
+ * dropped for another's. Every incident comes from REAL checks.
+ */
+export async function listIncidents({
+  folderId,
+  now = Date.now(),
+}: { folderId?: string; now?: number } = {}): Promise<IncidentDTO[]> {
+  const monitors = await db.monitor.findMany({
+    where: folderId ? { folderId } : undefined,
+    select: { id: true, name: true, intervalSec: true, enabled: true },
+  });
+  return deriveIncidents(monitors, now);
 }
 
 /**
@@ -84,7 +81,7 @@ interface Streak {
  * longer change. The output is identical to the full scan, but the work is
  * bounded by the output size, not by the fleet's total streak count.
  */
-export async function deriveIncidents(
+async function deriveIncidents(
   monitors: {
     id: string;
     name: string;
@@ -93,7 +90,7 @@ export async function deriveIncidents(
   }[],
   /** Injectable clock for deterministic tests. */
   now = Date.now(),
-): Promise<DerivedIncident[]> {
+): Promise<IncidentDTO[]> {
   if (monitors.length === 0) return [];
   const since = new Date(now - INCIDENT_WINDOW_DAYS * 86400_000);
 
@@ -102,10 +99,10 @@ export async function deriveIncidents(
   //    A per-monitor query here was N queries per incidents view.
   const sinceMs = since.getTime();
   const rawDowns = await db.$queryRaw<
-    Array<{ monitorId: string; statusCode: number | null; checkedAt: Date | number | string }>
+    Array<{ monitorId: string; checkedAt: Date | number | string }>
   >`
-    SELECT monitorId, statusCode, checkedAt FROM (
-      SELECT monitorId, statusCode, checkedAt,
+    SELECT monitorId, checkedAt FROM (
+      SELECT monitorId, checkedAt,
              ROW_NUMBER() OVER (PARTITION BY monitorId ORDER BY checkedAt DESC) AS rn
       FROM "Check"
       WHERE monitorId IN (${Prisma.join(monitors.map((m) => m.id))})
@@ -114,7 +111,7 @@ export async function deriveIncidents(
   const downsByMonitor = new Map<string, DownRow[]>();
   for (const r of rawDowns) {
     const list = downsByMonitor.get(r.monitorId) ?? [];
-    list.push({ t: new Date(r.checkedAt as string | number).getTime(), code: r.statusCode ?? null });
+    list.push({ t: new Date(r.checkedAt as string | number).getTime() });
     downsByMonitor.set(r.monitorId, list);
   }
   // ROW_NUMBER ordered newest-first; reverse each list to chronological.
@@ -164,7 +161,7 @@ export async function deriveIncidents(
 
   // 3) Every monitor's LAST streak is resolved first: it is the only streak
   //    that can be ongoing, and ongoing incidents are exempt from the cap.
-  const incidents: DerivedIncident[] = await resolveStreaks(
+  const incidents: IncidentDTO[] = await resolveStreaks(
     streaks.filter((s) => s.isLast),
     monitorById,
   );
@@ -177,15 +174,15 @@ export async function deriveIncidents(
   const rest = streaks.filter((s) => !s.isLast).sort((a, b) => b.lastDown - a.lastDown);
   for (let i = 0; i < rest.length; i += RESOLVE_BATCH) {
     incidents.push(...(await resolveStreaks(rest.slice(i, i + RESOLVE_BATCH), monitorById)));
-    const closedStarts = incidents
-      .filter((x) => x.endedAt != null)
+    const settledStarts = incidents
+      .filter((x) => x.state !== "ongoing")
       .map((x) => new Date(x.startedAt).getTime())
       .sort((a, b) => b - a);
     const nextLastDown = rest[i + RESOLVE_BATCH]?.lastDown;
     if (
-      closedStarts.length >= MAX_INCIDENTS &&
+      settledStarts.length >= MAX_INCIDENTS &&
       nextLastDown !== undefined &&
-      nextLastDown < closedStarts[MAX_INCIDENTS - 1]
+      nextLastDown < settledStarts[MAX_INCIDENTS - 1]
     ) {
       break;
     }
@@ -196,10 +193,10 @@ export async function deriveIncidents(
   // newest-first history cap. The exempt set is bounded by the fleet cap (one
   // ongoing incident per monitor), so the list can never grow without limit
   // while still never dropping a real current outage.
-  const byNewest = (a: DerivedIncident, b: DerivedIncident) =>
+  const byNewest = (a: IncidentDTO, b: IncidentDTO) =>
     new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
-  const ongoing = incidents.filter((i) => incidentState(i) === "ongoing").sort(byNewest);
-  const settled = incidents.filter((i) => incidentState(i) !== "ongoing").sort(byNewest);
+  const ongoing = incidents.filter((i) => i.state === "ongoing").sort(byNewest);
+  const settled = incidents.filter((i) => i.state !== "ongoing").sort(byNewest);
   return [...ongoing.slice(0, MAX_ONGOING_INCIDENTS), ...settled.slice(0, MAX_INCIDENTS)];
 }
 
@@ -216,7 +213,7 @@ export async function deriveIncidents(
 async function resolveStreaks(
   streaks: Streak[],
   monitorById: Map<string, { name: string; paused: boolean }>,
-): Promise<DerivedIncident[]> {
+): Promise<IncidentDTO[]> {
   if (streaks.length === 0) return [];
 
   // Up checks strictly inside each streak's span. ONE query over all spans (a
@@ -278,7 +275,7 @@ async function resolveStreaks(
   // DOWN must NOT close it — that would fabricate an outage duration across the
   // sleep gap we never observed; the incident ends at its own last down
   // instead. No following check at all → still ongoing.
-  const out: DerivedIncident[] = [];
+  const out: IncidentDTO[] = [];
   for (const streak of streaks) {
     const ups = upsByStreak.get(streak.id) ?? [];
     const subStreaks: Array<{ rows: DownRow[]; closedByUpAt: number | null }> = [];
@@ -294,53 +291,35 @@ async function resolveStreaks(
     }
     if (cur.length > 0) subStreaks.push({ rows: cur, closedByUpAt: null });
 
+    const monitor = monitorById.get(streak.monitorId);
+    const monitorPaused = monitor?.paused ?? false;
     for (const sub of subStreaks) {
       const subLast = sub.rows[sub.rows.length - 1].t;
       let endedAt: number | null = sub.closedByUpAt;
-      let recovered: boolean | null = endedAt == null ? null : true;
+      let state: IncidentState = endedAt == null ? "ongoing" : "resolved";
       if (endedAt == null) {
         const boundary = boundaryByStreak.get(streak.id) ?? null;
         if (!boundary) {
-          endedAt = null;
+          // No check after the run. A paused monitor cannot close it either.
+          state = monitorPaused ? "paused" : "ongoing";
         } else if (boundary.status === "up") {
           endedAt = boundary.checkedAt;
-          recovered = true;
+          state = "resolved";
         } else {
           // A sleep gap ended the run; no recovery was observed.
           endedAt = subLast;
-          recovered = false;
+          state = "no-recovery";
         }
       }
 
-      const monitor = monitorById.get(streak.monitorId);
       out.push({
         monitorId: streak.monitorId,
         monitorName: monitor?.name ?? "",
-        monitorPaused: monitor?.paused ?? false,
-        recovered,
         startedAt: new Date(sub.rows[0].t).toISOString(),
         endedAt: endedAt == null ? null : new Date(endedAt).toISOString(),
-        downChecks: sub.rows.length,
-        lastStatusCode: sub.rows[sub.rows.length - 1].code,
+        state,
       });
     }
   }
   return out;
-}
-
-/** Joins admin IncidentNote rows onto derived incidents (exact start match). */
-export async function incidentsWithNotes(
-  incidents: DerivedIncident[],
-): Promise<AdminIncidentDTO[]> {
-  if (incidents.length === 0) return [];
-  const notes = await db.incidentNote.findMany({
-    where: { monitorId: { in: incidents.map((i) => i.monitorId) } },
-  });
-  const byKey = new Map(
-    notes.map((n) => [`${n.monitorId}:${n.startedAt.getTime()}`, n] as const),
-  );
-  return incidents.map((inc) => {
-    const n = byKey.get(`${inc.monitorId}:${new Date(inc.startedAt).getTime()}`);
-    return { ...inc, noteId: n?.id ?? null, note: n?.note ?? null };
-  });
 }

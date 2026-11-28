@@ -1,4 +1,4 @@
-// deriveIncidents only ever returns every ongoing incident plus the newest
+// listIncidents only ever returns every ongoing incident plus the newest
 // MAX_INCIDENTS closed ones. The derivation must therefore resolve only the
 // streaks that can reach that output — not all ~40 per monitor — while
 // producing exactly the same list. These tests pin the output on fleets that
@@ -45,16 +45,16 @@ async function seedOngoing(name: string, startedAt: number) {
 }
 
 test("the newest closed incidents win across the whole fleet", async () => {
-  const { deriveIncidents, MAX_INCIDENTS } = await import("@/lib/incidents");
+  const { listIncidents, MAX_INCIDENTS } = await import("@/lib/incidents");
   const now = Date.now();
   // One flapping monitor with more incidents than the cap, all newer than a
   // second monitor's single old incident. The cap must keep the flapping
   // monitor's newest ones, not the old monitor's — and they come from its
   // OLDER (non-last) streaks, which the selection must still resolve.
   const blip = await seedClosed("blip", MAX_INCIDENTS + 5, H, now - H);
-  const old = await seedClosed("old", 1, H, now - 500 * H);
+  await seedClosed("old", 1, H, now - 500 * H);
 
-  const incidents = await deriveIncidents([blip.monitor, old.monitor]);
+  const incidents = await listIncidents({ now });
 
   expect(incidents.length).toBe(MAX_INCIDENTS);
   expect(incidents.every((i) => i.monitorId === blip.monitor.id)).toBe(true);
@@ -64,23 +64,23 @@ test("the newest closed incidents win across the whole fleet", async () => {
 });
 
 test("every ongoing incident is kept while closed ones are capped", async () => {
-  const { deriveIncidents, MAX_INCIDENTS } = await import("@/lib/incidents");
+  const { listIncidents, MAX_INCIDENTS } = await import("@/lib/incidents");
   const now = Date.now();
-  const blip = await seedClosed("blip", MAX_INCIDENTS + 5, H, now - H);
+  await seedClosed("blip", MAX_INCIDENTS + 5, H, now - H);
   const on1 = await seedOngoing("on1", now - 30_000);
   const on2 = await seedOngoing("on2", now - 60_000);
 
-  const incidents = await deriveIncidents([blip.monitor, on1, on2]);
+  const incidents = await listIncidents({ now });
 
-  expect(incidents.filter((i) => i.endedAt == null).length).toBe(2);
-  expect(incidents.filter((i) => i.endedAt != null).length).toBe(MAX_INCIDENTS);
+  expect(incidents.filter((i) => i.state === "ongoing").length).toBe(2);
+  expect(incidents.filter((i) => i.state !== "ongoing").length).toBe(MAX_INCIDENTS);
   // Ongoing pin to the top, newest first.
   expect(incidents[0].monitorId).toBe(on1.id);
   expect(incidents[1].monitorId).toBe(on2.id);
 });
 
 test("closed incidents from different monitors interleave by start time", async () => {
-  const { deriveIncidents } = await import("@/lib/incidents");
+  const { listIncidents } = await import("@/lib/incidents");
   const now = Date.now();
   // A: now-1h, now-3h, now-5h. B: now-2h, now-4h.
   const a = await seedClosed("a", 1, 0, now - 1 * H);
@@ -104,7 +104,7 @@ test("closed incidents from different monitors interleave by start time", async 
     ],
   });
 
-  const incidents = await deriveIncidents([a.monitor, b]);
+  const incidents = await listIncidents({ now });
 
   expect(incidents.map((i) => new Date(i.startedAt).getTime())).toEqual([
     now - 1 * H,
@@ -117,7 +117,7 @@ test("closed incidents from different monitors interleave by start time", async 
 });
 
 test("a monitor's older streak still contributes when it is among the newest", async () => {
-  const { deriveIncidents } = await import("@/lib/incidents");
+  const { listIncidents } = await import("@/lib/incidents");
   const now = Date.now();
   // One monitor whose LAST streak is an ongoing outage, with an older CLOSED
   // streak before it. A selection that only ever resolves each monitor's final
@@ -132,15 +132,15 @@ test("a monitor's older streak still contributes when it is among the newest", a
       { monitorId: mixed.id, status: "down", statusCode: 503, checkedAt: new Date(now - 60_000) },
     ],
   });
-  const recent = await seedClosed("recent", 1, 0, now - 3 * H);
+  await seedClosed("recent", 1, 0, now - 3 * H);
 
-  const incidents = await deriveIncidents([mixed, recent.monitor]);
+  const incidents = await listIncidents({ now });
 
   // mixed: one closed (now-6h) + one ongoing. recent: one closed (now-3h).
   expect(incidents.length).toBe(3);
-  expect(incidents.filter((i) => i.endedAt == null).length).toBe(1);
+  expect(incidents.filter((i) => i.state === "ongoing").length).toBe(1);
   const closedStarts = incidents
-    .filter((i) => i.endedAt != null)
+    .filter((i) => i.state !== "ongoing")
     .map((i) => new Date(i.startedAt).getTime())
     .sort((a, b) => a - b);
   expect(closedStarts).toEqual([now - 6 * H, now - 3 * H]);
