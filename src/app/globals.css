@@ -604,6 +604,36 @@ body::before {
   }
 }
 
+/* Dashboard ledger layout — edge-to-edge rows, trimmed rail */
+.ping-ledger > header > div {
+  max-width: none;
+}
+.ping-ledger > .ping-ledger-body {
+  max-width: none;
+}
+.ping-ledger > .ping-ledger-body > aside {
+  width: 190px;
+  padding-right: 10px;
+  border-right: 1px solid var(--border);
+}
+.ping-ledger > .ping-ledger-body > main {
+  padding-top: 6px;
+}
+.ping-ledger .ping-ledger-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ping-ledger > footer {
+  margin-top: 0;
+}
+@media (min-width: 1024px) {
+  .ping-ledger > .ping-ledger-body {
+    gap: 0;
+    padding-inline: 24px;
+  }
+}
+
 /* Hide the Next.js dev-tools portal ("N" badge) — dev-only noise */
 nextjs-portal {
   display: none !important;

@@ -439,7 +439,7 @@ export function DashboardView({
   );
 
   return (
-    <div className="ping-ambient flex min-h-dvh flex-col">
+    <div className="ping-ambient ping-ledger flex min-h-dvh flex-col">
       {/* keyboard bypass — first focusable element on the surface */}
       <a
         href="#main"
@@ -539,7 +539,7 @@ export function DashboardView({
       </header>
 
       {/* ---------- body: sidebar (lg) + main ---------- */}
-      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 gap-6 px-0 sm:px-4 lg:px-4 2xl:max-w-7xl 2xl:gap-8">
+      <div className="ping-ledger-body relative z-10 mx-auto flex w-full max-w-6xl flex-1 gap-6 px-0 sm:px-4 lg:px-4 2xl:max-w-7xl 2xl:gap-8">
         {/* folder nav — sidebar on desktop */}
         <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-border/50 py-4 pr-3 lg:flex">
           <button
@@ -847,7 +847,7 @@ export function DashboardView({
           ) : (
             <div
               ref={listRef}
-              className={cn("relative space-y-2.5", reorder.draggingId && "select-none")}
+              className={cn("ping-ledger-list relative", reorder.draggingId && "select-none")}
             >
               {/* Insertion indicator — where the dragged card will land. Only
                   while dragging, so the resting list carries no extra chrome. */}
