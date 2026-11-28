@@ -84,6 +84,8 @@ export function useCardReorder<T extends { id: string }>({
   const draggedEl = useRef<HTMLElement | null>(null);
   /** The optimistic order not yet confirmed by the server; null when settled. */
   const optimisticRef = useRef<T[] | null>(null);
+  /** The newest order currently being committed; null once settled. */
+  const inFlightList = useRef<T[] | null>(null);
   const pointerY = useRef(0);
   const grabOffset = useRef(0);
   const slotRef = useRef(-1);
@@ -107,11 +109,13 @@ export function useCardReorder<T extends { id: string }>({
   const enqueue = useCallback(
     (list: T[], movedId: string) => {
       optimisticRef.current = list;
+      inFlightList.current = list;
       setPreview(list);
       chain.current = chain.current
         .then(() => onCommit(list, movedId))
         .catch(() => undefined)
         .then(() => {
+          if (inFlightList.current === list) inFlightList.current = null;
           if (optimisticRef.current === list) {
             optimisticRef.current = null;
             setPreview(null);
@@ -199,7 +203,7 @@ export function useCardReorder<T extends { id: string }>({
       startSlot.current = draggedSlot;
       moved.current = false;
       setDraggingId(id);
-      setPreview(items);
+      setPreview(inFlightList.current ?? items);
       setIndicatorY(s[draggedSlot].offsetTop);
       document.body.style.userSelect = "none";
 
@@ -242,7 +246,6 @@ export function useCardReorder<T extends { id: string }>({
 
       /** Reset everything the session touched — safe to call twice. */
       const teardown = () => {
-        cancelAnimationFrame(raf);
         if (draggedEl.current) draggedEl.current.style.transform = "";
         document.body.style.userSelect = "";
         draggedEl.current = null;
@@ -277,8 +280,15 @@ export function useCardReorder<T extends { id: string }>({
 
         setDraggingId(null);
         setIndicatorY(null);
-        if (changed && list) enqueue(list, id);
-        else if (optimisticRef.current == null) setPreview(null);
+        if (changed && list) {
+          enqueue(list, id);
+        } else {
+          // Restore only a still-in-flight commit (or null), so dragging away
+          // and back to the start slot never freezes `preview` on stale data.
+          const active = inFlightList.current;
+          optimisticRef.current = active;
+          setPreview(active);
+        }
       };
 
       window.addEventListener("pointermove", onMove);
@@ -286,6 +296,7 @@ export function useCardReorder<T extends { id: string }>({
       window.addEventListener("pointercancel", finish);
       window.addEventListener("scroll", onScroll, { passive: true });
       detach.current = () => {
+        cancelAnimationFrame(raf);
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", finish);
         window.removeEventListener("pointercancel", finish);

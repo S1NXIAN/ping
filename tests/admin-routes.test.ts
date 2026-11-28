@@ -2,10 +2,17 @@
 // are the invariants a refactor could silently break: changing the password
 // must revoke every other session, reorder must persist the exact order and pin
 // set, and retention must store the policy and actually prune.
-import { beforeEach, expect, test } from "bun:test";
+import { afterEach, beforeEach, expect, setSystemTime, test } from "bun:test";
 import { NextRequest } from "next/server";
 import { db, resetDb } from "./helpers/test-db";
-import { hashPassword, SESSION_COOKIE, verifyPassword } from "@/lib/ping-auth";
+import {
+  hashPassword,
+  LOCKOUT_MS,
+  MAX_ATTEMPTS,
+  resetThrottle,
+  SESSION_COOKIE,
+  verifyPassword,
+} from "@/lib/ping-auth";
 
 /** A request carrying a valid session cookie (the routes are all auth-guarded).
  *  Idempotent: several calls in one test share the one "sess" token. */
@@ -20,6 +27,11 @@ async function authed(path: string, body: unknown, method = "POST"): Promise<Nex
 
 beforeEach(async () => {
   await resetDb();
+});
+
+afterEach(() => {
+  setSystemTime();
+  resetThrottle();
 });
 
 // ---- POST /api/admin/password ----
@@ -68,6 +80,48 @@ test("a wrong current password changes nothing", async () => {
   expect(await db.session.count()).toBe(1); // the caller's own session survives
   const settings = await db.settings.findUniqueOrThrow({ where: { id: "main" } });
   expect(await verifyPassword("oldpassword", settings.passwordHash, settings.passwordSalt)).toBe(true);
+});
+
+test("changing the password rejects an oversized currentPassword", async () => {
+  const { hash, salt } = await hashPassword("oldpassword");
+  await db.settings.create({ data: { id: "main", passwordHash: hash, passwordSalt: salt } });
+
+  const { POST } = await import("@/app/api/admin/password/route");
+  const res = await POST(
+    await authed("/api/admin/password", {
+      currentPassword: "a".repeat(201),
+      newPassword: "brandnewpass",
+    }),
+  );
+
+  expect(res.status).toBe(400);
+});
+
+test("changing the password locks out after MAX_ATTEMPTS wrong current passwords", async () => {
+  setSystemTime(new Date("2026-01-01T00:00:00Z"));
+  const { hash, salt } = await hashPassword("oldpassword");
+  await db.settings.create({ data: { id: "main", passwordHash: hash, passwordSalt: salt } });
+  const { POST } = await import("@/app/api/admin/password/route");
+
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    const bad = await POST(
+      await authed("/api/admin/password", {
+        currentPassword: "wrongpassword",
+        newPassword: "brandnewpass",
+      }),
+    );
+    expect(bad.status).toBe(401);
+  }
+
+  // Even the right password is refused during the lockout.
+  const blocked = await POST(
+    await authed("/api/admin/password", {
+      currentPassword: "oldpassword",
+      newPassword: "brandnewpass",
+    }),
+  );
+  expect(blocked.status).toBe(429);
+  expect(blocked.headers.get("retry-after")).toBe(String(LOCKOUT_MS / 1000));
 });
 
 // ---- PATCH /api/monitors/reorder ----

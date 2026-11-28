@@ -192,8 +192,8 @@ export function tooManyAttempts(ip: string): boolean {
   return bucket ? bucketBlocked(bucket, now) : false;
 }
 
-/** Records one failed attempt; locks the bucket when the limit is crossed. */
-function recordFailure(bucket: ThrottleBucket, now: number) {
+/** Records one failed attempt; locks the bucket when `limit` is crossed. */
+function recordFailure(bucket: ThrottleBucket, now: number, limit: number) {
   if (bucket.blockedUntil !== 0) {
     if (now < bucket.blockedUntil) return; // already locked — don't extend it
     bucket.blockedUntil = 0;
@@ -201,7 +201,7 @@ function recordFailure(bucket: ThrottleBucket, now: number) {
   }
   bucket.failures = bucket.failures.filter((t) => now - t < WINDOW_MS);
   bucket.failures.push(now);
-  if (bucket.failures.length >= MAX_ATTEMPTS) {
+  if (bucket.failures.length >= limit) {
     bucket.blockedUntil = now + LOCKOUT_MS;
     bucket.failures = [];
   }
@@ -210,7 +210,7 @@ function recordFailure(bucket: ThrottleBucket, now: number) {
 export function recordAttempt(ip: string) {
   const state = throttleState();
   const now = Date.now();
-  recordFailure(state.global, now);
+  recordFailure(state.global, now, MAX_GLOBAL_ATTEMPTS);
   if (state.attempts.size >= MAX_TRACKED_IPS) {
     sweepExpired(now);
     // Still at the cap after sweeping (a genuine flood of live buckets):
@@ -218,7 +218,7 @@ export function recordAttempt(ip: string) {
     if (state.attempts.size >= MAX_TRACKED_IPS) state.attempts.clear();
   }
   const bucket = state.attempts.get(ip) ?? emptyBucket();
-  recordFailure(bucket, now);
+  recordFailure(bucket, now, MAX_ATTEMPTS);
   state.attempts.set(ip, bucket);
 }
 
@@ -228,6 +228,17 @@ export function retryAfterMs(ip: string): number {
   const now = Date.now();
   const until = Math.max(global.blockedUntil, attempts.get(ip)?.blockedUntil ?? 0);
   return until > now ? until - now : 0;
+}
+
+/** Returns a 429 response when this caller (or the global ceiling) is locked, else null. */
+export function throttleResponse(ip: string): NextResponse | null {
+  if (!tooManyAttempts(ip)) return null;
+  const retrySec = Math.ceil(retryAfterMs(ip) / 1000);
+  const minutes = Math.max(1, Math.ceil(retrySec / 60));
+  return NextResponse.json(
+    { error: `Too many attempts — try again in ${minutes} minute${minutes === 1 ? "" : "s"}` },
+    { status: 429, headers: { "retry-after": String(retrySec) } },
+  );
 }
 
 export function clearAttempts(ip: string) {

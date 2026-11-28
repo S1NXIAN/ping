@@ -50,11 +50,9 @@ export async function POST(req: NextRequest) {
   const methodErr = methodKeywordError({ method: method ?? "GET", keyword });
   if (methodErr) return NextResponse.json({ error: methodErr }, { status: 400 });
 
-  if (folderId) {
-    const folder = await db.folder.findUnique({ where: { id: folderId } });
-    if (!folder) {
-      return NextResponse.json({ error: "Folder not found" }, { status: 400 });
-    }
+  const folder = folderId ? await db.folder.findUnique({ where: { id: folderId } }) : null;
+  if (folderId && !folder) {
+    return NextResponse.json({ error: "Folder not found" }, { status: 400 });
   }
 
   // Same cap as import: keeps tick duration and DB size honest on free tier.
@@ -106,6 +104,6 @@ export async function POST(req: NextRequest) {
   // result just means the scheduler already had this monitor in flight.)
   runCheck(monitor).catch((e) => console.error("[PING] first check failed:", e));
 
-  const dto = toMonitorDTO(monitor, null, emptyStats(), []);
+  const dto = toMonitorDTO(monitor, folder, emptyStats(), []);
   return NextResponse.json(dto, { status: 201 });
 }

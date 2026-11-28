@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/ping-client";
 import type { SessionResponse } from "@/lib/ping-types";
 import { PingLogo } from "./ping-logo";
@@ -14,40 +14,42 @@ export function PingApp() {
   const [phase, setPhase] = useState<Phase>("booting");
   const [initialized, setInitialized] = useState(false);
   const [view, setView] = useState<"dashboard" | "admin">("dashboard");
+  const mounted = useRef(true);
 
   useEffect(() => {
-    let cancelled = false;
+    mounted.current = true;
     void (async () => {
       try {
         const s = await api<SessionResponse>("/api/auth/session");
-        if (cancelled) return;
+        if (!mounted.current) return;
         setInitialized(s.initialized);
         // A valid token inside the re-prompt window goes straight in; a valid
         // token whose window has lapsed shows the login screen again. The tab
         // is never interrupted once open — only a fresh visit re-prompts.
         setPhase(s.authenticated && s.windowOpen ? "app" : "login");
       } catch {
-        if (!cancelled) {
-          setInitialized(false);
-          setPhase("login");
-        }
+        if (!mounted.current) return;
+        setInitialized(false);
+        setPhase("login");
       }
     })();
     return () => {
-      cancelled = true;
+      mounted.current = false;
     };
   }, []);
 
-  /** Session died server-side (401) — return to login. */
-  const handleAuthLost = useCallback(() => {
+  /** Returns to login and syncs `initialized` in case the ephemeral DB reset. */
+  const returnToLogin = useCallback(() => {
     setView("dashboard");
     setPhase("login");
+    void api<SessionResponse>("/api/auth/session")
+      .then((s) => {
+        if (mounted.current) setInitialized(s.initialized);
+      })
+      .catch(() => {
+        /* server unreachable — keep current initialized guess */
+      });
   }, []);
-
-  function handleLogout() {
-    setView("dashboard");
-    setPhase("login");
-  }
 
   if (phase === "booting") {
     return (
@@ -63,6 +65,7 @@ export function PingApp() {
       <LoginView
         initialized={initialized}
         onAuthenticated={() => {
+          setInitialized(true);
           setPhase("app");
           setView("dashboard");
         }}
@@ -73,11 +76,11 @@ export function PingApp() {
   return view === "admin" ? (
     <AdminView
       onBack={() => setView("dashboard")}
-      onAuthLost={handleAuthLost}
+      onAuthLost={returnToLogin}
     />
   ) : (
     <DashboardView
-      onLogout={handleLogout}
+      onLogout={returnToLogin}
       onOpenAdmin={() => setView("admin")}
     />
   );

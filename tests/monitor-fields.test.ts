@@ -142,3 +142,12 @@ test("a HEAD monitor with a keyword is refused on import", async () => {
   });
   expect(imp.status).toBe(400);
 });
+
+test("create inside a folder returns that folder's name in the 201 payload", async () => {
+  const folder = await db.folder.create({ data: { name: "Render Free" } });
+  const res = await create({ url: "https://a.com", folderId: folder.id });
+  expect(res.status).toBe(201);
+  const dto = await res.json();
+  expect(dto.folderId).toBe(folder.id);
+  expect(dto.folderName).toBe("Render Free");
+});

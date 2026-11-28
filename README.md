@@ -50,11 +50,9 @@ only visible by looking at PING.
   fast sample cannot hide a slow one. The card shows an amber “slow” state, and
   the header counts slow monitors across the whole fleet; the detail sheet
   agrees.
-- **Incident postmortem notes** — from the Incidents sheet, attach a short
-  note (500 chars) to any derived incident, for your own later reference.
-  Notes are keyed to the incident's exact start, editable, removable, and
-  pruned once older than the 30-day incident window. Ongoing incidents are
-  pinned to the top of the list and can never be buried under newer ones.
+- **Incidents** — the Incidents sheet lists down periods derived from the last
+  30 days of checks. Ongoing incidents are pinned to the top of the list and
+  can never be buried under newer ones.
 - **Response-time chart with a time axis** — the monitor detail sheet's
   “Response time” section renders a real chart (1h / 24h / 7d ranges) with
   labelled time and ms axes, dashed gridlines, per-point markers, rose tick
@@ -164,8 +162,7 @@ without triggering checks.
 
 - Next.js (App Router) single-page app, dark theme, no chart
   libraries — the sparkline and uptime bars are hand-rolled SVG.
-- Prisma + SQLite: `Folder`, `Monitor`, `Check`, `IncidentNote`, `Session`,
-  `Settings`.
+- Prisma + SQLite: `Folder`, `Monitor`, `Check`, `Session`, `Settings`.
 - An in-process scheduler (via `instrumentation.ts`) wakes every 30 s and
   checks every enabled monitor whose interval elapsed (concurrency-capped).
 - Auth: scrypt password hash + opaque session tokens in httpOnly cookies. The
@@ -183,8 +180,8 @@ without triggering checks.
 | `POST /api/monitors/[id]/check` | run one check now |
 | `POST /api/folders`, `PATCH/DELETE /api/folders/[id]` | folders |
 | `POST /api/admin/password`, `GET/POST /api/admin/session` | password & re-prompt window |
-| `GET /api/admin/info`, `GET/POST /api/admin/retention` | runtime info & data retention |
-| `GET/POST/DELETE /api/incidents` | incident list + postmortem notes |
+| `GET /api/admin/info`, `POST /api/admin/retention` | runtime info & data retention |
+| `GET /api/incidents` | 30-day derived incident list |
 | `GET /api/render-status` | live status from status.render.com (5 min cache) |
 | `GET /api/export`, `POST /api/import` | backup / restore (monitors, folders) |
 | `GET /api/health` | public keep-alive ping, no DB access |

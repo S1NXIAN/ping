@@ -43,7 +43,6 @@ model Monitor {
   // this, the monitor shows a "slow/degraded" state. null = off for this
   // monitor.
   slowThresholdMs Int?
-  incidentNotes  IncidentNote[]
   createdAt      DateTime  @default(now())
   lastCheckAt    DateTime?
   lastStatus     String? // "up" | "down"
@@ -51,22 +50,6 @@ model Monitor {
   lastResponseMs Int?
   lastError      String?
   checks         Check[]
-}
-
-// A postmortem/acknowledgment note the admin attaches to one derived
-// incident (a down period). Matched to the incident by the exact timestamp
-// of its first failed check — the same key the incident derivation uses —
-// and shown in the admin incidents sheet under that incident.
-model IncidentNote {
-  id        String   @id @default(cuid())
-  monitorId String
-  monitor   Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
-  startedAt DateTime // first failed check of the incident
-  note      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([monitorId, startedAt])
 }
 
 // One health-check result. Only real, recorded checks exist here.

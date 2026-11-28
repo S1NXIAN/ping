@@ -8,9 +8,8 @@ import {
   getSettings,
   hashPassword,
   recordAttempt,
-  retryAfterMs,
   setSessionCookie,
-  tooManyAttempts,
+  throttleResponse,
 } from "@/lib/ping-auth";
 import { ensureSelfMonitor, requestOrigin } from "@/lib/self-monitor";
 
@@ -20,14 +19,8 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   const ip = clientIp(req);
-  if (tooManyAttempts(ip)) {
-    const retrySec = Math.ceil(retryAfterMs(ip) / 1000);
-    const minutes = Math.max(1, Math.ceil(retrySec / 60));
-    return NextResponse.json(
-      { error: `Too many attempts — try again in ${minutes} minute${minutes === 1 ? "" : "s"}` },
-      { status: 429, headers: { "retry-after": String(retrySec) } },
-    );
-  }
+  const throttled = throttleResponse(ip);
+  if (throttled) return throttled;
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);

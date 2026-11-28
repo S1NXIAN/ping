@@ -198,14 +198,6 @@ export interface AdminInfoResponse {
   };
 }
 
-/** GET /api/admin/retention — current data-retention configuration. */
-export interface RetentionResponse {
-  /** Raw setting: null = default (30 days + 1,000/monitor cap), 0 = forever. */
-  retentionDays: number | null;
-  lastPrunedAt: string | null;
-  lastPrunedCount: number | null;
-}
-
 export interface ImportResult {
   created: number;
   skipped: number;

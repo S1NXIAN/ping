@@ -92,6 +92,15 @@ test("databaseFileSize reads the real file the app opens", () => {
   expect(databaseFileSize("file:./db/x.db", root)).toBe(5);
 });
 
+test("databaseFileSize strips query parameters from the file URL", () => {
+  const root = mkdtempSync(join(tmpdir(), "ping-size-q-"));
+  mkdirSync(join(root, "prisma", "db"), { recursive: true });
+  writeFileSync(join(root, "prisma", "schema.prisma"), "// anchor");
+  writeFileSync(join(root, "prisma", "db", "x.db"), "hello");
+  expect(databaseFileSize("file:./db/x.db?cache=shared", root)).toBe(5);
+  expect(databaseFileSize(`file:${join(root, "prisma", "db", "x.db")}?connection_limit=1`, root)).toBe(5);
+});
+
 test("databaseFileSize returns null for a missing file or non-file URL", () => {
   expect(databaseFileSize(undefined)).toBeNull();
   expect(databaseFileSize("postgresql://user:pw@host/db")).toBeNull();

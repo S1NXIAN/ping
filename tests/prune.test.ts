@@ -32,7 +32,16 @@ test("the default policy caps a monitor at the newest 1000 checks", async () => 
   const { deleted } = await pruneChecks();
 
   expect(deleted).toBe(5);
-  expect(await db.check.count({ where: { monitorId: m.id } })).toBe(MAX_CHECKS_PER_MONITOR);
+  const remaining = await db.check.findMany({
+    where: { monitorId: m.id },
+    orderBy: { checkedAt: "asc" },
+    select: { checkedAt: true },
+  });
+  expect(remaining).toHaveLength(MAX_CHECKS_PER_MONITOR);
+  // The 5 oldest (i = 0..4) were removed; i = 5 is now the oldest kept and the
+  // newest (i = MAX_CHECKS_PER_MONITOR + 4) survived.
+  expect(remaining[0]!.checkedAt.getTime()).toBe(base - MAX_CHECKS_PER_MONITOR * 60_000);
+  expect(remaining[remaining.length - 1]!.checkedAt.getTime()).toBe(base - 60_000);
 });
 
 test("an explicit N-day policy deletes only checks older than N days", async () => {
@@ -69,30 +78,4 @@ test("keep-forever (0) deletes no checks at all", async () => {
 
   expect(deleted).toBe(0);
   expect(await db.check.count({ where: { monitorId: m.id } })).toBe(2);
-});
-
-// Incident postmortem notes are keyed to a derived incident's exact start, and
-// a derived incident never reaches further back than the lookback window — so a
-// note older than the lookback can never match again and is pruned. This is a
-// different clock from the retention setting: it must hold even when history is
-// kept forever.
-test("a note past the incident lookback is pruned; a note inside it is kept", async () => {
-  const { pruneChecks } = await import("@/lib/retention");
-  const { INCIDENT_LOOKBACK_DAYS } = await import("@/lib/incidents");
-  const m = await db.monitor.create({ data: { name: "svc", url: "https://svc.example.com" } });
-  const now = Date.now();
-  const days = (d: number) => new Date(now - d * 86400_000);
-  // One day either side of the lookback boundary.
-  await db.incidentNote.createMany({
-    data: [
-      { monitorId: m.id, startedAt: days(INCIDENT_LOOKBACK_DAYS + 1), note: "too old" },
-      { monitorId: m.id, startedAt: days(INCIDENT_LOOKBACK_DAYS - 1), note: "still in range" },
-    ],
-  });
-  await setRetention(0); // keep check history forever — notes are pruned anyway
-
-  await pruneChecks();
-
-  const left = await db.incidentNote.findMany({ select: { note: true } });
-  expect(left.map((n) => n.note)).toEqual(["still in range"]);
 });

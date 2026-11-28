@@ -106,3 +106,23 @@ test("the check writes both the history row and the monitor's last status", asyn
   // contradicts.
   expect(await db.check.count({ where: { monitorId: m.id } })).toBe(1);
 });
+
+test("a 4xx/5xx error response cancels its unread body stream", async () => {
+  let cancelled = false;
+  const body = new ReadableStream({
+    pull(controller) {
+      controller.enqueue(new TextEncoder().encode("error page"));
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+  globalThis.fetch = mock(
+    async () => new Response(body, { status: 502, statusText: "Bad Gateway" }),
+  ) as unknown as typeof fetch;
+
+  const { runCheck } = await import("@/lib/checker");
+  const c = await runCheck(await monitor());
+  expect(c!.status).toBe("down");
+  expect(cancelled).toBe(true);
+});

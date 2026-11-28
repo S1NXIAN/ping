@@ -180,28 +180,32 @@ async function runCheckInner(monitor: Monitor): Promise<Check> {
       },
     });
     statusCode = res.status;
+    let bodyRead = false;
     if (res.status >= 200 && res.status < 400) {
       status = "up";
       if (keyword) {
         // Body read stays inside the check timeout (same AbortSignal) and
         // any transport error while reading marks the check down honestly.
+        bodyRead = true;
         const body = await readBodyUpTo(res, KEYWORD_BODY_LIMIT_BYTES);
         const kwError = keywordFailure(monitor.keywordMode, keyword, body);
         if (kwError) {
           status = "down";
           error = kwError;
         }
-      } else {
-        // Release the body without fully downloading it — status line is enough.
-        try {
-          await res.body?.cancel();
-        } catch {
-          /* ignore */
-        }
       }
     } else {
       status = "down";
       error = `HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ""}`;
+    }
+    if (!bodyRead) {
+      // Release unread bodies (no-keyword 2xx/3xx and 4xx/5xx error pages)
+      // without downloading them so sockets close promptly.
+      try {
+        await res.body?.cancel();
+      } catch {
+        /* stream already closed or errored */
+      }
     }
   } catch (e) {
     status = "down";

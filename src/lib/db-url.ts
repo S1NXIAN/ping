@@ -74,7 +74,7 @@ export function databaseFileSize(
   const url = resolveDatabaseUrl(raw, cwd);
   if (!url || !url.startsWith(FILE_PREFIX)) return null;
   try {
-    return statSync(url.slice(FILE_PREFIX.length)).size;
+    return statSync(url.slice(FILE_PREFIX.length).split("?")[0]).size;
   } catch {
     return null;
   }

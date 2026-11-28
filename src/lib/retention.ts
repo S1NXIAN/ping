@@ -4,7 +4,6 @@
 // behaviour, this for how long history is kept).
 import { db } from "./db";
 import { runtimeState } from "./checker";
-import { INCIDENT_LOOKBACK_DAYS } from "./incidents";
 
 /** Default days of check history to keep (the "default" policy). */
 const RETENTION_DAYS = 30;
@@ -36,9 +35,7 @@ async function getRetentionPolicy(): Promise<RetentionPolicy> {
 
 /**
  * Prunes old check history according to the configured retention policy (see
- * getRetentionPolicy) and drops incident notes past the incident lookback.
- * Only check history respects the retention setting; the note cleanup is tied
- * to the fixed lookback. (Expired sessions are cleaned in ping-auth.ts.)
+ * getRetentionPolicy). (Old sessions are cleaned in ping-auth.ts.)
  */
 export async function pruneChecks(): Promise<{ deleted: number }> {
   const policy = await getRetentionPolicy();
@@ -55,25 +52,21 @@ export async function pruneChecks(): Promise<{ deleted: number }> {
     for (const m of monitors) {
       const count = await db.check.count({ where: { monitorId: m.id } });
       if (count > MAX_CHECKS_PER_MONITOR) {
-        const keep = await db.check.findMany({
-          where: { monitorId: m.id },
-          orderBy: { checkedAt: "desc" },
-          take: MAX_CHECKS_PER_MONITOR,
-          select: { id: true },
-        });
-        const r = await db.check.deleteMany({
-          where: { monitorId: m.id, id: { notIn: keep.map((k) => k.id) } },
-        });
-        deleted += r.count;
+        // Single atomic statement so a check written concurrently cannot slip
+        // between reading the keep list and deleting the rest.
+        const removed = await db.$executeRaw`
+          DELETE FROM "Check"
+          WHERE monitorId = ${m.id}
+            AND id NOT IN (
+              SELECT id FROM "Check"
+              WHERE monitorId = ${m.id}
+              ORDER BY checkedAt DESC, id DESC
+              LIMIT ${MAX_CHECKS_PER_MONITOR}
+            )`;
+        deleted += removed;
       }
     }
   }
-
-  // Incident notes older than the incident lookback can never match a derived
-  // incident again — tied to that fixed window, not the retention setting.
-  await db.incidentNote.deleteMany({
-    where: { startedAt: { lt: new Date(Date.now() - INCIDENT_LOOKBACK_DAYS * 86400_000) } },
-  });
 
   runtimeState.lastPrunedAt = new Date().toISOString();
   runtimeState.lastPrunedCount = deleted;

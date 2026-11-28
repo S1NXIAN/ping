@@ -4,9 +4,8 @@ import { db } from "@/lib/db";
 import { guard } from "@/lib/ping-auth";
 import { runtimeState } from "@/lib/checker";
 import { pruneChecks } from "@/lib/retention";
-import type { RetentionResponse } from "@/lib/ping-types";
 
-async function responseBody(): Promise<RetentionResponse> {
+async function retentionStatus() {
   const settings = await db.settings.findUnique({
     where: { id: "main" },
     select: { retentionDays: true },
@@ -16,16 +15,6 @@ async function responseBody(): Promise<RetentionResponse> {
     lastPrunedAt: runtimeState.lastPrunedAt,
     lastPrunedCount: runtimeState.lastPrunedCount,
   };
-}
-
-/** Current retention configuration. */
-export async function GET(req: NextRequest) {
-  const unauthorized = await guard(req);
-  if (unauthorized) return unauthorized;
-
-  return NextResponse.json(await responseBody(), {
-    headers: { "Cache-Control": "no-store" },
-  });
 }
 
 const actionSchema = z.union([
@@ -71,7 +60,7 @@ export async function POST(req: NextRequest) {
       where: { id: "main" },
       data: { retentionDays: parsed.data.days },
     });
-    const r = await responseBody();
+    const r = await retentionStatus();
     return NextResponse.json({
       ...r,
       applied:
@@ -85,6 +74,6 @@ export async function POST(req: NextRequest) {
 
   // action === "prune": applies the CURRENT policy immediately.
   const result = await pruneChecks();
-  const r = await responseBody();
+  const r = await retentionStatus();
   return NextResponse.json({ ...r, deleted: result.deleted });
 }
