@@ -667,7 +667,7 @@ export function DashboardView({
 
           {/* Scope summary — one strip, one live trace. The generous break
               below separates overview from the working group. */}
-          <StatsStrip summary={summary} monitors={scopedMonitors} />
+          <StatsStrip summary={summary} />
 
           {/* working group: toolbar + list — one tight unit (10px internal rhythm) */}
           <div className="space-y-2.5">

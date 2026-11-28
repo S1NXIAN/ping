@@ -19,8 +19,6 @@ interface TracePoint {
 
 interface TraceModel {
   paths: string[];
-  upTicks: { x: number; y: number }[];
-  downXs: number[];
   aria: string;
 }
 
@@ -106,19 +104,7 @@ export function StatTrace({ monitors }: { monitors: MonitorDTO[] }) {
     }
     if (current.length > 1) paths.push(current.join(" "));
 
-    // Isolated real samples (a monitor that checks far less often than the
-    // fleet) still deserve a mark instead of disappearing with the line.
-    const upTicks: { x: number; y: number }[] = [];
-    for (let i = 0; i < up.length; i++) {
-      const prevGap = i === 0 ? Infinity : up[i].t - up[i - 1].t;
-      const nextGap = i === up.length - 1 ? Infinity : up[i + 1].t - up[i].t;
-      if (prevGap > gapCut && nextGap > gapCut) {
-        upTicks.push({ x: xOf(up[i].t), y: yOf(up[i].ms) });
-      }
-    }
-
-    const downXs = recent.filter((p) => p.down).map((p) => xOf(p.t));
-    const downCount = downXs.length;
+    const downCount = recent.filter((p) => p.down).length;
     const latest = up.length ? up[up.length - 1] : null;
     const aria =
       `Response-time trace of ${recent.length} recent checks` +
@@ -126,7 +112,7 @@ export function StatTrace({ monitors }: { monitors: MonitorDTO[] }) {
       (latest ? `, latest ${formatMs(latest.ms)}` : "") +
       ". Line breaks mean no checks were recorded.";
 
-    return { paths, upTicks, downXs, aria };
+    return { paths, aria };
   }, [monitors]);
 
   if (!model) return null;
@@ -140,19 +126,6 @@ export function StatTrace({ monitors }: { monitors: MonitorDTO[] }) {
         role="img"
         aria-label={model.aria}
       >
-        {[0.25, 0.5, 0.75].map((f) => (
-          <line
-            key={f}
-            x1={VB_W * f}
-            x2={VB_W * f}
-            y1={TRACE_TOP}
-            y2={TRACE_BOTTOM}
-            stroke="currentColor"
-            strokeWidth="1"
-            vectorEffect="non-scaling-stroke"
-            className="text-muted-foreground/10"
-          />
-        ))}
         {model.paths.map((d, i) => (
           <path
             key={i}
@@ -169,38 +142,7 @@ export function StatTrace({ monitors }: { monitors: MonitorDTO[] }) {
             style={{ animationDelay: `${Math.min(i * 70, 420)}ms` }}
           />
         ))}
-        {model.upTicks.map((tick, i) => (
-          <line
-            key={`t${i}`}
-            x1={tick.x}
-            x2={tick.x}
-            y1={tick.y - 2}
-            y2={tick.y + 2}
-            stroke="currentColor"
-            strokeWidth="1"
-            vectorEffect="non-scaling-stroke"
-            opacity="0.4"
-            className="text-teal"
-          />
-        ))}
-        {model.downXs.map((x, i) => (
-          <line
-            key={i}
-            x1={x}
-            x2={x}
-            y1={TRACE_BOTTOM}
-            y2={TRACE_BOTTOM - 12}
-            stroke="currentColor"
-            strokeWidth="1.5"
-            vectorEffect="non-scaling-stroke"
-            opacity="0.6"
-            className="text-down"
-          />
-        ))}
       </svg>
-      <div aria-hidden="true" className="ping-scan absolute inset-y-0 left-0 w-full">
-        <div className="absolute inset-y-0 left-0 w-px bg-primary/[0.12]" />
-      </div>
     </div>
   );
 }
