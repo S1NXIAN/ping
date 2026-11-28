@@ -692,9 +692,9 @@ body::before {
   top: 0;
   bottom: 0;
   left: 0;
-  width: 1px;
+  width: 2px;
   background: var(--foreground);
-  opacity: 0.2;
+  opacity: 0.9;
   animation: ping-stats-sweep 7s linear infinite;
 }
 /* Empty band: the faintest sweep on the track still shows PING is watching. */
@@ -704,9 +704,9 @@ body::before {
   top: 0;
   bottom: 0;
   left: 0;
-  width: 1px;
+  width: 2px;
   background: var(--foreground);
-  opacity: 0.1;
+  opacity: 0.35;
   animation: ping-stats-sweep 7s linear infinite;
 }
 /* Real-check pulse: same light, faster and brighter, once. */
@@ -715,7 +715,7 @@ body::before {
   top: 0;
   bottom: 0;
   left: 0;
-  width: 1px;
+  width: 2px;
   background: var(--foreground);
   animation: ping-stats-pulse 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
