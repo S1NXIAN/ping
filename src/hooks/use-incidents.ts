@@ -21,7 +21,8 @@ async function fetchIncidents(folderId: string | null): Promise<IncidentDTO[]> {
 const byOngoing = (i: IncidentDTO): boolean => i.state === "ongoing";
 
 /** The newest incident start in a loaded list, as epoch ms (0 for an empty
- *  list). Opening the sheet records this, so the badge clears. */
+ *  list). Closing the sheet records this, so the badge clears for what the
+ *  operator saw. */
 export function newestIncidentStart(incidents: IncidentDTO[]): number {
   return incidents.reduce((max, i) => Math.max(max, Date.parse(i.startedAt)), 0);
 }
@@ -32,18 +33,49 @@ export function ongoingIncidentCount(incidents: IncidentDTO[]): number {
 }
 
 /**
- * The incidents badge count: every ongoing incident (unresolved, so it keeps
- * asking for attention) plus every paused or closed incident that started after
- * the last time the sheet was opened (`seenStartedAt`). A paused monitor's open
- * incident has no check left to close it, so it clears like viewed history
- * instead of asking forever.
+ * The incidents badge count and the sheet's "New" group: every incident that
+ * started after the last time the sheet was closed. An ongoing incident is not
+ * exempt — the header's down count, the cards and the tab title already carry
+ * a current outage, so the badge stays a pure "what happened since I looked".
  */
 export function unseenIncidentCount(
   incidents: IncidentDTO[],
   seenStartedAt: number,
 ): number {
-  return incidents.filter((i) => byOngoing(i) || Date.parse(i.startedAt) > seenStartedAt)
-    .length;
+  return incidents.filter((i) => isUnseen(i, seenStartedAt)).length;
+}
+
+/** One incident is unread until a list containing it was seen after it began. */
+function isUnseen(inc: IncidentDTO, seenStartedAt: number): boolean {
+  return Date.parse(inc.startedAt) > seenStartedAt;
+}
+
+const byNewest = (a: IncidentDTO, b: IncidentDTO) =>
+  Date.parse(b.startedAt) - Date.parse(a.startedAt);
+
+/**
+ * The sheet's three display groups: unread incidents first, then ongoing ones
+ * the badge no longer counts, then the rest of the history. Each newest-first,
+ * so "New" reads in the same order it was counted — including an ongoing
+ * incident that is both unread and still down.
+ */
+export function groupIncidents(
+  incidents: IncidentDTO[],
+  seenStartedAt: number,
+): { unseen: IncidentDTO[]; ongoing: IncidentDTO[]; earlier: IncidentDTO[] } {
+  const unseen: IncidentDTO[] = [];
+  const ongoing: IncidentDTO[] = [];
+  const earlier: IncidentDTO[] = [];
+  for (const inc of incidents) {
+    if (isUnseen(inc, seenStartedAt)) unseen.push(inc);
+    else if (byOngoing(inc)) ongoing.push(inc);
+    else earlier.push(inc);
+  }
+  return {
+    unseen: unseen.sort(byNewest),
+    ongoing: ongoing.sort(byNewest),
+    earlier: earlier.sort(byNewest),
+  };
 }
 
 /** The ONGOING incident's real first failed check per monitor. A paused open
@@ -140,6 +172,9 @@ export function useIncidents(
     unseenCount,
     ongoingCount,
     downSince,
+    /** The watermark the projections above were computed against, so the sheet
+     *  can group the same list the badge counted. */
+    seenStartedAt: seenIncidentsAt,
     markViewed,
     refresh: loadIncidents,
   };

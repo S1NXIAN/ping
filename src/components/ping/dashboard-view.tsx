@@ -163,6 +163,7 @@ export function DashboardView({
     unseenCount: incidentCount,
     ongoingCount,
     downSince: downSinceByMonitor,
+    seenStartedAt,
     markViewed: markIncidentsViewed,
     refresh: refreshIncidents,
   } = useIncidents(scopeFolderId, data);
@@ -170,6 +171,15 @@ export function DashboardView({
   // Palette-initiated delete — confirmed here with the same consequence copy
   // as the card's dialog (the palette itself can't host a confirm step).
   const [paletteDelete, setPaletteDelete] = useState<{ id: string; name: string } | null>(null);
+
+  // The watermark the sheet groups against, frozen when it opens. Closing
+  // advances the live watermark, and the exit animation is still on screen —
+  // grouping against the live one would visibly shuffle rows as it slides out.
+  const [incidentsShownAt, setIncidentsShownAt] = useState(0);
+  const openIncidents = useCallback(() => {
+    setIncidentsShownAt(seenStartedAt);
+    setIncidentsOpen(true);
+  }, [seenStartedAt]);
 
   // drag-and-drop reorder (manual sort only) — the hook owns pointer tracking,
   // the live preview, and the FLIP motion; this view only persists the result.
@@ -748,7 +758,7 @@ export function DashboardView({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setIncidentsOpen(true)}
+              onClick={openIncidents}
               className={cn(
                 "relative h-11 gap-1 px-1.5 text-[10px] sm:h-9 sm:gap-1.5 sm:px-3 sm:text-xs",
                 // Rose state voice: the /10 wash
@@ -756,7 +766,7 @@ export function DashboardView({
                 incidentCount > 0 &&
                   "border-down/40 bg-down/10 text-down hover:bg-down/10 hover:text-down",
               )}
-              aria-label={`Incidents${incidentCount > 0 ? ` (${incidentCount} to review)` : ""}`}
+              aria-label={`Incidents${incidentCount > 0 ? ` (${incidentCount} new)` : ""}`}
               title="Incidents — down periods over the last 30 days"
             >
               <AlertTriangle className="size-4" aria-hidden="true" />
@@ -861,7 +871,7 @@ export function DashboardView({
                   onEdited={() => refresh(true)}
                   onDeleted={() => refresh(true)}
                   onCheckNow={() => refresh(true)}
-                  onViewIncidents={() => setIncidentsOpen(true)}
+                  onViewIncidents={openIncidents}
                   downSince={downSinceByMonitor.get(m.id) ?? null}
                   canReorder={sortMode === "manual" && visible.length > 1}
                   canMoveUp={mi > 0}
@@ -930,6 +940,7 @@ export function DashboardView({
         incidents={incidents}
         error={incidentsError}
         ongoingCount={ongoingCount}
+        seenStartedAt={incidentsShownAt}
         onViewed={markIncidentsViewed}
         onRefresh={refreshIncidents}
       />
@@ -943,7 +954,7 @@ export function DashboardView({
         sortMode={sortMode}
         onNewMonitor={() => setAddOpen(true)}
         onRefresh={() => refresh()}
-        onOpenIncidents={() => setIncidentsOpen(true)}
+        onOpenIncidents={openIncidents}
         onOpenSettings={onOpenAdmin}
         onLogout={logout}
         onSelectMonitor={(id) => setDetailId(id)}

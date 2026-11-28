@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, ShieldQuestion } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -12,9 +12,12 @@ import {
 } from "@/components/ui/sheet";
 import { formatDateTime, timeAgo } from "@/lib/ping-client";
 import type { IncidentDTO, IncidentState } from "@/lib/ping-types";
+import { groupIncidents } from "@/hooks/use-incidents";
+import { cn } from "@/lib/utils";
 import { StatusPill, type PillTone } from "./status-pill";
 import { EmptyState } from "./empty-state";
 import { InlineAlert } from "./inline-alert";
+import { SectionLabel } from "./section-label";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const STATE_PILL: Record<IncidentState, { label: string; tone: PillTone }> = {
@@ -24,9 +27,9 @@ const STATE_PILL: Record<IncidentState, { label: string; tone: PillTone }> = {
   resolved: { label: "resolved", tone: "up" },
 };
 
-/** Admin view of the last 30 days of incidents (derived from real checks). The
- *  list and the seen watermark are owned by the dashboard's Incident state, so
- *  the badge and this sheet never disagree. */
+/** Admin view of the last 30 days of incidents (derived from real checks), the
+ *  unread ones split out on top. The list and the seen watermark are owned by
+ *  the dashboard's Incident state, so the badge and this sheet never disagree. */
 export function IncidentsSheet({
   open,
   onOpenChange,
@@ -34,6 +37,7 @@ export function IncidentsSheet({
   incidents,
   error,
   ongoingCount,
+  seenStartedAt,
   onViewed,
   onRefresh,
 }: {
@@ -45,8 +49,11 @@ export function IncidentsSheet({
   incidents: IncidentDTO[] | null;
   error: string | null;
   ongoingCount: number;
-  /** Called once with the list each time the sheet opens, so the badge clears
-   *  for what the operator actually saw. */
+  /** The watermark the badge counted against, frozen when the sheet opened:
+   *  everything newer than it is "New" here. */
+  seenStartedAt: number;
+  /** Called once with the list each time the sheet closes, so the badge clears
+   *  only for a list that was actually on screen. */
   onViewed: (incidents: IncidentDTO[]) => void;
   /** One background refresh on open, so the list is current when shown. */
   onRefresh: () => Promise<void>;
@@ -55,27 +62,27 @@ export function IncidentsSheet({
   // so a re-render never produces a different number from the same props, and
   // ticked while open so a long outage's duration stays honest.
   const [now, setNow] = useState(() => Date.now());
-  const markedRef = useRef(false);
 
   useEffect(() => {
-    if (!open) {
-      markedRef.current = false;
-      return;
-    }
+    if (!open) return;
     setNow(Date.now());
     void onRefresh();
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
   }, [open, onRefresh]);
 
-  useEffect(() => {
-    if (!open || !incidents || markedRef.current) return;
-    markedRef.current = true;
-    onViewed(incidents);
-  }, [open, incidents, onViewed]);
+  // The watermark advances only when the sheet closes (below), so the rows the
+  // badge counted stay in "New" for as long as the sheet is on screen. A list
+  // that never loaded marks nothing, so a failed fetch cannot silence the badge.
+  function handleOpenChange(next: boolean) {
+    if (!next && incidents) onViewed(incidents);
+    onOpenChange(next);
+  }
+
+  const groups = incidents ? groupIncidents(incidents, seenStartedAt) : null;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent side="right" className="flex w-full max-w-md flex-col gap-0 p-0 sm:max-w-md">
         <SheetHeader className="border-b px-4 py-4">
           <SheetTitle className="flex items-center gap-2 text-base">
@@ -112,14 +119,15 @@ export function IncidentsSheet({
           />
         ) : (
           <ScrollArea className="min-h-0 flex-1">
-            <div className="space-y-2.5 px-4 py-4">
-              {(incidents ?? []).map((inc, i) => (
-                <IncidentRow
-                  key={`${inc.monitorId}-${inc.startedAt}-${i}`}
-                  inc={inc}
-                  now={now}
-                />
-              ))}
+            <div className="space-y-4 px-4 py-4">
+              <IncidentGroup
+                label={`New (${groups?.unseen.length ?? 0})`}
+                className="text-foreground"
+                incidents={groups?.unseen ?? []}
+                now={now}
+              />
+              <IncidentGroup label="Ongoing" incidents={groups?.ongoing ?? []} now={now} />
+              <IncidentGroup label="Earlier" incidents={groups?.earlier ?? []} now={now} />
             </div>
           </ScrollArea>
         )}
@@ -142,6 +150,35 @@ function formatRange(startedAt: string, endedAt: string | null, state: IncidentS
       ? ended.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
       : formatDateTime(endedAt);
   return `${formatDateTime(startedAt)} → ${end}`;
+}
+
+/**
+ * One labelled run of rows. "New" carries the count the badge showed, in
+ * foreground ink so it leads the eye; an empty group renders nothing at all,
+ * so an all-seen sheet looks like the plain history it is.
+ */
+function IncidentGroup({
+  label,
+  className,
+  incidents,
+  now,
+}: {
+  label: string;
+  className?: string;
+  incidents: IncidentDTO[];
+  now: number;
+}) {
+  if (incidents.length === 0) return null;
+  return (
+    <section>
+      <SectionLabel className={cn("mb-2", className)}>{label}</SectionLabel>
+      <div className="space-y-2.5">
+        {incidents.map((inc, i) => (
+          <IncidentRow key={`${inc.monitorId}-${inc.startedAt}-${i}`} inc={inc} now={now} />
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function IncidentRow({ inc, now }: { inc: IncidentDTO; now: number }) {
