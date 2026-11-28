@@ -1,13 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Loader2, LockKeyhole, ShieldCheck } from "lucide-react";
 import { api, ApiError } from "@/lib/ping-client";
-import { PingLogo, PingWordmark } from "./ping-logo";
-import { InlineAlert } from "./inline-alert";
+import { PingLogo } from "./ping-logo";
 
 export function LoginView({
   initialized,
@@ -61,92 +56,112 @@ export function LoginView({
   }
 
   return (
-    <main className="ping-ambient relative flex min-h-dvh flex-col items-center justify-center px-4 py-10">
-      <div className="ping-fade-up relative z-10 w-full max-w-sm">
-        <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <PingLogo className="size-14 ping-breathe" />
-          <PingWordmark className="text-2xl" />
-          <p className="max-w-[280px] text-sm leading-relaxed text-muted-foreground">
-            Lightweight HTTP checks and monitoring for free-tier services.
-          </p>
-        </div>
+    <main className={busy ? "ping-login is-busy" : "ping-login"}>
+      <div className="ping-login-graticule" aria-hidden="true" />
 
-        <form
-          onSubmit={submit}
-          className="rounded-xl border bg-card p-5 shadow-lg shadow-black/30"
-        >
-          <div className="mb-4 flex items-center gap-2 text-sm font-medium">
-            {isSetup ? (
-              <ShieldCheck className="size-4 text-teal" aria-hidden="true" />
-            ) : (
-              <LockKeyhole className="size-4 text-primary" aria-hidden="true" />
-            )}
-            {isSetup ? "Create your dashboard password" : "Sign in to PING"}
-          </div>
-
-          <div className="space-y-3.5">
-            <div className="space-y-1.5">
-              <Label htmlFor="password">{isSetup ? "Password" : "Password"}</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={show ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={isSetup ? "At least 8 characters" : "••••••••"}
-                  autoComplete={isSetup ? "new-password" : "current-password"}
-                  autoFocus
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShow((s) => !s)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus-ring"
-                  aria-label={show ? "Hide password" : "Show password"}
-                >
-                  {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </button>
-              </div>
-            </div>
-
-            {isSetup && (
-              <div className="space-y-1.5">
-                <Label htmlFor="confirm">Confirm password</Label>
-                <Input
-                  id="confirm"
-                  type={show ? "text" : "password"}
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  placeholder="Repeat it"
-                  autoComplete="new-password"
-                />
-              </div>
-            )}
-
-            {error && <InlineAlert className="leading-relaxed">{error}</InlineAlert>}
-
-            {/* Render-style primary CTA: white button, black text */}
-            <Button
-              type="submit"
-              disabled={busy}
-              className="h-10 w-full bg-white text-black font-semibold hover:bg-zinc-200 disabled:opacity-60"
-            >
-              {busy ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" /> Please wait…
-                </>
-              ) : isSetup ? (
-                "Secure my dashboard"
-              ) : (
-                "Sign in"
-              )}
-            </Button>
-          </div>
-        </form>
+      <div className="ping-login-head">
+        <span className="ping-login-live">
+          <i aria-hidden="true" />
+          {busy ? "Authenticating" : "Idle"}
+        </span>
+        <span>Display only</span>
       </div>
 
-      <footer className="absolute bottom-4 left-0 right-0 z-10 text-center text-[11px] text-muted-foreground/70">
-        PING is an independent tool — not affiliated with any hosting provider
+      <form onSubmit={submit} className="ping-login-panel">
+        <PingLogo className="ping-login-tile" />
+        <h1 className="ping-login-title">PING.</h1>
+        <p className="ping-login-sub">Sign in to watch what your services actually do.</p>
+
+        <div className="ping-login-line">
+          <label htmlFor="password" className="ping-login-label">
+            {isSetup ? "Set a passphrase" : "Passphrase"}
+          </label>
+          <div className="ping-login-entry">
+            <input
+              id="password"
+              className="ping-login-input"
+              type={show ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={isSetup ? "at least 8 characters" : "••••••••"}
+              autoComplete={isSetup ? "new-password" : "current-password"}
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={() => setShow((s) => !s)}
+              className="ping-login-eye"
+              aria-label={show ? "Hide password" : "Show password"}
+            >
+              {show ? "Hide" : "Show"}
+            </button>
+          </div>
+        </div>
+
+        {isSetup && (
+          <div className="ping-login-line">
+            <label htmlFor="confirm" className="ping-login-label">
+              Confirm
+            </label>
+            <div className="ping-login-entry">
+              <input
+                id="confirm"
+                className="ping-login-input"
+                type={show ? "text" : "password"}
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="repeat it"
+                autoComplete="new-password"
+              />
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <p className="ping-login-err" role="alert">
+            {error}
+          </p>
+        )}
+
+        <button type="submit" disabled={busy} className="ping-login-go">
+          {busy ? "Please wait…" : isSetup ? "Secure my dashboard" : "Sign in"}
+        </button>
+        <p className="ping-login-note">Single operator · local instance</p>
+      </form>
+
+      <svg
+        className="ping-login-trace"
+        viewBox="0 0 1600 260"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <path
+          className="ping-login-wave"
+          pathLength={1000}
+          d="M0 150 H150 l12 0 l6 -16 l8 28 l7 -44 l8 58 l7 -38 l5 12 l4 0 H470 l12 0 l6 -10 l7 18 l6 -26 l7 32 l6 -18 l4 4 l3 0 H760"
+        />
+        {/* unmeasured stretch: drawn dashed, never joined by the pulse */}
+        <path className="ping-login-gap" d="M760 150 H960" />
+        <path
+          className="ping-login-wave"
+          pathLength={1000}
+          d="M960 150 H1080 l12 0 l7 -34 l8 50 l8 -88 l10 116 l8 -62 l5 18 l4 0 H1300 l14 0 l6 -14 l7 22 l6 -24 l6 16 l4 0 H1600"
+        />
+        <path
+          className="ping-login-pulse"
+          pathLength={1000}
+          d="M0 150 H150 l12 0 l6 -16 l8 28 l7 -44 l8 58 l7 -38 l5 12 l4 0 H470 l12 0 l6 -10 l7 18 l6 -26 l7 32 l6 -18 l4 4 l3 0 H760"
+        />
+        <path
+          className="ping-login-pulse ping-login-pulse-b"
+          pathLength={1000}
+          d="M960 150 H1080 l12 0 l7 -34 l8 50 l8 -88 l10 116 l8 -62 l5 18 l4 0 H1300 l14 0 l6 -14 l7 22 l6 -24 l6 16 l4 0 H1600"
+        />
+      </svg>
+
+      <footer className="ping-login-foot">
+        <span>Live service monitoring</span>
+        <span>Not affiliated with any hosting provider</span>
       </footer>
     </main>
   );
